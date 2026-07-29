@@ -178,10 +178,42 @@ fun OnboardingScreen(
                     .fillMaxHeight()
                     .verticalScroll(scrollState)
                     .statusBarsPadding()
-                    .padding(top = 80.dp) // Space for fixed header
                     .padding(horizontal = 20.dp)
                     .navigationBarsPadding()
             ) {
+                // ── Top App Bar (Scrollable) ─────────────────────────────
+                Row(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(top = 16.dp, bottom = 16.dp),
+                    horizontalArrangement = Arrangement.SpaceBetween,
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    IconButton(onClick = onBack) {
+                        Icon(
+                            imageVector = Icons.AutoMirrored.Filled.ArrowBack,
+                            contentDescription = "Go back",
+                            tint = MaterialTheme.colorScheme.primary
+                        )
+                    }
+                    Text(
+                        text = "Askvocate",
+                        style = MaterialTheme.typography.displayMedium.copy(
+                            fontWeight = FontWeight.Bold,
+                            fontSize = 28.sp,
+                            letterSpacing = (-0.5).sp
+                        ),
+                        color = MaterialTheme.colorScheme.primary
+                    )
+                    IconButton(onClick = { /* Profile */ }) {
+                        Icon(
+                            imageVector = Icons.Filled.AccountCircle,
+                            contentDescription = "Profile",
+                            tint = MaterialTheme.colorScheme.primary
+                        )
+                    }
+                }
+
                 // ── Header Section ────────────────────────────────────────
                 Column(
                     modifier = Modifier
@@ -244,49 +276,6 @@ fun OnboardingScreen(
                     .fillMaxHeight()
                     .padding(end = 8.dp)
             )
-        }
-
-        // ── Fixed Top App Bar ─────────────────────────────────────────────
-        Box(
-            modifier = Modifier
-                .fillMaxWidth()
-                .statusBarsPadding()
-                .shadow(
-                    elevation = 2.dp,
-                    shape = RoundedCornerShape(0.dp)
-                )
-                .background(MaterialTheme.colorScheme.surface.copy(alpha = 0.9f))
-                .padding(horizontal = 20.dp, vertical = 12.dp)
-        ) {
-            Row(
-                modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.SpaceBetween,
-                verticalAlignment = Alignment.CenterVertically
-            ) {
-                IconButton(onClick = onBack) {
-                    Icon(
-                        imageVector = Icons.AutoMirrored.Filled.ArrowBack,
-                        contentDescription = "Go back",
-                        tint = MaterialTheme.colorScheme.primary
-                    )
-                }
-                Text(
-                    text = "Askvocate",
-                    style = MaterialTheme.typography.displayMedium.copy(
-                        fontWeight = FontWeight.Bold,
-                        fontSize = 28.sp,
-                        letterSpacing = (-0.5).sp
-                    ),
-                    color = MaterialTheme.colorScheme.primary
-                )
-                IconButton(onClick = { /* Profile */ }) {
-                    Icon(
-                        imageVector = Icons.Filled.AccountCircle,
-                        contentDescription = "Profile",
-                        tint = MaterialTheme.colorScheme.primary
-                    )
-                }
-            }
         }
     }
 }
