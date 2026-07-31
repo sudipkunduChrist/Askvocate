@@ -57,8 +57,8 @@ fun AnimatedIllustration(
             .shadow(
                 elevation = 4.dp,
                 shape = RoundedCornerShape(24.dp),
-                ambientColor = Color(0x0D0B1F3A),
-                spotColor = Color(0x0D0B1F3A)
+                ambientColor = Color(0x0D000000),
+                spotColor = Color(0x0D000000)
             )
             .clip(RoundedCornerShape(24.dp))
             .background(Color.White.copy(alpha = 0.8f))
@@ -86,7 +86,6 @@ fun AnimatedIllustration(
                 }
             },
             error = {
-                // Placeholder gradient on error
                 Box(
                     modifier = Modifier
                         .fillMaxWidth()

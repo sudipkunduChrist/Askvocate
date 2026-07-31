@@ -17,6 +17,7 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.filled.Email
 import androidx.compose.material.icons.filled.Lock
+import androidx.compose.material.icons.filled.Person
 import androidx.compose.material.icons.filled.Visibility
 import androidx.compose.material.icons.filled.VisibilityOff
 import androidx.compose.material3.Divider
@@ -48,17 +49,40 @@ import com.example.askvocate.ui.components.GradientBackground
 import com.example.askvocate.ui.components.PrimaryButton
 
 /**
- * Login Screen — Premium glassmorphic authentication flow.
+ * Login / Signup Screen — Premium glassmorphic authentication flow.
+ *
+ * Role-aware: headline and subtext adapt to whether the person picked
+ * User or Lawyer in RoleSelectionScreen. Also toggles between a Login
+ * form and a Signup form (adds a Full Name field) via the bottom link.
  */
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun LoginScreen(
+    role: UserRole,
     onLoginSuccess: () -> Unit,
     onBack: () -> Unit
 ) {
+    var isSignUpMode by remember { mutableStateOf(false) }
+    var fullName by remember { mutableStateOf("") }
     var email by remember { mutableStateOf("") }
     var password by remember { mutableStateOf("") }
     var passwordVisible by remember { mutableStateOf(false) }
+
+    val isLawyer = role == UserRole.LAWYER
+
+    val title = when {
+        isSignUpMode && isLawyer -> "Join as a Lawyer"
+        isSignUpMode -> "Create Your Account"
+        isLawyer -> "Welcome Back, Counselor"
+        else -> "Welcome Back"
+    }
+
+    val subtitle = when {
+        isSignUpMode && isLawyer -> "Set up your professional profile to start receiving client requests."
+        isSignUpMode -> "Sign up to start your legal journey with Askvocate."
+        isLawyer -> "Sign in to manage your cases and clients."
+        else -> "Sign in to continue your legal journey"
+    }
 
     Box(modifier = Modifier.fillMaxSize()) {
         // Background
@@ -90,8 +114,8 @@ fun LoginScreen(
                     .shadow(
                         elevation = 8.dp,
                         shape = RoundedCornerShape(32.dp),
-                        ambientColor = Color(0x0D0B1F3A),
-                        spotColor = Color(0x0D0B1F3A)
+                        ambientColor = Color(0x0D000000),
+                        spotColor = Color(0x0D000000)
                     )
                     .clip(RoundedCornerShape(32.dp))
                     .background(Color.White.copy(alpha = 0.85f))
@@ -99,23 +123,51 @@ fun LoginScreen(
                 horizontalAlignment = Alignment.CenterHorizontally
             ) {
                 Text(
-                    text = "Welcome Back",
+                    text = title,
                     style = MaterialTheme.typography.displayMedium.copy(
                         fontWeight = FontWeight.Bold
                     ),
-                    color = MaterialTheme.colorScheme.primary
+                    color = MaterialTheme.colorScheme.primary,
+                    textAlign = TextAlign.Center
                 )
-                
+
                 Spacer(modifier = Modifier.height(8.dp))
-                
+
                 Text(
-                    text = "Sign in to continue your legal journey",
+                    text = subtitle,
                     style = MaterialTheme.typography.bodyLarge,
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                     textAlign = TextAlign.Center
                 )
 
                 Spacer(modifier = Modifier.height(48.dp))
+
+                // Full Name Input (Signup only)
+                if (isSignUpMode) {
+                    OutlinedTextField(
+                        value = fullName,
+                        onValueChange = { fullName = it },
+                        modifier = Modifier.fillMaxWidth(),
+                        label = { Text(if (isLawyer) "Full Name" else "Full Name") },
+                        leadingIcon = {
+                            Icon(
+                                imageVector = Icons.Filled.Person,
+                                contentDescription = null,
+                                tint = MaterialTheme.colorScheme.onSurfaceVariant
+                            )
+                        },
+                        shape = RoundedCornerShape(16.dp),
+                        colors = OutlinedTextFieldDefaults.colors(
+                            focusedContainerColor = MaterialTheme.colorScheme.surfaceContainerLow,
+                            unfocusedContainerColor = MaterialTheme.colorScheme.surfaceContainerLow,
+                            focusedBorderColor = MaterialTheme.colorScheme.secondary,
+                            unfocusedBorderColor = Color.Transparent
+                        ),
+                        singleLine = true
+                    )
+
+                    Spacer(modifier = Modifier.height(16.dp))
+                }
 
                 // Email Input
                 OutlinedTextField(
@@ -177,28 +229,32 @@ fun LoginScreen(
                     singleLine = true
                 )
 
-                Row(
-                    modifier = Modifier.fillMaxWidth(),
-                    horizontalArrangement = Arrangement.End
-                ) {
-                    TextButton(onClick = { }) {
-                        Text(
-                            text = "Forgot Password?",
-                            style = MaterialTheme.typography.labelMedium,
-                            color = MaterialTheme.colorScheme.secondary
-                        )
+                if (!isSignUpMode) {
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.End
+                    ) {
+                        TextButton(onClick = { }) {
+                            Text(
+                                text = "Forgot Password?",
+                                style = MaterialTheme.typography.labelMedium,
+                                color = MaterialTheme.colorScheme.secondary
+                            )
+                        }
                     }
+                } else {
+                    Spacer(modifier = Modifier.height(8.dp))
                 }
 
-                Spacer(modifier = Modifier.height(24.dp))
+                Spacer(modifier = Modifier.height(16.dp))
 
                 PrimaryButton(
-                    text = "Sign In",
+                    text = if (isSignUpMode) "Create Account" else "Sign In",
                     onClick = onLoginSuccess
                 )
-                
+
                 Spacer(modifier = Modifier.height(32.dp))
-                
+
                 // OR Divider
                 Row(
                     modifier = Modifier.fillMaxWidth(),
@@ -213,9 +269,9 @@ fun LoginScreen(
                     )
                     Divider(modifier = Modifier.weight(1f), color = MaterialTheme.colorScheme.surfaceVariant)
                 }
-                
+
                 Spacer(modifier = Modifier.height(24.dp))
-                
+
                 // Social buttons (placeholder shapes)
                 Row(
                     modifier = Modifier.fillMaxWidth(),
@@ -243,23 +299,23 @@ fun LoginScreen(
                     }
                 }
             }
-            
+
             Spacer(modifier = Modifier.weight(1f))
-            
-            // Sign Up link
+
+            // Toggle between Login / Sign Up
             Row(
                 modifier = Modifier.fillMaxWidth(),
                 horizontalArrangement = Arrangement.Center,
                 verticalAlignment = Alignment.CenterVertically
             ) {
                 Text(
-                    text = "Don't have an account?",
+                    text = if (isSignUpMode) "Already have an account?" else "Don't have an account?",
                     style = MaterialTheme.typography.bodyMedium,
                     color = MaterialTheme.colorScheme.onSurfaceVariant
                 )
-                TextButton(onClick = { }) {
+                TextButton(onClick = { isSignUpMode = !isSignUpMode }) {
                     Text(
-                        text = "Sign Up",
+                        text = if (isSignUpMode) "Log In" else "Sign Up",
                         style = MaterialTheme.typography.labelLarge,
                         color = MaterialTheme.colorScheme.secondary
                     )
