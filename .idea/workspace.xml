@@ -26,9 +26,7 @@
     <option name="autoReloadType" value="NONE" />
   </component>
   <component name="ChangeListManager">
-    <list default="true" id="8c40b19e-8cf3-4264-811e-47abeef4b14a" name="Changes" comment="">
-      <change beforePath="$PROJECT_DIR$/.kotlin/sessions/kotlin-compiler-15058508192008231844.salive" beforeDir="false" />
-    </list>
+    <list default="true" id="8c40b19e-8cf3-4264-811e-47abeef4b14a" name="Changes" comment="" />
     <option name="SHOW_DIALOG" value="false" />
     <option name="HIGHLIGHT_CONFLICTS" value="true" />
     <option name="HIGHLIGHT_NON_ACTIVE_CHANGELIST" value="false" />
@@ -94,7 +92,7 @@
     "RunOnceActivity.readMode.enableVisualFormatting": "true",
     "cf.first.check.clang-format": "false",
     "cidr.known.project.marker": "true",
-    "git-widget-placeholder": "feature-frontend-rewa",
+    "git-widget-placeholder": "feature-backend/SB",
     "implementationPlan.dismissed.80bd2043-6801-4733-8a53-f598836b5b39": "true",
     "kotlin-language-version-configured": "true",
     "last_opened_file_path": "C:/Users/SUDIP/OneDrive/Documents/Askvocate/Askvocate"
