@@ -20,8 +20,8 @@ import kotlin.math.sin
 /**
  * Animated Gradient Background — Replicates the WebGL shader from the design reference.
  *
- * Creates a slowly flowing gradient between Deep Navy and Royal Blue
- * with a subtle gold accent glow that moves in a circular path.
+ * Creates a slowly flowing gradient between Ink Black and Charcoal
+ * with a Sun Yellow accent glow that moves in a circular path.
  * Uses Compose Canvas with infiniteTransition for smooth animation.
  */
 @Composable
@@ -53,10 +53,10 @@ fun GradientBackground(
         label = "gradientWave"
     )
 
-    val deepNavy = Color(0xFF0B1F3A)
-    val royalBlue = Color(0xFF1E4DB7)
-    val lightGray = Color(0xFFF7F8FA)
-    val goldAccent = Color(0xFFC8A45D)
+    val deepNavy = Color(0xFF161616) // Ink Black
+    val royalBlue = Color(0xFF3D3D3D) // Charcoal
+    val lightGray = Color(0xFFFFF8EC) // Cream
+    val goldAccent = Color(0xFFFFC93C) // Sun Yellow
 
     Canvas(
         modifier = modifier.fillMaxSize()

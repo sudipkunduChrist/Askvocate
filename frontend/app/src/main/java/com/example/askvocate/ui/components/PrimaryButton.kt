@@ -20,7 +20,6 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.scale
 import androidx.compose.ui.draw.shadow
 import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.unit.dp
 import com.example.askvocate.ui.theme.Primary
 import com.example.askvocate.ui.theme.OnPrimary
@@ -61,8 +60,8 @@ fun PrimaryButton(
             .shadow(
                 elevation = elevation,
                 shape = RoundedCornerShape(16.dp),
-                ambientColor = Color(0x63000615),
-                spotColor = Color(0x63000615)
+                ambientColor = Color(0x63000000),
+                spotColor = Color(0x63000000)
             ),
         enabled = enabled,
         shape = RoundedCornerShape(16.dp),
