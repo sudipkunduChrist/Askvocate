@@ -1,6 +1,6 @@
 # Askvocate
 
-Askvocate is an Android application designed to provide specialized assistance and booking services.
+Askvocate is an Android application designed to provide specialized lgeal assistance and booking services.
 
 ## 🚀 Getting Started
 
