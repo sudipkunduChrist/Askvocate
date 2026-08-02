@@ -33,11 +33,11 @@ import kotlinx.coroutines.launch
  * - Animated blue gradient background (GradientBackground)
  * - Logo: "Askvocate" text centered, fades in + scales 0.7→1.0 over 900ms
  * - Tagline: "Ask Smart. Connect Right." fades in after logo
- * - Auto-navigates to Welcome after 2 seconds
+ * - Auto-navigates to Onboarding after 2 seconds
  */
 @Composable
 fun SplashScreen(
-    onNavigateToWelcome: () -> Unit
+    onNavigateToOnboarding: () -> Unit
 ) {
     // Animation states
     val logoAlpha = remember { Animatable(0f) }
@@ -53,9 +53,9 @@ fun SplashScreen(
         delay(600)
         launch { taglineAlpha.animateTo(1f, tween(600)) }
 
-        // Navigate to Welcome after 2 seconds total
+        // Navigate to Onboarding after 2 seconds total
         delay(1400) // 600 + 1400 = 2000ms total
-        onNavigateToWelcome()
+        onNavigateToOnboarding()
     }
 
     Box(

@@ -17,6 +17,7 @@ local.properties
 *.swp
 *~
 .lock-wscript
+.artifacts/
 
 # Android specific
 captures/
