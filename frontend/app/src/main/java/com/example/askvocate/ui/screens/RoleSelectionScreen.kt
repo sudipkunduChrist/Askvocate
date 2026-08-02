@@ -1,12 +1,14 @@
 package com.example.askvocate.ui.components
 
-import androidx.compose.animation.core.animateDpAsState
+import androidx.compose.animation.core.Spring
 import androidx.compose.animation.core.animateFloatAsState
-import androidx.compose.animation.core.tween
+import androidx.compose.animation.core.spring
 import androidx.compose.foundation.BorderStroke
+import androidx.compose.foundation.LocalIndication
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.interaction.MutableInteractionSource
+import androidx.compose.foundation.interaction.collectIsPressedAsState
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Spacer
@@ -60,22 +62,13 @@ fun RoleSelectionCard(
     onClick: () -> Unit,
     modifier: Modifier = Modifier
 ) {
+    val interactionSource = remember { MutableInteractionSource() }
+    val isPressed by interactionSource.collectIsPressedAsState()
+
     val scale by animateFloatAsState(
-        targetValue = if (isSelected) 1.03f else 1f,
-        animationSpec = tween(300),
+        targetValue = if (isPressed) 0.98f else 1f,
+        animationSpec = spring(stiffness = Spring.StiffnessHigh),
         label = "roleCardScale"
-    )
-
-    val elevation by animateDpAsState(
-        targetValue = if (isSelected) 12.dp else 2.dp,
-        animationSpec = tween(300),
-        label = "roleCardElevation"
-    )
-
-    val borderColor by animateFloatAsState(
-        targetValue = if (isSelected) 1f else 0f,
-        animationSpec = tween(300),
-        label = "roleCardBorder"
     )
 
     Card(
@@ -83,24 +76,24 @@ fun RoleSelectionCard(
             .fillMaxWidth()
             .scale(scale)
             .shadow(
-                elevation = elevation,
+                elevation = 2.dp,
                 shape = RoundedCornerShape(24.dp),
                 ambientColor = Color(0x0D000000),
                 spotColor = Color(0x0D000000)
             )
             .clickable(
-                interactionSource = remember { MutableInteractionSource() },
-                indication = null,
+                interactionSource = interactionSource,
+                indication = LocalIndication.current,
                 onClick = onClick
             ),
         shape = RoundedCornerShape(24.dp),
         colors = CardDefaults.cardColors(
-            containerColor = Color.White.copy(alpha = 0.8f)
+            containerColor = MaterialTheme.colorScheme.surfaceContainer
         ),
         border = BorderStroke(
-            width = if (isSelected) 2.dp else 1.dp,
-            color = if (isSelected) Secondary.copy(alpha = borderColor)
-            else MaterialTheme.colorScheme.surfaceVariant
+            width = 1.dp,
+            color = if (isSelected) Secondary.copy(alpha = 0.5f)
+            else MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f)
         )
     ) {
         Column(

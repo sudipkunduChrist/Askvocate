@@ -1,5 +1,6 @@
 package com.example.askvocate.navigation
 
+import androidx.compose.animation.core.EaseInOut
 import androidx.compose.animation.core.tween
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
@@ -52,8 +53,19 @@ fun NavGraph() {
         composable(
             route = Routes.Onboarding.route,
             enterTransition = { fadeIn(animationSpec = tween(500)) },
-            exitTransition = { fadeOut(animationSpec = tween(300)) },
-            popEnterTransition = { fadeIn(animationSpec = tween(300)) }
+            exitTransition = {
+                // Slide out left AND fade out together so no peek-through during RoleSelection slide-in
+                slideOutHorizontally(
+                    targetOffsetX = { -it / 4 },
+                    animationSpec = tween(450, easing = EaseInOut)
+                ) + fadeOut(animationSpec = tween(300))
+            },
+            popEnterTransition = {
+                slideInHorizontally(
+                    initialOffsetX = { -it / 4 },
+                    animationSpec = tween(450, easing = EaseInOut)
+                ) + fadeIn(animationSpec = tween(300))
+            }
         ) {
             OnboardingScreen(
                 onNavigateToRoleSelection = {
@@ -67,28 +79,29 @@ fun NavGraph() {
         composable(
             route = Routes.RoleSelection.route,
             enterTransition = {
+                // Slide in from right + fade in so the incoming screen is opaque immediately
                 slideInHorizontally(
                     initialOffsetX = { it },
-                    animationSpec = tween(400)
-                )
+                    animationSpec = tween(450, easing = EaseInOut)
+                ) + fadeIn(animationSpec = tween(250))
             },
             exitTransition = {
                 slideOutHorizontally(
-                    targetOffsetX = { -it / 3 },
-                    animationSpec = tween(400)
-                )
+                    targetOffsetX = { -it / 4 },
+                    animationSpec = tween(450, easing = EaseInOut)
+                ) + fadeOut(animationSpec = tween(300))
             },
             popEnterTransition = {
                 slideInHorizontally(
-                    initialOffsetX = { -it / 3 },
-                    animationSpec = tween(400)
-                )
+                    initialOffsetX = { -it / 4 },
+                    animationSpec = tween(450, easing = EaseInOut)
+                ) + fadeIn(animationSpec = tween(300))
             },
             popExitTransition = {
                 slideOutHorizontally(
                     targetOffsetX = { it },
-                    animationSpec = tween(400)
-                )
+                    animationSpec = tween(450, easing = EaseInOut)
+                ) + fadeOut(animationSpec = tween(300))
             }
         ) {
             RoleSelectionScreen(
@@ -119,26 +132,26 @@ fun NavGraph() {
             enterTransition = {
                 slideInHorizontally(
                     initialOffsetX = { it },
-                    animationSpec = tween(400)
-                )
+                    animationSpec = tween(450, easing = EaseInOut)
+                ) + fadeIn(animationSpec = tween(250))
             },
             exitTransition = {
                 slideOutHorizontally(
-                    targetOffsetX = { -it / 3 },
-                    animationSpec = tween(400)
-                )
+                    targetOffsetX = { -it / 4 },
+                    animationSpec = tween(450, easing = EaseInOut)
+                ) + fadeOut(animationSpec = tween(300))
             },
             popEnterTransition = {
                 slideInHorizontally(
-                    initialOffsetX = { -it / 3 },
-                    animationSpec = tween(400)
-                )
+                    initialOffsetX = { -it / 4 },
+                    animationSpec = tween(450, easing = EaseInOut)
+                ) + fadeIn(animationSpec = tween(300))
             },
             popExitTransition = {
                 slideOutHorizontally(
                     targetOffsetX = { it },
-                    animationSpec = tween(400)
-                )
+                    animationSpec = tween(450, easing = EaseInOut)
+                ) + fadeOut(animationSpec = tween(300))
             }
         ) { backStackEntry ->
             val roleParam =

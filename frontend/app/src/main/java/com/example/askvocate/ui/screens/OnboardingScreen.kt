@@ -37,7 +37,6 @@ import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
-import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
@@ -45,9 +44,6 @@ import androidx.compose.ui.unit.dp
 import com.example.askvocate.ui.components.OnboardingPageIndicator
 import com.example.askvocate.ui.components.OnboardingSticker
 import com.example.askvocate.ui.components.PrimaryButton
-import com.example.askvocate.ui.theme.InkBlack
-import com.example.askvocate.ui.theme.SunYellow
-import com.example.askvocate.ui.theme.SunYellowLight
 import kotlinx.coroutines.launch
 
 /**
@@ -63,8 +59,6 @@ import kotlinx.coroutines.launch
 
 private data class OnboardingPageData(
     val icon: ImageVector,
-    val iconTint: Color,
-    val stickerBackground: Color,
     val title: String,
     val description: String
 )
@@ -72,43 +66,31 @@ private data class OnboardingPageData(
 private val onboardingPages = listOf(
     OnboardingPageData(
         icon = Icons.Filled.Gavel,
-        iconTint = InkBlack,
-        stickerBackground = SunYellowLight,
         title = "Legal Help Shouldn't Feel Like a Maze",
         description = "Askvocate connects you with real lawyers and smart AI — no confusing legal jargon required."
     ),
     OnboardingPageData(
         icon = Icons.Filled.Lock,
-        iconTint = SunYellow,
-        stickerBackground = InkBlack,
         title = "Ask Anything, Privately",
         description = "Describe your situation in a secure, encrypted space. Your story stays yours until you choose to share it."
     ),
     OnboardingPageData(
         icon = Icons.Filled.Psychology,
-        iconTint = InkBlack,
-        stickerBackground = SunYellowLight,
         title = "AI That Actually Gets It",
         description = "Our legal AI breaks down your case, spots what matters, and turns it into something a lawyer can act on fast."
     ),
     OnboardingPageData(
         icon = Icons.Filled.PersonSearch,
-        iconTint = SunYellow,
-        stickerBackground = InkBlack,
         title = "Matched With the Right Lawyer",
         description = "Skip the guesswork. Get matched with vetted, specialized lawyers who've handled cases like yours."
     ),
     OnboardingPageData(
         icon = Icons.Filled.Forum,
-        iconTint = InkBlack,
-        stickerBackground = SunYellowLight,
         title = "Stay in the Loop, Always",
         description = "Chat, share files, and track every update in one secure thread — no more chasing emails."
     ),
     OnboardingPageData(
         icon = Icons.Filled.TaskAlt,
-        iconTint = SunYellow,
-        stickerBackground = InkBlack,
         title = "Ready When You Are",
         description = "Join as someone who needs help, or as a lawyer ready to offer it. Either way, we've got you."
     )
@@ -177,6 +159,10 @@ fun OnboardingScreen(
                     .fillMaxWidth()
             ) { page ->
                 val data = onboardingPages[page]
+                val isEven = page % 2 == 0
+                val iconTint = if (isEven) MaterialTheme.colorScheme.onSecondaryContainer else MaterialTheme.colorScheme.primary
+                val stickerBackground = if (isEven) MaterialTheme.colorScheme.secondaryContainer else MaterialTheme.colorScheme.surfaceVariant
+
                 Column(
                     modifier = Modifier
                         .fillMaxSize()
@@ -186,8 +172,8 @@ fun OnboardingScreen(
                 ) {
                     OnboardingSticker(
                         icon = data.icon,
-                        tint = data.iconTint,
-                        background = data.stickerBackground,
+                        tint = iconTint,
+                        background = stickerBackground,
                         modifier = Modifier.fillMaxWidth(0.7f)
                     )
 

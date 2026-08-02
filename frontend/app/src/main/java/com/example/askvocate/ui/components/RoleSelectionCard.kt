@@ -46,10 +46,6 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import coil3.compose.AsyncImage
 import com.example.askvocate.ui.components.RoleSelectionCard
-import com.example.askvocate.ui.theme.Secondary
-import com.example.askvocate.ui.theme.SecondaryContainer
-import com.example.askvocate.ui.theme.Tertiary
-import com.example.askvocate.ui.theme.TertiaryFixedDim
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 
@@ -174,7 +170,10 @@ fun RoleSelectionScreen(
                                 .clip(RoundedCornerShape(2.dp))
                                 .background(
                                     Brush.horizontalGradient(
-                                        colors = listOf(Secondary, Tertiary)
+                                        colors = listOf(
+                                            MaterialTheme.colorScheme.secondary,
+                                            MaterialTheme.colorScheme.tertiary
+                                        )
                                     )
                                 )
                         )
@@ -213,32 +212,26 @@ fun RoleSelectionScreen(
             ) {
                 RoleSelectionCard(
                     icon = Icons.Filled.Person,
-                    iconTint = Secondary,
-                    iconBackground = SecondaryContainer,
+                    iconTint = MaterialTheme.colorScheme.secondary,
+                    iconBackground = MaterialTheme.colorScheme.secondaryContainer,
                     title = "Continue as User",
                     description = "Find top-tier lawyers, consult with our AI legal assistant, and seamlessly book appointments to resolve your legal matters.",
                     buttonText = "Continue as User",
                     isSelected = selectedRole == UserRole.USER,
                     isPrimary = true,
-                    onClick = {
-                        selectedRole = UserRole.USER
-                        onRoleSelected(UserRole.USER)
-                    }
+                    onClick = { onRoleSelected(UserRole.USER) }
                 )
 
                 RoleSelectionCard(
                     icon = Icons.Filled.Gavel,
-                    iconTint = Tertiary,
-                    iconBackground = TertiaryFixedDim,
+                    iconTint = MaterialTheme.colorScheme.tertiary,
+                    iconBackground = MaterialTheme.colorScheme.tertiaryContainer,
                     title = "Continue as Lawyer",
                     description = "Create a verified professional profile, receive high-quality client requests, and manage communications efficiently.",
                     buttonText = "Continue as Lawyer",
                     isSelected = selectedRole == UserRole.LAWYER,
                     isPrimary = false,
-                    onClick = {
-                        selectedRole = UserRole.LAWYER
-                        onRoleSelected(UserRole.LAWYER)
-                    }
+                    onClick = { onRoleSelected(UserRole.LAWYER) }
                 )
             }
 
@@ -266,9 +259,9 @@ fun RoleSelectionScreen(
                         .background(
                             Brush.horizontalGradient(
                                 colors = listOf(
-                                    SecondaryContainer.copy(alpha = 0.2f),
+                                    MaterialTheme.colorScheme.secondaryContainer.copy(alpha = 0.2f),
                                     Color.Transparent,
-                                    TertiaryFixedDim.copy(alpha = 0.2f)
+                                    MaterialTheme.colorScheme.tertiaryContainer.copy(alpha = 0.2f)
                                 )
                             )
                         )
