@@ -6,19 +6,28 @@ import lombok.AllArgsConstructor;
 import lombok.Builder;
 import lombok.Data;
 import lombok.NoArgsConstructor;
+import org.springframework.data.annotation.Id;
+import org.springframework.data.mongodb.core.mapping.Document;
+
+import java.time.Instant;
 
 @Data
 @Builder
 @NoArgsConstructor
 @AllArgsConstructor
-
+@Document("users")
 public class User {
-    private String id;                                    // Firebase Auth UID
+    @Id
+    private String id;
     private String name;
     private String email;
-    private Role role;                                    // CLIENT, LAWYER_FRESHER, LAWYER_EXPERIENCED, ADMIN
-    private Verification_Status verificationStatus;       // PENDING, UNDER_VERIFICATION, VERIFIED, REJECTED
-    private String rejectionReason;                       // Set if verification fails
-    private Long createdAt;
+    private String passwordHash;
+    private Role role;
+    private Verification_Status verificationStatus;
+    private String rejectionReason;
+
+    @Builder.Default
+    private Long createdAt = Instant.now().toEpochMilli();
+
     private Long verifiedAt;
 }

@@ -32,7 +32,29 @@ build/
 ### VS Code ###
 .vscode/
 
-# Firebase credentials key
-src/main/resources/askvocate-firebase-adminsdk-fbsvc-*.json
-
+### Environment Variables ###
 .env
+.env.local
+.env.*.local
+
+### Application Properties ###
+application-*.properties
+!application.properties
+
+### Logs ###
+*.log
+logs/
+
+### OS Files ###
+.DS_Store
+Thumbs.db
+
+### Temporary Files ###
+*.tmp
+*.temp
+*.bak
+*.backup
+
+### Test Reports ###
+test-output/
+surefire-reports/

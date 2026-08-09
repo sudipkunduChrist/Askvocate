@@ -6,25 +6,38 @@ import lombok.AllArgsConstructor;
 import lombok.Builder;
 import lombok.Data;
 import lombok.NoArgsConstructor;
+import org.springframework.data.annotation.Id;
+import org.springframework.data.mongodb.core.mapping.Document;
 
-// JSON FILE TEMPLATE FOR EACH DOCUMENT STORING IN "documents" COLLECTION/FOLDER IN FIREBASE.
+import java.time.Instant;
+import java.util.Map;
 
+// MongoDB document representation for user-uploaded documents (collection: "documents").
 
 @Data
 @Builder
 @NoArgsConstructor
 @AllArgsConstructor
-
+@Document("documents")
 public class UserDoc {
-    private String id;                    // identical to docType.name()
+    @Id
+    private String id;                    // can hold string ObjectId or custom id (e.g., docType.name())
     private String userId;
     private DocType docType;
     private String fileUrl;
     private String storagePath;
-    private boolean ocrProcessed;
-    private String extractedData;
-    private boolean tamperFlagged;
+
+    @Builder.Default
+    private boolean ocrProcessed = false;
+
+    private Map<String, Object> extractedData;
+
+    @Builder.Default
+    private boolean tamperFlagged = false;
+
     private Double tamperConfidence;
     private DocStatus status;
-    private Long uploadedAt;
+
+    @Builder.Default
+    private Long uploadedAt = Instant.now().toEpochMilli();
 }
