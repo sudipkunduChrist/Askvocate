@@ -35,3 +35,4 @@ build/
 # Firebase credentials key
 src/main/resources/askvocate-firebase-adminsdk-fbsvc-*.json
 
+.env
