@@ -1,3 +1,171 @@
+<?xml version="1.0" encoding="utf-8"?>
 <resources>
+    <!-- App Name -->
     <string name="app_name">Askvocate</string>
+    <string name="app_tagline">Your Legal Advocate, Anytime</string>
+
+    <!-- Navigation -->
+    <string name="nav_home">Home</string>
+    <string name="nav_find_lawyers">Find Lawyers</string>
+    <string name="nav_chat">Chat</string>
+    <string name="nav_profile">Profile</string>
+    <string name="nav_map">Map</string>
+    <string name="nav_appointments">My Appointments</string>
+    <string name="nav_privacy_policy">Privacy Policy</string>
+    <string name="nav_settings">Settings</string>
+    <string name="nav_logout">Logout</string>
+    <string name="navigation_drawer_open">Open navigation drawer</string>
+    <string name="navigation_drawer_close">Close navigation drawer</string>
+
+    <!-- Home Screen -->
+    <string name="welcome_message">Hello, Welcome!</string>
+    <string name="welcome_subtitle">Find your trusted legal advocate today</string>
+    <string name="continue_button">Continue</string>
+    <string name="top_rated_lawyers">Top Rated Lawyers</string>
+    <string name="recent_consultations">Recent Consultations</string>
+    <string name="see_all">See All</string>
+    <string name="quick_categories">Quick Categories</string>
+
+    <!-- Find Lawyers Screen -->
+    <string name="search_lawyers">Search lawyers…</string>
+    <string name="filter">Filter</string>
+    <string name="sort_by">Sort by</string>
+    <string name="all">All</string>
+    <string name="business">Business</string>
+    <string name="criminal">Criminal</string>
+    <string name="family">Family</string>
+    <string name="property">Property</string>
+    <string name="immigration">Immigration</string>
+    <string name="corporate">Corporate</string>
+    <string name="tax">Tax</string>
+    <string name="labor">Labor</string>
+    <string name="no_lawyers_found">No lawyers found matching your search</string>
+    <string name="results_count">%d results found</string>
+
+    <!-- Lawyer Profile -->
+    <string name="about">About</string>
+    <string name="reviews">Reviews</string>
+    <string name="experience">Experience</string>
+    <string name="years_experience">%d years</string>
+    <string name="consultations_done">%d consultations</string>
+    <string name="rating_format">%.1f</string>
+    <string name="book_consultation">Book Consultation</string>
+    <string name="send_message">Send Message</string>
+    <string name="call_now">Call Now</string>
+    <string name="verified_lawyer">Verified Lawyer</string>
+    <string name="specialization">Specialization</string>
+    <string name="location">Location</string>
+    <string name="consultation_fee">Consultation Fee</string>
+    <string name="fee_format">₹%s/hr</string>
+
+    <!-- Client Profile -->
+    <string name="edit_profile">Edit Profile</string>
+    <string name="personal_info">Personal Information</string>
+    <string name="full_name">Full Name</string>
+    <string name="email">Email</string>
+    <string name="phone">Phone</string>
+    <string name="address">Address</string>
+    <string name="consultation_history">Consultation History</string>
+    <string name="saved_lawyers">Saved Lawyers</string>
+    <string name="account_settings">Account Settings</string>
+
+    <!-- Chat -->
+    <string name="messages">Messages</string>
+    <string name="search_conversations">Search conversations…</string>
+    <string name="type_message">Type a message…</string>
+    <string name="send">Send</string>
+    <string name="online">Online</string>
+    <string name="offline">Offline</string>
+    <string name="typing">Typing…</string>
+    <string name="today">Today</string>
+    <string name="yesterday">Yesterday</string>
+    <string name="no_messages">No messages yet</string>
+    <string name="start_conversation">Start a conversation with your lawyer</string>
+
+    <!-- Map -->
+    <string name="nearby_lawyers">Nearby Lawyers</string>
+    <string name="search_location">Search location…</string>
+    <string name="km_away">%s km away</string>
+
+    <!-- Privacy Policy -->
+    <string name="privacy_policy_title">Privacy Policy</string>
+    <string name="last_updated">Last updated: August 2026</string>
+    <string name="privacy_intro">At Askvocate, we take your privacy seriously. This policy describes how we collect, use, and protect your personal information when you use our legal services platform.</string>
+    <string name="info_collection_title">1. Information We Collect</string>
+    <string name="info_collection_body">We collect information you provide directly, including your name, email address, phone number, and any details shared during consultations. We also collect usage data such as app interactions and device information to improve our services.</string>
+    <string name="info_use_title">2. How We Use Your Information</string>
+    <string name="info_use_body">Your information is used to connect you with qualified legal professionals, facilitate consultations, process payments, and improve our platform. We never share your consultation details with third parties without your explicit consent.</string>
+    <string name="data_security_title">3. Data Security</string>
+    <string name="data_security_body">We employ industry-standard encryption and security measures to protect your personal data. All communications between you and your lawyer are end-to-end encrypted to ensure confidentiality.</string>
+    <string name="your_rights_title">4. Your Rights</string>
+    <string name="your_rights_body">You have the right to access, update, or delete your personal data at any time. You may also opt out of non-essential communications. Contact our support team for any privacy-related requests.</string>
+    <string name="contact_us_title">5. Contact Us</string>
+    <string name="contact_us_body">If you have questions about this Privacy Policy, please contact us at privacy@askvocate.com or through the in-app support feature.</string>
+
+    <!-- Auth Screens -->
+    <string name="get_started">Get Started</string>
+    <string name="welcome_to_askvocate">Welcome to Askvocate</string>
+    <string name="onboarding_desc">Connect with the best legal minds in the country. Legal advice is just a tap away.</string>
+    <string name="sign_in">Sign In</string>
+    <string name="sign_up">Sign Up</string>
+    <string name="dont_have_account">Don\'t have an account? Sign Up</string>
+    <string name="already_have_account">Already have an account? Sign In</string>
+    <string name="email_hint">Email Address</string>
+    <string name="password_hint">Password</string>
+    <string name="name_hint">Full Name</string>
+    <string name="forgot_password">Forgot Password?</string>
+    <string name="login_welcome">Welcome Back</string>
+    <string name="signup_welcome">Create Account</string>
+
+    <!-- Settings -->
+    <string name="notifications">Notifications</string>
+    <string name="language">Language</string>
+    <string name="dark_mode">Dark Mode</string>
+    <string name="help_center">Help Center</string>
+    <string name="about_app">About Askvocate</string>
+
+    <!-- Role Selection -->
+    <string name="how_will_you_use">How will you use Askvocate?</string>
+    <string name="need_legal_help">I need legal help</string>
+    <string name="need_legal_help_desc">Find verified lawyers, book consultations and track your cases in one place.</string>
+    <string name="im_a_lawyer">I\'m a lawyer</string>
+    <string name="im_a_lawyer_desc">List your practice, manage bookings and connect with clients who need you.</string>
+    <string name="switch_roles_note">You can switch roles anytime from Settings</string>
+    <string name="continue_arrow">Continue \u2192</string>
+
+    <!-- Onboarding -->
+    <string name="welcome_askvocate_title">Welcome to Askvocate!</string>
+    <string name="onboarding_step_1_desc">Want help with finding verified lawyers near you?</string>
+    <string name="lets_start_exploring">Let\'s start exploring</string>
+    <string name="skip">Skip</string>
+
+    <!-- Sign Up Refinement -->
+    <string name="already_late">already\nlate.</string>
+    <string name="confirm_password_hint">Confirm Password</string>
+
+    <string name="onboarding_step_2_title">Expert Advice</string>
+    <string name="onboarding_step_2_desc">Talk to top rated lawyers instantly.</string>
+    <string name="onboarding_step_3_desc">Start your legal journey with us.</string>
+    <string name="or_divider">or</string>
+    <string name="google">Google</string>
+
+    <!-- General -->
+    <string name="loading">Loading…</string>
+    <string name="error_occurred">An error occurred. Please try again.</string>
+    <string name="retry">Retry</string>
+    <string name="cancel">Cancel</string>
+    <string name="ok">OK</string>
+    <string name="save">Save</string>
+    <string name="back">Back</string>
+
+    <!-- Accessibility -->
+    <string name="cd_lawyer_photo">Lawyer profile photo</string>
+    <string name="cd_user_avatar">User avatar</string>
+    <string name="cd_rating_stars">Rating stars</string>
+    <string name="cd_send_message">Send message</string>
+    <string name="cd_open_menu">Open menu</string>
+    <string name="cd_filter_options">Filter options</string>
+    <string name="cd_search">Search</string>
+    <string name="cd_back">Go back</string>
+    <string name="cd_verified">Verified professional</string>
 </resources>

@@ -1,0 +1,84 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <!-- Spacing -->
+    <dimen name="spacing_xxs">2dp</dimen>
+    <dimen name="spacing_xs">4dp</dimen>
+    <dimen name="spacing_sm">8dp</dimen>
+    <dimen name="spacing_md">12dp</dimen>
+    <dimen name="spacing_lg">16dp</dimen>
+    <dimen name="spacing_xl">24dp</dimen>
+    <dimen name="spacing_xxl">32dp</dimen>
+    <dimen name="spacing_xxxl">48dp</dimen>
+
+    <!-- Corner Radius -->
+    <dimen name="radius_xs">4dp</dimen>
+    <dimen name="radius_sm">8dp</dimen>
+    <dimen name="radius_md">12dp</dimen>
+    <dimen name="radius_lg">16dp</dimen>
+    <dimen name="radius_xl">24dp</dimen>
+    <dimen name="radius_pill">100dp</dimen>
+
+    <!-- Text Sizes -->
+    <dimen name="text_caption">12sp</dimen>
+    <dimen name="text_body_small">13sp</dimen>
+    <dimen name="text_body">14sp</dimen>
+    <dimen name="text_body_large">16sp</dimen>
+    <dimen name="text_title">18sp</dimen>
+    <dimen name="text_headline">20sp</dimen>
+    <dimen name="text_headline_large">24sp</dimen>
+    <dimen name="text_display">28sp</dimen>
+
+    <!-- Icon Sizes -->
+    <dimen name="icon_xs">16dp</dimen>
+    <dimen name="icon_sm">20dp</dimen>
+    <dimen name="icon_md">24dp</dimen>
+    <dimen name="icon_lg">32dp</dimen>
+    <dimen name="icon_xl">48dp</dimen>
+    <dimen name="icon_xxl">64dp</dimen>
+
+    <!-- Avatar Sizes -->
+    <dimen name="avatar_sm">36dp</dimen>
+    <dimen name="avatar_md">48dp</dimen>
+    <dimen name="avatar_lg">64dp</dimen>
+    <dimen name="avatar_xl">96dp</dimen>
+    <dimen name="avatar_xxl">120dp</dimen>
+
+    <!-- Card -->
+    <dimen name="card_elevation">2dp</dimen>
+    <dimen name="card_elevation_raised">6dp</dimen>
+
+    <!-- Toolbar -->
+    <dimen name="toolbar_height">56dp</dimen>
+
+    <!-- Bottom Nav -->
+    <dimen name="bottom_nav_height">56dp</dimen>
+
+    <!-- Button -->
+    <dimen name="button_height">48dp</dimen>
+    <dimen name="button_height_small">36dp</dimen>
+    <dimen name="button_min_width">120dp</dimen>
+
+    <!-- Search Bar -->
+    <dimen name="search_bar_height">48dp</dimen>
+
+    <!-- Chat -->
+    <dimen name="chat_input_height">56dp</dimen>
+    <dimen name="chat_bubble_max_width">280dp</dimen>
+    <dimen name="chat_bubble_radius">16dp</dimen>
+
+    <!-- Nav Drawer -->
+    <dimen name="nav_drawer_width">300dp</dimen>
+    <dimen name="nav_header_height">180dp</dimen>
+
+    <!-- Lawyer Card -->
+    <dimen name="lawyer_card_image_size">80dp</dimen>
+    <dimen name="lawyer_horizontal_card_width">160dp</dimen>
+    <dimen name="lawyer_horizontal_card_height">200dp</dimen>
+
+    <!-- Map -->
+    <dimen name="map_bottom_sheet_peek">200dp</dimen>
+
+    <!-- Badge -->
+    <dimen name="badge_size">20dp</dimen>
+    <dimen name="badge_text_size">11sp</dimen>
+</resources>
