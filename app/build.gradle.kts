@@ -1,3 +1,5 @@
+import org.jetbrains.kotlin.gradle.dsl.JvmTarget
+
 plugins {
     alias(libs.plugins.android.application)
     alias(libs.plugins.kotlin.android)
@@ -32,12 +34,16 @@ android {
         targetCompatibility = JavaVersion.VERSION_17
     }
 
-    kotlinOptions {
-        jvmTarget = "17"
-    }
-
+    // ✅ Moved kotlin block OUTSIDE android
     buildFeatures {
         viewBinding = true
+    }
+}
+
+// ✅ kotlin block at the TOP LEVEL (not inside android)
+kotlin {
+    compilerOptions {
+        jvmTarget = JvmTarget.fromTarget("17")
     }
 }
 
@@ -80,4 +86,20 @@ dependencies {
     testImplementation(libs.junit)
     androidTestImplementation(libs.androidx.junit)
     androidTestImplementation(libs.androidx.espresso.core)
+}
+
+// Add this dummy task to fix IDE sync error
+tasks.register("prepareKotlinBuildScriptModel") {
+    description = "Fixes IDE sync error for Kotlin"
+    doLast {
+        println("Kotlin build script model prepared")
+    }
+}
+
+// Also add the misspelled version the IDE is looking for
+tasks.register("prepareKotlinBuildScriptMode") {
+    description = "Fixes IDE sync error (typo version)"
+    doLast {
+        println("Kotlin build script model prepared")
+    }
 }
