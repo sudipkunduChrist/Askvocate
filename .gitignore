@@ -1,0 +1,22 @@
+# IDE
+/.idea/
+*.iml
+*.iws
+*.ipr
+
+# Gradle / build output (root-level only; backend/ and frontend/ have their own)
+/.gradle/
+/.kotlin/
+/app/
+/build/
+/target/
+/local.properties
+
+# Freebuff tool state
+/.freebuff/
+
+# OS / editor
+.DS_Store
+Thumbs.db
+*.swp
+*~
