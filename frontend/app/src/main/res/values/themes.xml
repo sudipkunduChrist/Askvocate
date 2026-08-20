@@ -1,9 +1,70 @@
 <resources xmlns:tools="http://schemas.android.com/tools">
-    <!-- Base application theme. -->
-    <style name="Base.Theme.Askvocate" parent="Theme.Material3.DayNight.NoActionBar">
-        <!-- Customize your light theme here. -->
-        <!-- <item name="colorPrimary">@color/my_light_primary</item> -->
+    <!-- Base application theme -->
+    <style name="Base.Theme.Askvocate" parent="Theme.Material3.Light.NoActionBar">
+        <!-- Primary -->
+        <item name="colorPrimary">@color/navy_primary</item>
+        <item name="colorPrimaryDark">@color/navy_dark</item>
+        <item name="colorOnPrimary">@color/text_on_primary</item>
+        <item name="colorPrimaryContainer">@color/navy_light</item>
+
+        <!-- Secondary / Accent -->
+        <item name="colorSecondary">@color/amber_accent</item>
+        <item name="colorOnSecondary">@color/text_on_accent</item>
+        <item name="colorSecondaryContainer">@color/amber_light</item>
+
+        <!-- Background & Surface -->
+        <item name="android:colorBackground">@color/background_cream</item>
+        <item name="colorSurface">@color/surface_white</item>
+        <item name="colorOnSurface">@color/text_primary</item>
+        <item name="colorSurfaceVariant">@color/background_cream</item>
+
+        <!-- Error -->
+        <item name="colorError">@color/error_red</item>
+
+        <!-- Status Bar -->
+        <item name="android:statusBarColor">@color/navy_primary</item>
+        <item name="android:navigationBarColor">@color/surface_white</item>
+        <item name="android:windowLightStatusBar">false</item>
+
+        <!-- Window -->
+        <item name="android:windowBackground">@color/background_cream</item>
+
+        <!-- Default ripple -->
+        <item name="colorControlHighlight">@color/ripple_light</item>
+
+        <!-- Text Input -->
+        <item name="textInputStyle">@style/Widget.Askvocate.TextInputLayout</item>
     </style>
 
     <style name="Theme.Askvocate" parent="Base.Theme.Askvocate" />
+
+    <!-- Splash / Launch theme -->
+    <style name="Theme.Askvocate.Splash" parent="Theme.Askvocate">
+        <item name="android:windowBackground">@color/navy_primary</item>
+        <item name="android:statusBarColor">@color/navy_primary</item>
+    </style>
+    <!-- Typography styles for Splash -->
+    <style name="TextAppearance.Askvocate.HeadlineDisplay" parent="TextAppearance.Material3.HeadlineLarge">
+        <item name="android:fontFamily">serif</item>
+        <item name="android:textSize">48sp</item>
+        <item name="android:textStyle">bold</item>
+        <item name="android:letterSpacing">-0.02</item>
+    </style>
+
+    <style name="TextAppearance.Askvocate.LabelBold" parent="TextAppearance.Material3.LabelLarge">
+        <item name="android:fontFamily">sans-serif</item>
+        <item name="android:textSize">12sp</item>
+        <item name="android:textStyle">bold</item>
+        <item name="android:letterSpacing">0.05</item>
+    </style>
+
+    <style name="TextAppearance.Askvocate.BodyMd" parent="TextAppearance.Material3.BodyMedium">
+        <item name="android:fontFamily">sans-serif</item>
+        <item name="android:textSize">16sp</item>
+    </style>
+
+    <style name="TextAppearance.Askvocate.Tagline" parent="TextAppearance.Askvocate.LabelBold">
+        <item name="android:letterSpacing">0.15</item>
+        <item name="android:textAllCaps">true</item>
+    </style>
 </resources>

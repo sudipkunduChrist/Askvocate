@@ -1,0 +1,8 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <!-- Splash Screen (Sovereign Legal Night) -->
+    <color name="splash_background">#FF111415</color>
+    <color name="splash_primary">#FFF2CA50</color>
+    <color name="splash_text">#FFE1E3E4</color>
+    <color name="splash_text_variant">#66E1E3E4</color>
+</resources>

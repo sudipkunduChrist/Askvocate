@@ -1,5 +1,75 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
+    <!-- Primary Colors -->
+    <color name="navy_primary">#FF1F3A5F</color>
+    <color name="navy_dark">#FF152A45</color>
+    <color name="navy_light">#FF2D5080</color>
+
+    <!-- Accent Colors -->
+    <color name="amber_accent">#FFEB940E</color>
+    <color name="amber_light">#FFFDB94D</color>
+    <color name="amber_dark">#FFC57A0B</color>
+
+    <!-- Background Colors -->
+    <color name="background_cream">#FFF8F6F2</color>
+    <color name="surface_white">#FFFFFFFF</color>
+    <color name="border_light">#FFE7E2D6</color>
+    <color name="divider">#FFEDE9E0</color>
+
+    <!-- Text Colors -->
+    <color name="text_primary">#FF2B2B2B</color>
+    <color name="text_secondary">#FF6B7280</color>
+    <color name="text_tertiary">#FF9CA3AF</color>
+    <color name="text_on_primary">#FFFFFFFF</color>
+    <color name="text_on_accent">#FFFFFFFF</color>
+    <color name="text_link">#FF1F3A5F</color>
+
+    <!-- Status Colors -->
+    <color name="success_green">#FF22C55E</color>
+    <color name="error_red">#FFEF4444</color>
+    <color name="warning_orange">#FFF59E0B</color>
+    <color name="info_blue">#FF3B82F6</color>
+
+    <!-- Chat Colors -->
+    <color name="chat_sent_bg">#FFEB940E</color>
+    <color name="chat_received_bg">#FFFFFFFF</color>
+    <color name="chat_sent_text">#FFFFFFFF</color>
+    <color name="chat_received_text">#FF2B2B2B</color>
+
+    <!-- Rating Star -->
+    <color name="star_filled">#FFFBBF24</color>
+    <color name="star_empty">#FFD1D5DB</color>
+
+    <!-- Chip Colors -->
+    <color name="chip_selected_bg">#FF1F3A5F</color>
+    <color name="chip_selected_text">#FFFFFFFF</color>
+    <color name="chip_unselected_bg">#FFFFFFFF</color>
+    <color name="chip_unselected_text">#FF1F3A5F</color>
+
+    <!-- Scrim / Overlay -->
+    <color name="scrim">#66000000</color>
+    <color name="ripple_light">#1F1F3A5F</color>
+    <color name="ripple_dark">#33FFFFFF</color>
+
+    <!-- Standard -->
     <color name="black">#FF000000</color>
     <color name="white">#FFFFFFFF</color>
+    <color name="transparent">#00000000</color>
+
+    <!-- Gradient -->
+    <color name="gradient_start">#FF1F3A5F</color>
+    <color name="gradient_end">#FF2D5080</color>
+
+    <!-- Online status -->
+    <color name="online_green">#FF22C55E</color>
+    <color name="offline_gray">#FF9CA3AF</color>
+
+    <!-- Unread badge -->
+    <color name="badge_red">#FFEF4444</color>
+    <color name="badge_text">#FFFFFFFF</color>
+    <!-- Splash Screen (Sovereign Legal) -->
+    <color name="splash_background">#FFFFFFFF</color>
+    <color name="splash_primary">#FFF2CA50</color>
+    <color name="splash_text">#FF1D2021</color>
+    <color name="splash_text_variant">#661D2021</color>
 </resources>
