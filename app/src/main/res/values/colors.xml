@@ -67,4 +67,9 @@
     <!-- Unread badge -->
     <color name="badge_red">#FFEF4444</color>
     <color name="badge_text">#FFFFFFFF</color>
+    <!-- Splash Screen (Sovereign Legal) -->
+    <color name="splash_background">#FFFFFFFF</color>
+    <color name="splash_primary">#FFF2CA50</color>
+    <color name="splash_text">#FF1D2021</color>
+    <color name="splash_text_variant">#661D2021</color>
 </resources>

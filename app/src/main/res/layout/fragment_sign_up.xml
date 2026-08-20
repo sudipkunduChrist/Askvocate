@@ -23,7 +23,7 @@
         android:id="@+id/iv_sign_up_illustration"
         android:layout_width="0dp"
         android:layout_height="180dp"
-        android:src="@drawable/ic_logo"
+        android:src="@drawable/app_logo"
         android:padding="24dp"
         app:layout_constraintEnd_toEndOf="parent"
         app:layout_constraintStart_toStartOf="parent"

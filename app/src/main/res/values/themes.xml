@@ -43,4 +43,28 @@
         <item name="android:windowBackground">@color/navy_primary</item>
         <item name="android:statusBarColor">@color/navy_primary</item>
     </style>
+    <!-- Typography styles for Splash -->
+    <style name="TextAppearance.Askvocate.HeadlineDisplay" parent="TextAppearance.Material3.HeadlineLarge">
+        <item name="android:fontFamily">serif</item>
+        <item name="android:textSize">48sp</item>
+        <item name="android:textStyle">bold</item>
+        <item name="android:letterSpacing">-0.02</item>
+    </style>
+
+    <style name="TextAppearance.Askvocate.LabelBold" parent="TextAppearance.Material3.LabelLarge">
+        <item name="android:fontFamily">sans-serif</item>
+        <item name="android:textSize">12sp</item>
+        <item name="android:textStyle">bold</item>
+        <item name="android:letterSpacing">0.05</item>
+    </style>
+
+    <style name="TextAppearance.Askvocate.BodyMd" parent="TextAppearance.Material3.BodyMedium">
+        <item name="android:fontFamily">sans-serif</item>
+        <item name="android:textSize">16sp</item>
+    </style>
+
+    <style name="TextAppearance.Askvocate.Tagline" parent="TextAppearance.Askvocate.LabelBold">
+        <item name="android:letterSpacing">0.15</item>
+        <item name="android:textAllCaps">true</item>
+    </style>
 </resources>
