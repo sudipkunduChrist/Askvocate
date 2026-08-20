@@ -72,4 +72,11 @@
     <color name="splash_primary">#FFF2CA50</color>
     <color name="splash_text">#FF1D2021</color>
     <color name="splash_text_variant">#661D2021</color>
+    <!-- Legal Journey Screen -->
+    <color name="journey_background">#FFF8F5</color>
+    <color name="journey_walnut">#3D2F23</color>
+    <color name="journey_sandstone">#D8C9B0</color>
+    <color name="journey_gold">#D4AF37</color>
+    <color name="journey_brass">#A3814F</color>
+    <color name="journey_card_bg">#CCFFFFFF</color>
 </resources>

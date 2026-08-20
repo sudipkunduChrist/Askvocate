@@ -1,0 +1,158 @@
+<?xml version="1.0" encoding="utf-8"?>
+<androidx.constraintlayout.widget.ConstraintLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:app="http://schemas.android.com/apk/res-auto"
+    xmlns:tools="http://schemas.android.com/tools"
+    android:layout_width="match_parent"
+    android:layout_height="match_parent"
+    android:background="@color/journey_background">
+
+    <com.google.android.material.appbar.AppBarLayout
+        android:id="@+id/app_bar"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:background="@android:color/transparent"
+        app:elevation="0dp"
+        app:layout_constraintTop_toTopOf="parent">
+
+        <androidx.appcompat.widget.Toolbar
+            android:id="@+id/toolbar"
+            android:layout_width="match_parent"
+            android:layout_height="?attr/actionBarSize">
+
+            <ImageButton
+                android:id="@+id/btn_back"
+                android:layout_width="48dp"
+                android:layout_height="48dp"
+                android:background="?attr/selectableItemBackgroundBorderless"
+                android:src="@drawable/ic_back"
+                app:tint="@color/journey_walnut" />
+
+            <ImageView
+                android:layout_width="100dp"
+                android:layout_height="32dp"
+                android:layout_gravity="center"
+                android:src="@drawable/app_logo"
+                android:scaleType="fitCenter" />
+
+        </androidx.appcompat.widget.Toolbar>
+    </com.google.android.material.appbar.AppBarLayout>
+
+    <androidx.core.widget.NestedScrollView
+        android:id="@+id/scroll_view"
+        android:layout_width="match_parent"
+        android:layout_height="0dp"
+        app:layout_constraintBottom_toTopOf="@id/bottom_nav"
+        app:layout_constraintTop_toBottomOf="@id/app_bar">
+
+        <androidx.constraintlayout.widget.ConstraintLayout
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:paddingBottom="100dp">
+
+            <TextView
+                android:id="@+id/tv_title"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="32dp"
+                android:text="Your Legal Journey"
+                android:textAppearance="@style/TextAppearance.Askvocate.JourneyHeader"
+                app:layout_constraintEnd_toEndOf="parent"
+                app:layout_constraintStart_toStartOf="parent"
+                app:layout_constraintTop_toTopOf="parent" />
+
+            <TextView
+                android:id="@+id/tv_subtitle"
+                android:layout_width="0dp"
+                android:layout_height="wrap_content"
+                android:layout_marginHorizontal="48dp"
+                android:layout_marginTop="16dp"
+                android:gravity="center"
+                android:text="Experience a seamless, secure, and intelligent path to resolving your legal matters."
+                android:textAppearance="@style/TextAppearance.Askvocate.JourneyBody"
+                app:layout_constraintEnd_toEndOf="parent"
+                app:layout_constraintStart_toStartOf="parent"
+                app:layout_constraintTop_toBottomOf="@id/tv_title" />
+
+            <!-- Timeline Line -->
+            <View
+                android:id="@+id/timeline_line"
+                android:layout_width="2dp"
+                android:layout_height="0dp"
+                android:layout_marginTop="48dp"
+                android:background="@color/journey_sandstone"
+                app:layout_constraintBottom_toBottomOf="parent"
+                app:layout_constraintEnd_toEndOf="parent"
+                app:layout_constraintStart_toStartOf="parent"
+                app:layout_constraintTop_toBottomOf="@id/tv_subtitle" />
+
+            <View
+                android:id="@+id/timeline_progress"
+                android:layout_width="4dp"
+                android:layout_height="0dp"
+                android:background="@color/journey_gold"
+                app:layout_constraintEnd_toEndOf="@id/timeline_line"
+                app:layout_constraintStart_toStartOf="@id/timeline_line"
+                app:layout_constraintTop_toTopOf="@id/timeline_line" />
+
+            <!-- Timeline Items -->
+            <!-- 1. Discuss Privately -->
+            <include
+                android:id="@+id/item1"
+                layout="@layout/layout_journey_item"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="48dp"
+                app:layout_constraintTop_toBottomOf="@id/tv_subtitle" />
+
+            <!-- 2. AI Understands -->
+            <include
+                android:id="@+id/item2"
+                layout="@layout/layout_journey_item"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="80dp"
+                app:layout_constraintTop_toBottomOf="@id/item1" />
+
+            <!-- 3. Right Lawyer -->
+            <include
+                android:id="@+id/item3"
+                layout="@layout/layout_journey_item"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="80dp"
+                app:layout_constraintTop_toBottomOf="@id/item2" />
+
+            <!-- 4. Lawyers Choose -->
+            <include
+                android:id="@+id/item4"
+                layout="@layout/layout_journey_item"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="80dp"
+                app:layout_constraintTop_toBottomOf="@id/item3" />
+
+        </androidx.constraintlayout.widget.ConstraintLayout>
+    </androidx.core.widget.NestedScrollView>
+
+    <LinearLayout
+        android:id="@+id/bottom_nav"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:background="@drawable/bg_bottom_nav"
+        android:orientation="horizontal"
+        android:padding="16dp"
+        app:layout_constraintBottom_toBottomOf="parent">
+
+        <com.google.android.material.button.MaterialButton
+            android:id="@+id/btn_start"
+            style="@style/Widget.Material3.Button"
+            android:layout_width="0dp"
+            android:layout_height="60dp"
+            android:layout_weight="1"
+            android:text="Start Your Case"
+            app:cornerRadius="16dp"
+            app:icon="@drawable/ic_logo" />
+
+    </LinearLayout>
+
+</androidx.constraintlayout.widget.ConstraintLayout>
