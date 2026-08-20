@@ -131,6 +131,25 @@
                 android:layout_marginTop="80dp"
                 app:layout_constraintTop_toBottomOf="@id/item3" />
 
+            <!-- 5. Communicate Securely -->
+            <include
+                android:id="@+id/item5"
+                layout="@layout/layout_journey_item"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="80dp"
+                app:layout_constraintTop_toBottomOf="@id/item4" />
+
+            <!-- 6. Complete Your Legal Journey -->
+            <include
+                android:id="@+id/item6"
+                layout="@layout/layout_journey_item"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="80dp"
+                app:layout_constraintTop_toBottomOf="@id/item5" />
+
+
         </androidx.constraintlayout.widget.ConstraintLayout>
     </androidx.core.widget.NestedScrollView>
 
@@ -140,18 +159,23 @@
         android:layout_height="wrap_content"
         android:background="@drawable/bg_bottom_nav"
         android:orientation="horizontal"
-        android:padding="16dp"
+        android:padding="24dp"
+        android:elevation="8dp"
         app:layout_constraintBottom_toBottomOf="parent">
 
         <com.google.android.material.button.MaterialButton
             android:id="@+id/btn_start"
             style="@style/Widget.Material3.Button"
-            android:layout_width="0dp"
-            android:layout_height="60dp"
-            android:layout_weight="1"
+            android:layout_width="match_parent"
+            android:layout_height="64dp"
             android:text="Start Your Case"
+            android:textAllCaps="true"
+            android:textStyle="bold"
             app:cornerRadius="16dp"
-            app:icon="@drawable/ic_logo" />
+            app:backgroundTint="@color/journey_gold"
+            app:icon="@drawable/ic_logo"
+            app:iconGravity="textStart"
+            android:textColor="@color/journey_walnut" />
 
     </LinearLayout>
 

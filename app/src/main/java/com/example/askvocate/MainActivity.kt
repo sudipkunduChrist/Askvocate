@@ -37,6 +37,7 @@ class MainActivity : AppCompatActivity() {
         navController.addOnDestinationChangedListener { _, destination, _ ->
             when (destination.id) {
                 R.id.nav_splash,
+                R.id.nav_legal_journey,
                 R.id.nav_role_selection,
                 R.id.nav_onboarding,
                 R.id.nav_get_started,

@@ -42,8 +42,10 @@ class LegalJourneyFragment : Fragment() {
         // Initialize items
         configureItem(binding.item1, "Discuss Privately", "Start by detailing your situation in a completely secure, encrypted environment.", R.drawable.ic_lock)
         configureItem(binding.item2, "AI Understands Your Case", "Our advanced Legal AI analyzes your input instantly and structures your narrative.", R.drawable.ic_psychology)
-        configureItem(binding.item3, "Find the Right Lawyer", "Match with specialized attorneys whose expertise aligns with your specific legal needs.", R.drawable.ic_group)
+        configureItem(binding.item3, "Find the Right Lawyer", "Match with specialized attorneys whose expertise aligns with your legal needs.", R.drawable.ic_group)
         configureItem(binding.item4, "Lawyers Choose Cases", "Review curated proposals and select the counsel that best fits your budget.", R.drawable.ic_description)
+        configureItem(binding.item5, "Communicate Securely", "All communication and document sharing happens within our encrypted vault.", R.drawable.ic_forum)
+        configureItem(binding.item6, "Complete Your Legal Journey", "Experience a structured and transparent process powered by AI.", R.drawable.ic_verified_user)
 
         // Scroll listener for progress line and active states
         binding.scrollView.setOnScrollChangeListener(NestedScrollView.OnScrollChangeListener { v, _, scrollY, _, _ ->
@@ -72,6 +74,8 @@ class LegalJourneyFragment : Fragment() {
         updateActiveState(binding.item2, scrollY, 300)
         updateActiveState(binding.item3, scrollY, 600)
         updateActiveState(binding.item4, scrollY, 900)
+        updateActiveState(binding.item5, scrollY, 1200)
+        updateActiveState(binding.item6, scrollY, 1500)
     }
 
     private fun updateActiveState(itemBinding: LayoutJourneyItemBinding, scrollY: Int, activationPoint: Int) {
