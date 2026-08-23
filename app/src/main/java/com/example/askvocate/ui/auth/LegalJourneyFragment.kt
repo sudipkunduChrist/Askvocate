@@ -36,76 +36,82 @@ class LegalJourneyFragment : Fragment() {
 
         setupTimeline()
         setupListeners()
+        animateEntrance()
+        startPulsingAnimation()
+    }
+
+    private fun animateEntrance() {
+        val icons = listOf(binding.icon1, binding.icon2, binding.icon3, binding.icon4, binding.icon5, binding.icon6)
+
+        val allItems = listOf(
+            binding.item1.root, binding.item2.root, binding.item3.root,
+            binding.item4.root, binding.item5.root, binding.item6.root
+        )
+
+        allItems.forEachIndexed { index, view ->
+            val isLeft = index % 2 == 0
+            view.alpha = 0f
+            view.translationX = if (isLeft) -200f else 200f
+            view.animate()
+                .alpha(1f)
+                .translationX(0f)
+                .setDuration(600)
+                .setStartDelay(index * 200L)
+                .start()
+        }
+        
+        icons.forEachIndexed { index, icon ->
+            icon.alpha = 0f
+            icon.scaleX = 0f
+            icon.scaleY = 0f
+            icon.animate()
+                .alpha(1f)
+                .scaleX(1f)
+                .scaleY(1f)
+                .setDuration(400)
+                .setStartDelay(index * 200L + 100L)
+                .start()
+        }
+    }
+
+    private fun startPulsingAnimation() {
+        val scaleX = ObjectAnimator.ofFloat(binding.btnStart, View.SCALE_X, 1f, 1.02f)
+        val scaleY = ObjectAnimator.ofFloat(binding.btnStart, View.SCALE_Y, 1f, 1.02f)
+
+        listOf(scaleX, scaleY).forEach {
+            it.duration = 2000
+            it.repeatCount = ObjectAnimator.INFINITE
+            it.repeatMode = ObjectAnimator.REVERSE
+            it.start()
+            animators.add(it)
+        }
     }
 
     private fun setupTimeline() {
-        // Initialize items
-        configureItem(binding.item1, "Discuss Privately", "Start by detailing your situation in a completely secure, encrypted environment.", R.drawable.ic_lock)
-        configureItem(binding.item2, "AI Understands Your Case", "Our advanced Legal AI analyzes your input instantly and structures your narrative.", R.drawable.ic_psychology)
-        configureItem(binding.item3, "Find the Right Lawyer", "Match with specialized attorneys whose expertise aligns with your legal needs.", R.drawable.ic_group)
-        configureItem(binding.item4, "Lawyers Choose Cases", "Review curated proposals and select the counsel that best fits your budget.", R.drawable.ic_description)
-        configureItem(binding.item5, "Communicate Securely", "All communication and document sharing happens within our encrypted vault.", R.drawable.ic_forum)
-        configureItem(binding.item6, "Complete Your Legal Journey", "Experience a structured and transparent process powered by AI.", R.drawable.ic_verified_user)
+        // Initialize items with premium content from code.html
+        configureItem(binding.item1, "Discuss Privately", "Secure initial consultation to understand your needs.", true)
+        configureItem(binding.item2, "AI Understands", "Advanced legal analysis to build your case profile.", false)
+        configureItem(binding.item3, "Right Lawyer", "Targeted professional matching based on expertise.", true)
+        configureItem(binding.item4, "Lawyers Choose", "Selective representation by top-tier legal minds.", false)
+        configureItem(binding.item5, "Communicate Securely", "Encrypted dialogue for sensitive information.", true)
+        configureItem(binding.item6, "Complete Journey", "Resolution and finalization of your matter.", false)
 
-        // Scroll listener for progress line and active states
-        binding.scrollView.setOnScrollChangeListener(NestedScrollView.OnScrollChangeListener { v, _, scrollY, _, _ ->
-            val childHeight = v.getChildAt(0).height
-            val maxScroll = childHeight - v.height
-            if (maxScroll > 0) {
-                updateTimelineProgress(scrollY, maxScroll)
-            }
-        })
-    }
-
-    private fun configureItem(itemBinding: LayoutJourneyItemBinding, title: String, body: String, iconRes: Int) {
-        itemBinding.tvItemTitle.text = title
-        itemBinding.tvItemBody.text = body
-        itemBinding.ivIcon.setImageResource(iconRes)
-    }
-
-    private fun updateTimelineProgress(scrollY: Int, maxScroll: Int) {
-        val progress = scrollY.toFloat() / maxScroll
-        val params = binding.timelineProgress.layoutParams
-        params.height = (binding.timelineLine.height * progress).toInt()
-        binding.timelineProgress.layoutParams = params
-
-        // Update active states based on position (approximate points)
-        updateActiveState(binding.item1, scrollY, 0)
-        updateActiveState(binding.item2, scrollY, 300)
-        updateActiveState(binding.item3, scrollY, 600)
-        updateActiveState(binding.item4, scrollY, 900)
-        updateActiveState(binding.item5, scrollY, 1200)
-        updateActiveState(binding.item6, scrollY, 1500)
-    }
-
-    private fun updateActiveState(itemBinding: LayoutJourneyItemBinding, scrollY: Int, activationPoint: Int) {
-        val isActive = scrollY >= activationPoint
-        val targetScale = if (isActive) 1.15f else 1.0f
-        val targetColor = if (isActive) R.color.journey_gold else R.color.white
-        val targetIconColor = if (isActive) R.color.white else R.color.journey_brass
-
-        if (itemBinding.iconContainer.tag != isActive) {
-            itemBinding.iconContainer.tag = isActive
-            
-            // Animate scale and rotation
-            val scaleX = ObjectAnimator.ofFloat(itemBinding.iconContainer, View.SCALE_X, targetScale)
-            val scaleY = ObjectAnimator.ofFloat(itemBinding.iconContainer, View.SCALE_Y, targetScale)
-            scaleX.start()
-            scaleY.start()
-            animators.add(scaleX)
-            animators.add(scaleY)
-
-            if (isActive) {
-                val rotation = ObjectAnimator.ofFloat(itemBinding.iconContainer, View.ROTATION, 0f, 360f)
-                rotation.start()
-                animators.add(rotation)
-            }
-
-            // Update colors
-            itemBinding.iconContainer.backgroundTintList = ColorStateList.valueOf(ContextCompat.getColor(requireContext(), targetColor))
-            itemBinding.ivIcon.imageTintList = ColorStateList.valueOf(ContextCompat.getColor(requireContext(), targetIconColor))
+        // Show image views in cards as per code.html
+        listOf(binding.item1, binding.item2, binding.item3, binding.item6).forEach { 
+            it.ivItemImage.visibility = View.VISIBLE
         }
     }
+
+    private fun configureItem(itemBinding: LayoutJourneyItemBinding, title: String, body: String, isLeft: Boolean) {
+        itemBinding.tvItemTitle.text = title
+        itemBinding.tvItemBody.text = body
+        
+        // Align text towards the timeline (Center)
+        val gravity = if (isLeft) android.view.Gravity.END else android.view.Gravity.START
+        itemBinding.tvItemTitle.gravity = gravity
+        itemBinding.tvItemBody.gravity = gravity
+    }
+
 
     private fun setupListeners() {
         binding.btnBack.setOnClickListener {

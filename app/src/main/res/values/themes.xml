@@ -69,27 +69,27 @@
     </style>
     <style name="TextAppearance.Askvocate.JourneyHeader" parent="TextAppearance.Material3.DisplayLarge">
         <item name="android:fontFamily">serif</item>
-        <item name="android:textColor">@color/journey_walnut</item>
+        <item name="android:textColor">@color/journey_text_headline</item>
         <item name="android:textSize">32sp</item>
         <item name="android:textStyle">bold</item>
     </style>
 
     <style name="TextAppearance.Askvocate.JourneyBody" parent="TextAppearance.Material3.BodyMedium">
         <item name="android:fontFamily">sans-serif</item>
-        <item name="android:textColor">@color/journey_walnut</item>
+        <item name="android:textColor">@color/journey_text_headline</item>
         <item name="android:alpha">0.8</item>
     </style>
 
     <style name="TextAppearance.Askvocate.JourneyCardTitle" parent="TextAppearance.Material3.HeadlineMedium">
         <item name="android:fontFamily">serif</item>
-        <item name="android:textColor">@color/journey_walnut</item>
+        <item name="android:textColor">@color/journey_text_headline</item>
         <item name="android:textSize">22sp</item>
         <item name="android:textStyle">bold</item>
     </style>
 
     <style name="TextAppearance.Askvocate.JourneyCardBody" parent="TextAppearance.Material3.BodySmall">
         <item name="android:fontFamily">sans-serif</item>
-        <item name="android:textColor">@color/journey_walnut</item>
+        <item name="android:textColor">@color/journey_text_headline</item>
         <item name="android:alpha">0.7</item>
         <item name="android:lineHeight">20sp</item>
     </style>
