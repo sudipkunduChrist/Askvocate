@@ -30,3 +30,11 @@ memory_heap.bin
 # JNI
 libs/
 obj/
+
+target/
+*.class
+*.db
+*.db-shm
+.env
+*.db-wal
+*.log

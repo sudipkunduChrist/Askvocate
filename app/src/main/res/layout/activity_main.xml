@@ -19,8 +19,7 @@
             android:layout_height="match_parent"
             app:defaultNavHost="true"
             app:navGraph="@navigation/nav_graph"
-            app:layout_behavior="@string/appbar_scrolling_view_behavior"
-            android:layout_marginBottom="?attr/actionBarSize" />
+            app:layout_behavior="@string/appbar_scrolling_view_behavior" />
 
         <com.google.android.material.bottomnavigation.BottomNavigationView
             android:id="@+id/bottom_navigation"
