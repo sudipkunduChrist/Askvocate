@@ -26,20 +26,22 @@
     <path
         android:fillColor="#FFD700"
         android:pathData="M50,16a5,5 0,1 0,0,10a5,5 0,1 0,0,-10z" />
-    <!-- Left Scale -->
+    <!-- Left Scale chains -->
     <path
         android:strokeColor="#FFFFFF"
         android:strokeWidth="2"
         android:pathData="M26,34 L18,48 M26,34 L34,48" />
+    <!-- Left Scale pan - centered at x=26 (matching chain attachment) -->
     <path
         android:fillColor="#FFD700"
-        android:pathData="M16,48c0,6 16,6 16,0z" />
-    <!-- Right Scale -->
+        android:pathData="M18,48c0,6 16,6 16,0z" />
+    <!-- Right Scale chains -->
     <path
         android:strokeColor="#FFFFFF"
         android:strokeWidth="2"
         android:pathData="M74,34 L66,48 M74,34 L82,48" />
+    <!-- Right Scale pan - centered at x=74 (matching chain attachment) -->
     <path
         android:fillColor="#FFD700"
-        android:pathData="M64,48c0,6 16,6 16,0z" />
+        android:pathData="M66,48c0,6 16,6 16,0z" />
 </vector>

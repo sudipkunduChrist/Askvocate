@@ -11,6 +11,14 @@
     <path
         android:fillColor="#FFD700"
         android:pathData="M50,16l6,10h11l-3,11l8,8l-8,8l3,11h-11l-6,10l-6,-10h-11l3,-11l-8,-8l8,-8l-3,-11h11z" />
+    <!-- Ribbon Tails (Perfect X-axis symmetry, mirrored V-cuts) -->
+    <path
+        android:fillColor="#FFD700"
+        android:pathData="M34,63L46,63L46,82L40,75L34,82Z" />
+    <path
+        android:fillColor="#FFD700"
+        android:pathData="M66,63L54,63L54,82L60,75L66,82Z" />
+    <!-- Badge Circle -->
     <path
         android:fillColor="#FFFFFF"
         android:pathData="M50,28a18,18 0,1 0,0,36a18,18 0,0 0,0,-36z" />
@@ -22,8 +30,4 @@
         android:strokeLineJoin="round"
         android:fillColor="#00000000"
         android:pathData="M42,46l6,6l12,-12" />
-    <!-- Ribbon Tails -->
-    <path
-        android:fillColor="#FFD700"
-        android:pathData="M38,62l-8,24l12,-6l8,6l-4,-24zM62,62l4,24l-8,-6l-12,6l8,-24z" />
 </vector>

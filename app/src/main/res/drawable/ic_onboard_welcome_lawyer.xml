@@ -10,23 +10,34 @@
     <path
         android:fillColor="#33FFFFFF"
         android:pathData="M50,12A38,38 0,1 0,50,88A38,38 0,1 0,50,12Z" />
-    <!-- Briefcase Body -->
+
+    <!-- Folder back tab (behind) -->
+    <path
+        android:fillColor="#E6C200"
+        android:pathData="M28,30h14l4,6h28a4,4 0,0 1,4 4v28a4,4 0,0 1,-4 4H28a4,4 0,0 1,-4 -4V34a4,4 0,0 1,4 -4z" />
+
+    <!-- Folder front -->
     <path
         android:fillColor="#FFD700"
-        android:pathData="M24,36h52a4,4 0,0 1,4 4v32a4,4 0,0 1,-4 4H24a4,4 0,0 1,-4 -4V40a4,4 0,0 1,4 -4z" />
-    <!-- Briefcase Handle -->
-    <path
-        android:fillColor="#FFFFFF"
-        android:pathData="M38,28h24v8h-24zM42,32h16v4h-16z" />
-    <!-- Clasp/Lock -->
-    <path
-        android:fillColor="#FFFFFF"
-        android:pathData="M44,48h12v12h-12z" />
-    <!-- Gavel overlay -->
-    <path
-        android:fillColor="#FFFFFF"
-        android:pathData="M60,24l16,16l-6,6l-16,-16z" />
+        android:pathData="M28,36h40a4,4 0,0 1,4 4v26a4,4 0,0 1,-4 4H28a4,4 0,0 1,-4 -4V40a4,4 0,0 1,4 -4z" />
+
+    <!-- Folder tab (rounded) -->
     <path
         android:fillColor="#FFD700"
-        android:pathData="M48,36l24,24l-4,4l-24,-24z" />
+        android:pathData="M30,36h12a2,2 0,0 1,2 2v2a2,2 0,0 1,-2 2H30a2,2 0,0 1,-2 -2V38a2,2 0,0 1,2 -2z" />
+
+    <!-- Document line 1 -->
+    <path
+        android:fillColor="#FFFFFF"
+        android:pathData="M36,48h24a2,2 0,0 1,0 4H36a2,2 0,0 1,0 -4z" />
+
+    <!-- Document line 2 -->
+    <path
+        android:fillColor="#FFFFFF"
+        android:pathData="M36,56h24a2,2 0,0 1,0 4H36a2,2 0,0 1,0 -4z" />
+
+    <!-- Document line 3 (shorter) -->
+    <path
+        android:fillColor="#FFFFFF"
+        android:pathData="M36,64h16a2,2 0,0 1,0 4H36a2,2 0,0 1,0 -4z" />
 </vector>

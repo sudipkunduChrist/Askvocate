@@ -24,8 +24,8 @@
         android:strokeWidth="4"
         android:fillColor="#00000000"
         android:pathData="M42,48v-8a8,8 0,0 1,16,0v8" />
-    <!-- Keyhole -->
+    <!-- Keyhole - gold to match lock -->
     <path
-        android:fillColor="#1A2E6E"
-        android:pathData="M50,56a3,3 0,1 0,0,6a3,3 0,0 0,0,-6zM49,60h2v6h-2z" />
+        android:fillColor="#D4A800"
+        android:pathData="M48,58a2,2 0,1 0,4,0a2,2 0,0 0,-4,0zM49,60h2v5h-2z" />
 </vector>

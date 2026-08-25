@@ -18,7 +18,7 @@
     <!-- User Avatar Icon -->
     <path
         android:fillColor="#FFD700"
-        android:pathData="M38,44a6,6 0,1 0,0,-12a6,6 0,0 0,0,12zM28,58c0,-6 10,-6 10,-6s10,0 10,6v2H28v-2z" />
+        android:pathData="M38,48a6,6 0,1 0,0,-12a6,6 0,0 0,0,12zM28,58c0,-6 10,-6 10,-6s10,0 10,6v2H28v-2z" />
     <!-- Details Lines -->
     <path
         android:fillColor="#1A2E6E"
@@ -26,5 +26,5 @@
     <!-- Growth Arrow -->
     <path
         android:fillColor="#FFD700"
-        android:pathData="M30,68l12,-12l8,8l18,-18l4,4l-22,22l-8,-8l-8,8z" />
+        android:pathData="M30,76l12,-12l8,8l18,-18l4,4l-22,22l-8,-8l-8,8z" />
 </vector>
