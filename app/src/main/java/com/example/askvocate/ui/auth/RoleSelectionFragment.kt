@@ -52,7 +52,10 @@ class RoleSelectionFragment : Fragment() {
         updateUI(view)
 
         btnContinue.setOnClickListener {
-            NavHostFragment.findNavController(this).navigate(R.id.action_role_selection_to_onboarding)
+            val args = android.os.Bundle().apply {
+                putBoolean("isLawyer", !isClientSelected)
+            }
+            NavHostFragment.findNavController(this).navigate(R.id.action_role_selection_to_onboarding, args)
         }
     }
 

@@ -41,23 +41,27 @@ class MainActivity : AppCompatActivity() {
         // Setup drawer navigation
         navView.setupWithNavController(navController)
 
-        // Hide bottom nav on specific screens
+        // Hide bottom nav and lock drawer on specific screens
         navController.addOnDestinationChangedListener { _, destination, _ ->
             when (destination.id) {
                 R.id.nav_splash,
-                R.id.nav_legal_journey,
                 R.id.nav_role_selection,
                 R.id.nav_onboarding,
                 R.id.nav_get_started,
                 R.id.nav_sign_in,
                 R.id.nav_sign_up,
-                R.id.nav_lawyer_profile,
-                R.id.nav_chat_detail,
                 R.id.nav_privacy_policy -> {
                     bottomNav.visibility = View.GONE
+                    drawerLayout.setDrawerLockMode(DrawerLayout.LOCK_MODE_LOCKED_CLOSED)
+                }
+                R.id.nav_lawyer_profile,
+                R.id.nav_chat_detail -> {
+                    bottomNav.visibility = View.GONE
+                    drawerLayout.setDrawerLockMode(DrawerLayout.LOCK_MODE_UNLOCKED)
                 }
                 else -> {
                     bottomNav.visibility = View.VISIBLE
+                    drawerLayout.setDrawerLockMode(DrawerLayout.LOCK_MODE_UNLOCKED)
                 }
             }
         }

@@ -1,0 +1,32 @@
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="120dp"
+    android:height="120dp"
+    android:viewportWidth="100"
+    android:viewportHeight="100">
+    <!-- Outer circle background -->
+    <path
+        android:fillColor="#1AFFFFFF"
+        android:pathData="M50,4A46,46 0,1 0,50,96A46,46 0,1 0,50,4Z" />
+    <path
+        android:fillColor="#33FFFFFF"
+        android:pathData="M50,12A38,38 0,1 0,50,88A38,38 0,1 0,50,12Z" />
+    <!-- Briefcase Body -->
+    <path
+        android:fillColor="#FFD700"
+        android:pathData="M24,36h52a4,4 0,0 1,4 4v32a4,4 0,0 1,-4 4H24a4,4 0,0 1,-4 -4V40a4,4 0,0 1,4 -4z" />
+    <!-- Briefcase Handle -->
+    <path
+        android:fillColor="#FFFFFF"
+        android:pathData="M38,28h24v8h-24zM42,32h16v4h-16z" />
+    <!-- Clasp/Lock -->
+    <path
+        android:fillColor="#FFFFFF"
+        android:pathData="M44,48h12v12h-12z" />
+    <!-- Gavel overlay -->
+    <path
+        android:fillColor="#FFFFFF"
+        android:pathData="M60,24l16,16l-6,6l-16,-16z" />
+    <path
+        android:fillColor="#FFD700"
+        android:pathData="M48,36l24,24l-4,4l-24,-24z" />
+</vector>

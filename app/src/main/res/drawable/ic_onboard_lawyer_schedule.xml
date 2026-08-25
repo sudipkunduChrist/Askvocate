@@ -1,0 +1,36 @@
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="120dp"
+    android:height="120dp"
+    android:viewportWidth="100"
+    android:viewportHeight="100">
+    <!-- Outer background -->
+    <path
+        android:fillColor="#1AFFFFFF"
+        android:pathData="M50,4A46,46 0,1 0,50,96A46,46 0,1 0,50,4Z" />
+    <!-- Clock circle -->
+    <path
+        android:strokeColor="#FFFFFF"
+        android:strokeWidth="6"
+        android:fillColor="#1A2E6E"
+        android:pathData="M50,18a32,32 0,1 0,0,64a32,32 0,0 0,0,-64z" />
+    <!-- Clock Hands -->
+    <path
+        android:strokeColor="#FFD700"
+        android:strokeWidth="4"
+        android:strokeLineCap="round"
+        android:pathData="M50,50L50,32 M50,50L64,50" />
+    <path
+        android:fillColor="#FFD700"
+        android:pathData="M50,50m-4,0a4,4 0,1 0,8,0a4,4 0,1 0,-8,0" />
+    <!-- Badge Check -->
+    <path
+        android:fillColor="#FFD700"
+        android:pathData="M66,62a12,12 0,1 0,0,24a12,12 0,0 0,0,-24z" />
+    <path
+        android:strokeColor="#1A2E6E"
+        android:strokeWidth="3"
+        android:strokeLineCap="round"
+        android:strokeLineJoin="round"
+        android:fillColor="#00000000"
+        android:pathData="M61,74l3,3l7,-7" />
+</vector>

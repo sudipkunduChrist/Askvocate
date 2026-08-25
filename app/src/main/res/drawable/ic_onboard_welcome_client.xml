@@ -1,0 +1,45 @@
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="120dp"
+    android:height="120dp"
+    android:viewportWidth="100"
+    android:viewportHeight="100">
+    <!-- Outer glowing ring -->
+    <path
+        android:fillColor="#1AFFFFFF"
+        android:pathData="M50,4A46,46 0,1 0,50,96A46,46 0,1 0,50,4Z" />
+    <path
+        android:fillColor="#33FFFFFF"
+        android:pathData="M50,12A38,38 0,1 0,50,88A38,38 0,1 0,50,12Z" />
+    <!-- Scales of justice stem -->
+    <path
+        android:fillColor="#FFD700"
+        android:pathData="M48,22h4v42h-4z" />
+    <!-- Base -->
+    <path
+        android:fillColor="#FFD700"
+        android:pathData="M36,64h28v6H36zM32,70h36v4H32z" />
+    <!-- Top beam -->
+    <path
+        android:fillColor="#FFFFFF"
+        android:pathData="M24,30h52v4H24z" />
+    <!-- Center finial -->
+    <path
+        android:fillColor="#FFD700"
+        android:pathData="M50,16a5,5 0,1 0,0,10a5,5 0,1 0,0,-10z" />
+    <!-- Left Scale -->
+    <path
+        android:strokeColor="#FFFFFF"
+        android:strokeWidth="2"
+        android:pathData="M26,34 L18,48 M26,34 L34,48" />
+    <path
+        android:fillColor="#FFD700"
+        android:pathData="M16,48c0,6 16,6 16,0z" />
+    <!-- Right Scale -->
+    <path
+        android:strokeColor="#FFFFFF"
+        android:strokeWidth="2"
+        android:pathData="M74,34 L66,48 M74,34 L82,48" />
+    <path
+        android:fillColor="#FFD700"
+        android:pathData="M64,48c0,6 16,6 16,0z" />
+</vector>

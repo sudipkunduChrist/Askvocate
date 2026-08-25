@@ -40,7 +40,7 @@ class SplashFragment : Fragment() {
         // 4 second delay to allow animations to play before navigating
         Handler(Looper.getMainLooper()).postDelayed({
             if (isAdded && _binding != null) {
-                NavHostFragment.findNavController(this).navigate(R.id.action_splash_to_legal_journey)
+                NavHostFragment.findNavController(this).navigate(R.id.action_splash_to_role_selection)
             }
         }, 4000)
     }

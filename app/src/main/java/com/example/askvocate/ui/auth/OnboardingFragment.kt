@@ -5,16 +5,27 @@ import android.view.LayoutInflater
 import android.view.View
 import android.view.ViewGroup
 import android.widget.ImageButton
+import android.widget.ImageView
+import android.widget.LinearLayout
 import android.widget.TextView
+import androidx.activity.OnBackPressedCallback
+import androidx.core.content.ContextCompat
 import androidx.fragment.app.Fragment
 import androidx.navigation.fragment.NavHostFragment
 import androidx.recyclerview.widget.RecyclerView
 import androidx.viewpager2.widget.ViewPager2
 import com.example.askvocate.R
-import com.google.android.material.tabs.TabLayout
-import com.google.android.material.tabs.TabLayoutMediator
+import com.google.android.material.button.MaterialButton
 
 class OnboardingFragment : Fragment() {
+
+    private var isLawyer: Boolean = false
+    private lateinit var dots: Array<View>
+
+    override fun onCreate(savedInstanceState: Bundle?) {
+        super.onCreate(savedInstanceState)
+        isLawyer = arguments?.getBoolean("isLawyer", false) ?: false
+    }
 
     override fun onCreateView(
         inflater: LayoutInflater,
@@ -27,69 +38,233 @@ class OnboardingFragment : Fragment() {
     override fun onViewCreated(view: View, savedInstanceState: Bundle?) {
         super.onViewCreated(view, savedInstanceState)
 
-        val viewPager = view.findViewById<ViewPager2>(R.id.viewPager)
-        val tabLayout = view.findViewById<TabLayout>(R.id.tabLayout)
-        val btnNext = view.findViewById<ImageButton>(R.id.btn_next)
-        val tvSkip = view.findViewById<TextView>(R.id.tv_skip)
+        val viewPager    = view.findViewById<ViewPager2>(R.id.viewPager)
+        val dotContainer = view.findViewById<LinearLayout>(R.id.dot_container)
+        val btnNext      = view.findViewById<ImageButton>(R.id.btn_next)
+        val tvSkip       = view.findViewById<TextView>(R.id.tv_skip)
 
-        val adapter = OnboardingAdapter {
-            navigateToGetStarted()
-        }
+        val btnBack      = view.findViewById<ImageButton>(R.id.btn_back_onboarding)
+
+        val totalSlides = 5
+
+        val adapter = OnboardingAdapter(isLawyer) { navigateToSignUp() }
         viewPager.adapter = adapter
 
-        TabLayoutMediator(tabLayout, viewPager) { _, _ -> }.attach()
+        // Build 5 circular dot indicators
+        setupDots(dotContainer, totalSlides)
 
-        btnNext.setOnClickListener {
-            if (viewPager.currentItem < 2) {
-                viewPager.currentItem += 1
+        // Custom back button handling: step back page by page through the ViewPager
+        requireActivity().onBackPressedDispatcher.addCallback(viewLifecycleOwner, object : OnBackPressedCallback(true) {
+            override fun handleOnBackPressed() {
+                if (viewPager.currentItem > 0) {
+                    viewPager.currentItem -= 1
+                } else {
+                    isEnabled = false
+                    requireActivity().onBackPressedDispatcher.onBackPressed()
+                }
+            }
+        })
+
+        btnBack.setOnClickListener {
+            if (viewPager.currentItem > 0) {
+                viewPager.currentItem = 0
             } else {
-                navigateToGetStarted()
+                NavHostFragment.findNavController(this).navigateUp()
             }
         }
 
-        tvSkip.setOnClickListener {
-            navigateToGetStarted()
+        viewPager.registerOnPageChangeCallback(object : ViewPager2.OnPageChangeCallback() {
+            override fun onPageSelected(position: Int) {
+                updateDots(position)
+                val isLastSlide = position == totalSlides - 1
+                // Hide next arrow & skip pill on the last slide
+                btnNext.visibility = if (isLastSlide) View.GONE else View.VISIBLE
+                tvSkip.visibility  = if (isLastSlide) View.GONE else View.VISIBLE
+
+                if (isLastSlide) {
+                    btnBack.imageTintList = android.content.res.ColorStateList.valueOf(
+                        ContextCompat.getColor(requireContext(), R.color.navy_primary)
+                    )
+                    btnBack.background = ContextCompat.getDrawable(
+                        requireContext(), R.drawable.bg_pill_button_outline
+                    )
+                } else {
+                    btnBack.imageTintList = android.content.res.ColorStateList.valueOf(
+                        ContextCompat.getColor(requireContext(), R.color.white)
+                    )
+                    btnBack.background = ContextCompat.getDrawable(
+                        requireContext(), R.drawable.bg_skip_pill
+                    )
+                }
+            }
+        })
+
+        btnNext.setOnClickListener {
+            val next = viewPager.currentItem + 1
+            if (next < totalSlides) viewPager.currentItem = next else navigateToSignUp()
+        }
+
+        // Skip button jumps to slide 5 (Let's start exploring)
+        tvSkip.setOnClickListener { viewPager.currentItem = totalSlides - 1 }
+    }
+
+    // ── Dot helpers ──────────────────────────────────────────────────────────
+
+    private fun setupDots(container: LinearLayout, count: Int) {
+        container.removeAllViews()
+        val dp = resources.displayMetrics.density
+        val dotPx = (8 * dp).toInt()   // 8 dp diameter
+        val gapPx = (6 * dp).toInt()   // 6 dp spacing
+
+        dots = Array(count) { i ->
+            View(requireContext()).apply {
+                val lp = LinearLayout.LayoutParams(dotPx, dotPx)
+                if (i > 0) lp.marginStart = gapPx
+                layoutParams = lp
+                background = ContextCompat.getDrawable(
+                    requireContext(), R.drawable.bg_onboarding_dot
+                )
+                isSelected = i == 0
+            }.also { container.addView(it) }
         }
     }
 
-    private fun navigateToGetStarted() {
-        NavHostFragment.findNavController(this).navigate(R.id.action_onboarding_to_get_started)
+    private fun updateDots(activePosition: Int) {
+        dots.forEachIndexed { i, dot -> dot.isSelected = i == activePosition }
     }
 
-    inner class OnboardingAdapter(private val onFinish: () -> Unit) : RecyclerView.Adapter<OnboardingAdapter.ViewHolder>() {
+    // ── Navigation ───────────────────────────────────────────────────────────
+
+    private fun navigateToSignUp() {
+        NavHostFragment.findNavController(this)
+            .navigate(R.id.action_onboarding_to_sign_up)
+    }
+
+    // ── Data Class ───────────────────────────────────────────────────────────
+
+    data class OnboardingSlide(
+        val title: String,
+        val description: String,
+        val imageResId: Int,
+        val isFinal: Boolean
+    )
+
+    // ── Companion ────────────────────────────────────────────────────────────
+
+    companion object {
+        private const val VIEW_TYPE_NORMAL = 0
+        private const val VIEW_TYPE_FINAL  = 1
+    }
+
+    // ── Adapter ──────────────────────────────────────────────────────────────
+
+    inner class OnboardingAdapter(
+        private val isLawyer: Boolean,
+        private val onFinish: () -> Unit
+    ) : RecyclerView.Adapter<OnboardingAdapter.ViewHolder>() {
+
+        private val slides: List<OnboardingSlide> by lazy {
+            if (isLawyer) listOf(
+                OnboardingSlide(
+                    getString(R.string.lawyer_slide_1_title),
+                    getString(R.string.lawyer_slide_1_desc),
+                    R.drawable.ic_onboard_welcome_lawyer,
+                    false
+                ),
+                OnboardingSlide(
+                    getString(R.string.lawyer_slide_2_title),
+                    getString(R.string.lawyer_slide_2_desc),
+                    R.drawable.ic_onboard_lawyer_practice,
+                    false
+                ),
+                OnboardingSlide(
+                    getString(R.string.lawyer_slide_3_title),
+                    getString(R.string.lawyer_slide_3_desc),
+                    R.drawable.ic_onboard_lawyer_schedule,
+                    false
+                ),
+                OnboardingSlide(
+                    getString(R.string.lawyer_slide_4_title),
+                    getString(R.string.lawyer_slide_4_desc),
+                    R.drawable.ic_onboard_lawyer_verification,
+                    false
+                ),
+                OnboardingSlide(
+                    getString(R.string.onboarding_final_title),
+                    "",
+                    0,
+                    true
+                )
+            ) else listOf(
+                OnboardingSlide(
+                    getString(R.string.client_slide_1_title),
+                    getString(R.string.client_slide_1_desc),
+                    R.drawable.ic_onboard_welcome_client,
+                    false
+                ),
+                OnboardingSlide(
+                    getString(R.string.client_slide_2_title),
+                    getString(R.string.client_slide_2_desc),
+                    R.drawable.ic_onboard_find_lawyer,
+                    false
+                ),
+                OnboardingSlide(
+                    getString(R.string.client_slide_3_title),
+                    getString(R.string.client_slide_3_desc),
+                    R.drawable.ic_onboard_consultation,
+                    false
+                ),
+                OnboardingSlide(
+                    getString(R.string.client_slide_4_title),
+                    getString(R.string.client_slide_4_desc),
+                    R.drawable.ic_onboard_security,
+                    false
+                ),
+                OnboardingSlide(
+                    getString(R.string.onboarding_final_title),
+                    "",
+                    0,
+                    true
+                )
+            )
+        }
+
+        override fun getItemViewType(position: Int) =
+            if (slides[position].isFinal) VIEW_TYPE_FINAL else VIEW_TYPE_NORMAL
 
         override fun onCreateViewHolder(parent: ViewGroup, viewType: Int): ViewHolder {
-            val view = LayoutInflater.from(parent.context).inflate(R.layout.item_onboarding, parent, false)
-            return ViewHolder(view)
+            val layoutRes = if (viewType == VIEW_TYPE_FINAL)
+                R.layout.item_onboarding_final else R.layout.item_onboarding
+            val v = LayoutInflater.from(parent.context).inflate(layoutRes, parent, false)
+            return ViewHolder(v)
         }
 
-        override fun onBindViewHolder(holder: ViewHolder, position: Int) {
-            holder.bind(position)
-        }
+        override fun onBindViewHolder(holder: ViewHolder, position: Int) =
+            holder.bind(slides[position])
 
-        override fun getItemCount(): Int = 3
+        override fun getItemCount() = slides.size
 
         inner class ViewHolder(view: View) : RecyclerView.ViewHolder(view) {
-            fun bind(position: Int) {
-                val tvTitle = itemView.findViewById<TextView>(R.id.tv_title)
-                val tvDesc = itemView.findViewById<TextView>(R.id.tv_description)
-                val btn = itemView.findViewById<View>(R.id.btn_get_started_onboarding)
+            fun bind(slide: OnboardingSlide) {
+                // Title exists on both layouts
+                itemView.findViewById<TextView>(R.id.tv_title)?.text = slide.title
 
-                when (position) {
-                    0 -> {
-                        tvTitle.text = getString(R.string.welcome_askvocate_title)
-                        tvDesc.text = getString(R.string.onboarding_step_1_desc)
+                // Description and Illustration exist on normal slides
+                itemView.findViewById<TextView>(R.id.tv_description)?.text = slide.description
+
+                itemView.findViewById<ImageView>(R.id.iv_illustration)?.apply {
+                    if (slide.imageResId != 0) {
+                        setImageResource(slide.imageResId)
+                        visibility = View.VISIBLE
+                    } else {
+                        visibility = View.GONE
                     }
-                    1 -> {
-                        tvTitle.text = getString(R.string.onboarding_step_2_title)
-                        tvDesc.text = getString(R.string.onboarding_step_2_desc)
-                    }
-                    2 -> {
-                        tvTitle.text = getString(R.string.lets_start_exploring)
-                        tvDesc.text = getString(R.string.onboarding_step_3_desc)
-                        btn.visibility = View.VISIBLE
-                        btn.setOnClickListener { onFinish() }
-                    }
+                }
+
+                // Wire Get Started button on the final slide
+                if (slide.isFinal) {
+                    itemView.findViewById<MaterialButton>(R.id.btn_get_started_final)
+                        ?.setOnClickListener { onFinish() }
                 }
             }
         }

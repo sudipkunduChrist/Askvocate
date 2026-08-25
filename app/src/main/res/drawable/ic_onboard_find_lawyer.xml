@@ -1,0 +1,36 @@
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="120dp"
+    android:height="120dp"
+    android:viewportWidth="100"
+    android:viewportHeight="100">
+    <!-- Outer background -->
+    <path
+        android:fillColor="#1AFFFFFF"
+        android:pathData="M50,4A46,46 0,1 0,50,96A46,46 0,1 0,50,4Z" />
+    <!-- Shield / Badge -->
+    <path
+        android:fillColor="#FFD700"
+        android:pathData="M50,16L24,28v24c0,18 26,30 26,30s26,-12 26,-30V28L50,16z" />
+    <path
+        android:fillColor="#1A000000"
+        android:pathData="M50,16v66s26,-12 26,-30V28L50,16z" />
+    <!-- Magnifying Glass -->
+    <path
+        android:strokeColor="#FFFFFF"
+        android:strokeWidth="5"
+        android:fillColor="#00000000"
+        android:pathData="M44,44m-16,0a16,16 0,1 0,32,0a16,16 0,1 0,-32,0" />
+    <path
+        android:strokeColor="#FFFFFF"
+        android:strokeWidth="6"
+        android:strokeLineCap="round"
+        android:pathData="M56,56L72,72" />
+    <!-- Checkmark inside lens -->
+    <path
+        android:strokeColor="#FFD700"
+        android:strokeWidth="4"
+        android:strokeLineCap="round"
+        android:strokeLineJoin="round"
+        android:fillColor="#00000000"
+        android:pathData="M37,44l5,5l10,-10" />
+</vector>
