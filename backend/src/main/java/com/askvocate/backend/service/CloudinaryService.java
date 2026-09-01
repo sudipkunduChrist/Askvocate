@@ -1,5 +1,6 @@
 package com.askvocate.backend.service;
 
+import com.askvocate.backend.model.CloudinaryRef;
 import com.cloudinary.Cloudinary;
 import com.cloudinary.utils.ObjectUtils;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -19,6 +20,31 @@ public class CloudinaryService {
         Map<String, Object> options = ObjectUtils.asMap("folder", folder);
         Map<?, ?> uploadResult = cloudinary.uploader().upload(file.getBytes(), options);
         return (String) uploadResult.get("secure_url");
+    }
+
+    /**
+     * Uploads a file with OCR enabled and returns both the Cloudinary reference
+     * and the raw OCR data extracted from the image.
+     */
+    public UploadResult uploadWithOcr(MultipartFile file, String folder, String tag) throws IOException {
+        Map<String, Object> options = ObjectUtils.asMap(
+                "folder", folder,
+                "tags", tag,
+                "ocr", "adv_ocr"
+        );
+        
+        @SuppressWarnings("unchecked")
+        Map<String, Object> uploadResult = (Map<String, Object>) cloudinary.uploader().upload(file.getBytes(), options);
+        
+        String publicId = (String) uploadResult.get("public_id");
+        String secureUrl = (String) uploadResult.get("secure_url");
+        Object ocrData = uploadResult.get("info");
+        
+        CloudinaryRef ref = new CloudinaryRef();
+        ref.setPublicId(publicId);
+        ref.setSecureUrl(secureUrl);
+        
+        return new UploadResult(ref, ocrData);
     }
 
     // ✅ Signed URL - 1 hour (FIXED)
@@ -66,5 +92,21 @@ public class CloudinaryService {
 
     public void deleteFile(String publicId) throws IOException {
         cloudinary.uploader().destroy(publicId, ObjectUtils.emptyMap());
+    }
+
+    public void delete(String publicId) throws IOException {
+        deleteFile(publicId);
+    }
+
+    /**
+     * Result of uploading a file with OCR to Cloudinary.
+     *
+     * @param cloudinaryRef reference to the uploaded asset (public ID, URL, etc.)
+     * @param rawOcrData    the raw OCR extraction data from Cloudinary (if available)
+     */
+    public record UploadResult(
+            CloudinaryRef cloudinaryRef,
+            Object rawOcrData
+    ) {
     }
 }

@@ -80,8 +80,9 @@ public class DocumentVerificationController {
 
         HttpStatus status = switch (response.getVerificationStatus()) {
             case VERIFIED -> HttpStatus.OK;
-            case FAILED   -> HttpStatus.UNPROCESSABLE_ENTITY;
-            default       -> HttpStatus.ACCEPTED;
+            case FAILED -> HttpStatus.UNPROCESSABLE_ENTITY;
+            case PENDING -> HttpStatus.ACCEPTED;
+            case REJECTED -> HttpStatus.FORBIDDEN;
         };
 
         return ResponseEntity.status(status).body(response);
@@ -110,6 +111,9 @@ public class DocumentVerificationController {
 
         String userId = extractUserId(jwt);
         DocumentVerificationResponse response = verificationService.getDocumentById(userId, documentId);
+        if (response == null) {
+            throw new DocumentVerificationException("Document not found.");
+        }
         return ResponseEntity.ok(response);
     }
 

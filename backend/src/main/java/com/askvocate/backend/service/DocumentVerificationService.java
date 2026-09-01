@@ -12,6 +12,7 @@ import org.slf4j.LoggerFactory;
 import org.springframework.stereotype.Service;
 import org.springframework.web.multipart.MultipartFile;
 
+import java.io.IOException;
 import java.util.ArrayList;
 import java.util.List;
 
@@ -99,8 +100,12 @@ public class DocumentVerificationService {
 
         } catch (Exception e) {
             // If upload/OCR fails, clean up any uploaded images
-            cleanupCloudinaryAssets(cloudinaryRefs);
-            throw e;
+            try {
+                cleanupCloudinaryAssets(cloudinaryRefs);
+            } catch (Exception cleanupException) {
+                log.warn("Failed to clean up Cloudinary assets after verification failure", cleanupException);
+            }
+            throw new DocumentVerificationException("Document verification failed: " + e.getMessage(), e);
         }
 
         // 6. Determine verification status
@@ -188,7 +193,7 @@ public class DocumentVerificationService {
             try {
                 cloudinaryService.delete(ref.getPublicId());
             } catch (Exception e) {
-                log.error("Failed to cleanup Cloudinary asset: {}", ref.getPublicId());
+                log.error("Failed to cleanup Cloudinary asset: {}", ref.getPublicId(), e);
             }
         }
     }
