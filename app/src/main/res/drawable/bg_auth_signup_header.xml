@@ -1,0 +1,15 @@
+<?xml version="1.0" encoding="utf-8"?>
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="400dp"
+    android:height="300dp"
+    android:viewportWidth="400"
+    android:viewportHeight="300">
+    <!-- Navy Background -->
+    <path
+        android:fillColor="#1F3A5F"
+        android:pathData="M0,0h400v300h-400z" />
+    <!-- White Circle/Arc at top-left -->
+    <path
+        android:fillColor="#FFFFFF"
+        android:pathData="M-50,150 C-50,40 40,-50 150,-50 L-50,-50 Z" />
+</vector>

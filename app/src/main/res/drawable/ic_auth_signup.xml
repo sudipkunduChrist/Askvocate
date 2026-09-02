@@ -1,0 +1,38 @@
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="120dp"
+    android:height="120dp"
+    android:viewportWidth="100"
+    android:viewportHeight="100">
+    <!-- Background Rings (navy tint, visible on white) -->
+    <path
+        android:fillColor="#0D1F3A5F"
+        android:pathData="M50,4A46,46 0,1 0,50,96A46,46 0,1 0,50,4Z" />
+    <path
+        android:fillColor="#1A1F3A5F"
+        android:pathData="M50,14A36,36 0,1 0,50,86A36,36 0,1 0,50,14Z" />
+
+    <!-- User Profile Silhouette (Navy) -->
+    <!-- Head -->
+    <path
+        android:fillColor="#1F3A5F"
+        android:pathData="M50,22a12,12 0,1 0,0,24a12,12 0,1 0,0,-24z" />
+    <!-- Body -->
+    <path
+        android:fillColor="#1F3A5F"
+        android:pathData="M30,70c0,-12 10,-20 20,-20s20,8 20,20v4H30v-4z" />
+
+    <!-- Badge / Plus Circle (Amber) -->
+    <path
+        android:fillColor="#EB940E"
+        android:pathData="M65,55a10,10 0,1 0,0,20a10,10 0,1 0,0,-20z" />
+
+    <!-- Plus Sign -->
+    <path
+        android:fillColor="#FFFFFF"
+        android:pathData="M64,60h2v10h-2zM60,64h10v2h-10z" />
+
+    <!-- Decorative Stars/Sparkles -->
+    <path
+        android:fillColor="#EB940E"
+        android:pathData="M25,35l2,2l2,-2l-2,-2zM75,25l3,3l3,-3l-3,-3zM20,60l1.5,1.5l1.5,-1.5l-1.5,-1.5z" />
+</vector>

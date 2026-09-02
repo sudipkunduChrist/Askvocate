@@ -46,7 +46,6 @@
         <item name="android:textAllCaps">true</item>
         <item name="android:letterSpacing">0.05</item>
     </style>
-
     <!-- ==================== BUTTON STYLES ==================== -->
 
     <style name="Widget.Askvocate.Button.Primary" parent="Widget.Material3.Button">

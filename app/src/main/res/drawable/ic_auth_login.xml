@@ -1,0 +1,41 @@
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="120dp"
+    android:height="120dp"
+    android:viewportWidth="100"
+    android:viewportHeight="100">
+    <!-- Background Rings (Light Navy) -->
+    <path
+        android:fillColor="#0D1F3A5F"
+        android:pathData="M50,4A46,46 0,1 0,50,96A46,46 0,1 0,50,4Z" />
+    <path
+        android:fillColor="#1A1F3A5F"
+        android:pathData="M50,14A36,36 0,1 0,50,86A36,36 0,1 0,50,14Z" />
+
+    <!-- Access Card / Phone (Navy) -->
+    <path
+        android:fillColor="#1F3A5F"
+        android:pathData="M35,25h30a5,5 0,0 1,5 5v40a5,5 0,0 1,-5 5H35a5,5 0,0 1,-5 -5V30a5,5 0,0 1,5 -5z" />
+
+    <!-- Card Highlight -->
+    <path
+        android:fillColor="#2D5080"
+        android:pathData="M35,25h30v8H35z" />
+
+    <!-- Scanner Glow / Signal -->
+    <path
+        android:fillColor="#EB940E"
+        android:pathData="M40,40h20v2H40zM45,46h10v2H45z" />
+
+    <!-- Fingerprint / Authentication Circle -->
+    <path
+        android:fillColor="#FFFFFF"
+        android:pathData="M50,55a8,8 0,1 0,0,16a8,8 0,1 0,0,-16z" />
+    <path
+        android:fillColor="#EB940E"
+        android:pathData="M50,59a4,4 0,1 0,0,8a4,4 0,1 0,0,-8z" />
+
+    <!-- Bottom Detail -->
+    <path
+        android:fillColor="#FFFFFF"
+        android:pathData="M48,72h4v2h-4z" />
+</vector>

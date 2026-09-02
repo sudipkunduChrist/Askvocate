@@ -192,4 +192,5 @@
     <string name="cd_back">Go back</string>
     <string name="cd_verified">Verified professional</string>
     <string name="askvocate">ASKVOCATE</string>
+    <string name="sign_up_with_google">Sign up with Google</string>
 </resources>
