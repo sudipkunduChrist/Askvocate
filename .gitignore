@@ -1,15 +1,14 @@
 # IDE
-/.idea/
+.idea/
 *.iml
 *.iws
 *.ipr
 
-# Gradle / build output (root-level only; backend/ and frontend/ have their own)
-/.gradle/
-/.kotlin/
-/app/
-/build/
-/target/
+# Gradle / build output
+.gradle/
+.kotlin/
+**/build/
+**/target/
 /local.properties
 
 # Freebuff tool state
