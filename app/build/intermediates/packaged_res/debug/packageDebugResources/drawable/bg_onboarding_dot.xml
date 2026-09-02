@@ -1,0 +1,15 @@
+<?xml version="1.0" encoding="utf-8"?>
+<selector xmlns:android="http://schemas.android.com/apk/res/android">
+    <!-- Active dot: filled solid primary navy circle -->
+    <item android:state_selected="true">
+        <shape android:shape="oval">
+            <solid android:color="@color/navy_primary" />
+        </shape>
+    </item>
+    <!-- Inactive dot: light grey filled circle -->
+    <item>
+        <shape android:shape="oval">
+            <solid android:color="#D0D0D8" />
+        </shape>
+    </item>
+</selector>

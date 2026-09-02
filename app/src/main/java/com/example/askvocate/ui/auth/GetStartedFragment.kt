@@ -23,7 +23,7 @@ class GetStartedFragment : Fragment() {
         super.onViewCreated(view, savedInstanceState)
 
         view.findViewById<MaterialButton>(R.id.btn_get_started).setOnClickListener {
-            NavHostFragment.findNavController(this).navigate(R.id.action_get_started_to_sign_in)
+            NavHostFragment.findNavController(this).navigate(R.id.action_get_started_to_sign_up)
         }
     }
 }

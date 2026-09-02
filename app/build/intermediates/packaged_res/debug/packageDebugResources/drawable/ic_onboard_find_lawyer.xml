@@ -1,0 +1,41 @@
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="120dp"
+    android:height="120dp"
+    android:viewportWidth="100"
+    android:viewportHeight="100">
+    <path
+        android:fillColor="#1AFFFFFF"
+        android:pathData="M50,4A46,46 0,1 0,50,96A46,46 0,1 0,50,4Z" />
+    <path
+        android:fillColor="#FFD700"
+        android:pathData="M50,16L24,28v24c0,18 26,30 26,30s26,-12 26,-30V28L50,16z" />
+    <path
+        android:fillColor="#1A000000"
+        android:pathData="M50,16v66s26,-12 26,-30V28L50,16z" />
+
+    <!-- Smaller Magnifying Glass Lens -->
+    <path
+        android:strokeColor="#FFFFFF"
+        android:strokeWidth="4"
+        android:fillColor="#00000000"
+        android:pathData="M47,47m-11,0a11,11 0,1 0,22,0a11,11 0,1 0,-22,0" />
+
+    <!-- Shorter Handle -->
+    <path
+        android:strokeColor="#FFFFFF"
+        android:strokeWidth="5"
+        android:strokeLineCap="round"
+        android:pathData="M55,55L63,63" />
+
+    <!-- Smaller Verified badge, bottom-right -->
+    <path
+        android:fillColor="#2ECC71"
+        android:pathData="M65,65A9,9 0,1 0,65,83A9,9 0,1 0,65,65Z" />
+    <path
+        android:strokeColor="#FFFFFF"
+        android:strokeWidth="3"
+        android:strokeLineCap="round"
+        android:strokeLineJoin="round"
+        android:fillColor="#00000000"
+        android:pathData="M61,74l3,3l6,-6" />
+</vector>

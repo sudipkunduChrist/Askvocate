@@ -1,5 +1,5 @@
 <?xml version="1.0" encoding="utf-8"?>
-<resources>
+<resources xmlns:tools="http://schemas.android.com/tools">
 
     <!-- ==================== TEXT APPEARANCES ==================== -->
 
@@ -46,7 +46,6 @@
         <item name="android:textAllCaps">true</item>
         <item name="android:letterSpacing">0.05</item>
     </style>
-
     <!-- ==================== BUTTON STYLES ==================== -->
 
     <style name="Widget.Askvocate.Button.Primary" parent="Widget.Material3.Button">
@@ -166,6 +165,77 @@
         <item name="android:background">@color/surface_white</item>
         <item name="itemTextColor">@color/text_primary</item>
         <item name="itemIconTint">@color/navy_primary</item>
+    </style>
+
+    <!-- ==================== PREMIUM TEXT APPEARANCES ==================== -->
+
+    <style name="TextAppearance.Premium.Justitia" parent="TextAppearance.Material3.TitleLarge">
+        <item name="android:fontFamily">Libre Caslon Text</item>
+        <item name="android:textSize">20sp</item>
+        <item name="android:textStyle">bold</item>
+        <item name="android:letterSpacing">0.3</item>
+        <item name="android:textColor">@color/justitia_on_secondary</item>
+    </style>
+
+    <style name="TextAppearance.Premium.HeadlineLg" parent="TextAppearance.Material3.HeadlineLarge">
+        <item name="android:fontFamily">Libre Caslon Text</item>
+        <item name="android:textSize">32sp</item>
+        <item name="android:textStyle">bold</item>
+        <item name="android:textColor">@color/justitia_on_background</item>
+    </style>
+
+    <style name="TextAppearance.Premium.HeadlineMd" parent="TextAppearance.Material3.HeadlineMedium">
+        <item name="android:fontFamily">Libre Caslon Text</item>
+        <item name="android:textSize">20sp</item>
+        <item name="android:textStyle">bold</item>
+        <item name="android:textColor">@color/justitia_slate_text</item>
+    </style>
+
+    <style name="TextAppearance.Premium.BodyMd" parent="TextAppearance.Material3.BodyMedium">
+        <item name="android:fontFamily">Inter</item>
+        <item name="android:textSize">16sp</item>
+        <item name="android:textColor">@color/justitia_on_surface_variant</item>
+    </style>
+
+    <style name="TextAppearance.Premium.BodySm" parent="TextAppearance.Material3.BodySmall">
+        <item name="android:fontFamily">Inter</item>
+        <item name="android:textSize">14sp</item>
+        <item name="android:textColor">@color/justitia_on_surface_variant</item>
+    </style>
+
+    <!-- ==================== PREMIUM BUTTON STYLES ==================== -->
+
+    <style name="Widget.Premium.Button.Primary" parent="Widget.Material3.Button">
+        <item name="backgroundTint">@color/justitia_primary_container</item>
+        <item name="android:textColor">@color/justitia_on_secondary</item>
+        <item name="cornerRadius">8dp</item>
+        <item name="android:fontFamily">Inter</item>
+        <item name="android:textStyle">bold</item>
+    </style>
+
+    <style name="Widget.Premium.Button.3D" parent="Widget.Material3.Button">
+        <item name="backgroundTint">@color/justitia_secondary_container</item>
+        <item name="android:textColor">@color/justitia_on_secondary</item>
+        <item name="cornerRadius">12dp</item>
+        <item name="android:fontFamily">Inter</item>
+        <item name="android:textStyle">bold</item>
+        <item name="android:insetBottom">0dp</item>
+        <item name="android:insetTop">0dp</item>
+    </style>
+
+    <!-- ==================== PREMIUM CARD STYLE ==================== -->
+
+    <style name="Widget.Premium.Card" parent="Widget.Material3.CardView.Elevated">
+        <item name="cardBackgroundColor">@color/justitia_surface_elevated</item>
+        <item name="cardCornerRadius">24dp</item>
+        <item name="cardElevation">8dp</item>
+        <item name="strokeWidth">1dp</item>
+        <item name="strokeColor">@color/justitia_border</item>
+        <item name="android:stateListAnimator">@animator/card_lift</item>
+        <item name="android:clickable">true</item>
+        <item name="android:focusable">true</item>
+        <item name="android:outlineAmbientShadowColor" tools:targetApi="p">@color/justitia_shadow_glow</item>
+        <item name="android:outlineSpotShadowColor" tools:targetApi="p">@color/justitia_shadow_glow</item>
     </style>
 
 </resources>

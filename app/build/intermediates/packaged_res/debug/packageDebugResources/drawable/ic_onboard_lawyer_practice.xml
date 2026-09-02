@@ -1,0 +1,30 @@
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="120dp"
+    android:height="120dp"
+    android:viewportWidth="100"
+    android:viewportHeight="100">
+    <!-- Outer background -->
+    <path
+        android:fillColor="#1AFFFFFF"
+        android:pathData="M50,4A46,46 0,1 0,50,96A46,46 0,1 0,50,4Z" />
+    <!-- Professional Certificate / Profile Board -->
+    <path
+        android:fillColor="#FFFFFF"
+        android:pathData="M24,20h52a4,4 0,0 1,4 4v56a4,4 0,0 1,-4 4H24a4,4 0,0 1,-4 -4V24a4,4 0,0 1,4 -4z" />
+    <!-- Top Bar -->
+    <path
+        android:fillColor="#FFD700"
+        android:pathData="M20,24a4,4 0,0 1,4 -4h52a4,4 0,0 1,4 4v10H20V24z" />
+    <!-- User Avatar Icon -->
+    <path
+        android:fillColor="#FFD700"
+        android:pathData="M38,48a6,6 0,1 0,0,-12a6,6 0,0 0,0,12zM28,58c0,-6 10,-6 10,-6s10,0 10,6v2H28v-2z" />
+    <!-- Details Lines -->
+    <path
+        android:fillColor="#1A2E6E"
+        android:pathData="M54,36h20v3H54zM54,43h16v3H54zM54,50h18v3H54z" />
+    <!-- Growth Arrow -->
+    <path
+        android:fillColor="#FFD700"
+        android:pathData="M30,76l12,-12l8,8l18,-18l4,4l-22,22l-8,-8l-8,8z" />
+</vector>

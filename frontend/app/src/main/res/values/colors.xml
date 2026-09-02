@@ -72,4 +72,25 @@
     <color name="splash_primary">#FFF2CA50</color>
     <color name="splash_text">#FF1D2021</color>
     <color name="splash_text_variant">#661D2021</color>
+    <!-- Justitia Premium Design System (from code.html) -->
+    <color name="justitia_bg">#f6faff</color>
+    <color name="justitia_on_background">#171c20</color>
+    <color name="justitia_primary">#002961</color>
+    <color name="justitia_primary_container">#063e8a</color>
+    <color name="justitia_secondary_container">#fca223</color>
+    <color name="justitia_on_secondary">#ffffff</color>
+    <color name="justitia_on_surface_variant">#434751</color>
+    <color name="justitia_slate_text">#0F172A</color>
+    <color name="justitia_teal_success">#0D9488</color>
+    <color name="justitia_surface_elevated">#F8FAFC</color>
+    <color name="justitia_border">#E2E8F0</color>
+    <color name="justitia_shadow_glow">#26063E8A</color>
+    <color name="justitia_secondary_shadow">#875200</color>
+
+    <!-- Mappings -->
+    <color name="journey_background">@color/justitia_bg</color>
+    <color name="journey_text_headline">@color/justitia_slate_text</color>
+    <color name="journey_text_body">@color/justitia_on_surface_variant</color>
+    <color name="journey_card_bg">@color/justitia_surface_elevated</color>
+    <color name="journey_timeline_line">@color/justitia_secondary_container</color>
 </resources>

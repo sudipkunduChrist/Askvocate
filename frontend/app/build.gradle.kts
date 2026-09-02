@@ -1,8 +1,8 @@
 import org.jetbrains.kotlin.gradle.dsl.JvmTarget
 
 plugins {
-    alias(libs.plugins.android.application)
-    alias(libs.plugins.kotlin.android)
+    alias(libs.plugins.androidApplication)
+    // kotlinAndroid is now built-in with AGP 9.0+
 }
 
 android {
@@ -34,13 +34,11 @@ android {
         targetCompatibility = JavaVersion.VERSION_17
     }
 
-    // ✅ Moved kotlin block OUTSIDE android
     buildFeatures {
         viewBinding = true
     }
 }
 
-// ✅ kotlin block at the TOP LEVEL (not inside android)
 kotlin {
     compilerOptions {
         jvmTarget = JvmTarget.fromTarget("17")
@@ -88,18 +86,11 @@ dependencies {
     androidTestImplementation(libs.androidx.espresso.core)
 }
 
-// Add this dummy task to fix IDE sync error
+// Add these tasks if the IDE continues to report them as missing during sync.
+// They were likely added to fix a previous sync issue and can be removed once the IDE cache is cleared.
 tasks.register("prepareKotlinBuildScriptModel") {
-    description = "Fixes IDE sync error for Kotlin"
-    doLast {
-        println("Kotlin build script model prepared")
-    }
+    doLast { println("Kotlin build script model prepared") }
 }
-
-// Also add the misspelled version the IDE is looking for
 tasks.register("prepareKotlinBuildScriptMode") {
-    description = "Fixes IDE sync error (typo version)"
-    doLast {
-        println("Kotlin build script model prepared")
-    }
+    doLast { println("Kotlin build script model prepared") }
 }

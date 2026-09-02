@@ -20,3 +20,25 @@
 Thumbs.db
 *.swp
 *~
+.lock-wscript
+
+# Android specific
+captures/
+.externalNativeBuild/
+.cxx/
+memory_heap.bin
+*.apk
+*.aar
+*.ap_
+
+# JNI
+libs/
+obj/
+
+target/
+*.class
+*.db
+*.db-shm
+.env
+*.db-wal
+*.log

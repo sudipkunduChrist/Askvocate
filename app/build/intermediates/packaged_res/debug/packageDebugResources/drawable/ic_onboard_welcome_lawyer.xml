@@ -1,0 +1,43 @@
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="120dp"
+    android:height="120dp"
+    android:viewportWidth="100"
+    android:viewportHeight="100">
+    <!-- Outer circle background -->
+    <path
+        android:fillColor="#1AFFFFFF"
+        android:pathData="M50,4A46,46 0,1 0,50,96A46,46 0,1 0,50,4Z" />
+    <path
+        android:fillColor="#33FFFFFF"
+        android:pathData="M50,12A38,38 0,1 0,50,88A38,38 0,1 0,50,12Z" />
+
+    <!-- Folder back tab (behind) -->
+    <path
+        android:fillColor="#E6C200"
+        android:pathData="M28,30h14l4,6h28a4,4 0,0 1,4 4v28a4,4 0,0 1,-4 4H28a4,4 0,0 1,-4 -4V34a4,4 0,0 1,4 -4z" />
+
+    <!-- Folder front -->
+    <path
+        android:fillColor="#FFD700"
+        android:pathData="M28,36h40a4,4 0,0 1,4 4v26a4,4 0,0 1,-4 4H28a4,4 0,0 1,-4 -4V40a4,4 0,0 1,4 -4z" />
+
+    <!-- Folder tab (rounded) -->
+    <path
+        android:fillColor="#FFD700"
+        android:pathData="M30,36h12a2,2 0,0 1,2 2v2a2,2 0,0 1,-2 2H30a2,2 0,0 1,-2 -2V38a2,2 0,0 1,2 -2z" />
+
+    <!-- Document line 1 -->
+    <path
+        android:fillColor="#FFFFFF"
+        android:pathData="M36,48h24a2,2 0,0 1,0 4H36a2,2 0,0 1,0 -4z" />
+
+    <!-- Document line 2 -->
+    <path
+        android:fillColor="#FFFFFF"
+        android:pathData="M36,56h24a2,2 0,0 1,0 4H36a2,2 0,0 1,0 -4z" />
+
+    <!-- Document line 3 (shorter) -->
+    <path
+        android:fillColor="#FFFFFF"
+        android:pathData="M36,64h16a2,2 0,0 1,0 4H36a2,2 0,0 1,0 -4z" />
+</vector>

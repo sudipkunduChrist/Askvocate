@@ -139,6 +139,29 @@
     <string name="lets_start_exploring">Let\'s start exploring</string>
     <string name="skip">Skip</string>
 
+    <!-- Client Onboarding Slides -->
+    <string name="client_slide_1_title">Welcome to Askvocate!</string>
+    <string name="client_slide_1_desc">Want help with finding verified lawyers near you?</string>
+    <string name="client_slide_2_title">Find Verified Lawyers</string>
+    <string name="client_slide_2_desc">Browse through hundreds of certified legal professionals filtered by specialization, location, and ratings.</string>
+    <string name="client_slide_3_title">Book &amp; Consult Instantly</string>
+    <string name="client_slide_3_desc">Schedule consultations at your convenience, chat with your lawyer, and track your case — all in one place.</string>
+    <string name="client_slide_4_title">Secure &amp; Confidential</string>
+    <string name="client_slide_4_desc">Your legal matters and chat history are protected with top-grade privacy and end-to-end encryption.</string>
+
+    <!-- Lawyer Onboarding Slides -->
+    <string name="lawyer_slide_1_title">Welcome to Askvocate!</string>
+    <string name="lawyer_slide_1_desc">Ready to connect with clients and expand your legal practice?</string>
+    <string name="lawyer_slide_2_title">Showcase Your Practice</string>
+    <string name="lawyer_slide_2_desc">Create a professional profile with your specializations, experience, and fees to attract the right clients.</string>
+    <string name="lawyer_slide_3_title">Manage Your Bookings</string>
+    <string name="lawyer_slide_3_desc">Accept consultation requests, manage your schedule, and communicate with clients seamlessly.</string>
+    <string name="lawyer_slide_4_title">Verified Lawyer Badge</string>
+    <string name="lawyer_slide_4_desc">Gain trust with verified legal credentials, high client ratings, and top platform visibility.</string>
+
+    <!-- Shared Final Onboarding Slide -->
+    <string name="onboarding_final_title">Let\'s start exploring</string>
+
     <!-- Sign Up Refinement -->
     <string name="already_late">already\nlate.</string>
     <string name="confirm_password_hint">Confirm Password</string>
@@ -168,4 +191,6 @@
     <string name="cd_search">Search</string>
     <string name="cd_back">Go back</string>
     <string name="cd_verified">Verified professional</string>
+    <string name="askvocate">ASKVOCATE</string>
+    <string name="sign_up_with_google">Sign up with Google</string>
 </resources>

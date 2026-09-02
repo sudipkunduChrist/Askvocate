@@ -1,0 +1,30 @@
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="120dp"
+    android:height="120dp"
+    android:viewportWidth="100"
+    android:viewportHeight="100">
+    <!-- Outer background -->
+    <path
+        android:fillColor="#1AFFFFFF"
+        android:pathData="M50,4A46,46 0,1 0,50,96A46,46 0,1 0,50,4Z" />
+    <!-- Calendar Body -->
+    <path
+        android:fillColor="#FFFFFF"
+        android:pathData="M22,24h56a4,4 0,0 1,4 4v50a4,4 0,0 1,-4 4H22a4,4 0,0 1,-4 -4V28a4,4 0,0 1,4 -4z" />
+    <!-- Calendar Header -->
+    <path
+        android:fillColor="#FFD700"
+        android:pathData="M18,28a4,4 0,0 1,4 -4h56a4,4 0,0 1,4 4v12H18V28z" />
+    <!-- Calendar Rings -->
+    <path
+        android:fillColor="#1A2E6E"
+        android:pathData="M32,18h6v10h-6zM62,18h6v10h-6z" />
+    <!-- Chat Speech Bubble Overlay -->
+    <path
+        android:fillColor="#FFD700"
+        android:pathData="M42,46h32a4,4 0,0 1,4 4v20a4,4 0,0 1,-4 4h-16l-8,8v-8h-8a4,4 0,0 1,-4 -4V50a4,4 0,0 1,4 -4z" />
+    <!-- Chat Lines -->
+    <path
+        android:fillColor="#1A2E6E"
+        android:pathData="M48,54h20v3H48zM48,61h14v3H48z" />
+</vector>

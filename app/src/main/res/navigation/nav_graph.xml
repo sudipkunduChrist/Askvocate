@@ -38,13 +38,17 @@
         android:name="com.example.askvocate.ui.auth.OnboardingFragment"
         android:label="Onboarding"
         tools:layout="@layout/fragment_onboarding">
+        <argument
+            android:name="isLawyer"
+            app:argType="boolean"
+            android:defaultValue="false" />
         <action
-            android:id="@+id/action_onboarding_to_get_started"
-            app:destination="@id/nav_get_started"
-            app:enterAnim="@anim/fade_in"
-            app:exitAnim="@anim/fade_out"
-            app:popUpTo="@id/nav_onboarding"
-            app:popUpToInclusive="true" />
+            android:id="@+id/action_onboarding_to_sign_up"
+            app:destination="@id/nav_sign_up"
+            app:enterAnim="@anim/slide_in_right"
+            app:exitAnim="@anim/slide_out_left"
+            app:popEnterAnim="@anim/slide_in_left"
+            app:popExitAnim="@anim/slide_out_right" />
     </fragment>
 
     <fragment
@@ -59,6 +63,13 @@
             app:exitAnim="@anim/slide_out_left"
             app:popEnterAnim="@anim/slide_in_left"
             app:popExitAnim="@anim/slide_out_right" />
+        <action
+            android:id="@+id/action_get_started_to_sign_up"
+            app:destination="@id/nav_sign_up"
+            app:enterAnim="@anim/slide_in_right"
+            app:exitAnim="@anim/slide_out_left"
+            app:popUpTo="@id/nav_role_selection"
+            app:popUpToInclusive="true" />
     </fragment>
 
     <fragment

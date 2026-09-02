@@ -1,7 +1,11 @@
 package com.example.askvocate
 
+import android.annotation.SuppressLint
+import android.graphics.Color
 import android.os.Bundle
 import android.view.View
+import androidx.activity.SystemBarStyle
+import androidx.activity.enableEdgeToEdge
 import androidx.appcompat.app.AppCompatActivity
 import androidx.core.view.GravityCompat
 import androidx.drawerlayout.widget.DrawerLayout
@@ -16,6 +20,10 @@ class MainActivity : AppCompatActivity() {
     private lateinit var drawerLayout: DrawerLayout
 
     override fun onCreate(savedInstanceState: Bundle?) {
+        enableEdgeToEdge(
+            statusBarStyle = SystemBarStyle.light(Color.TRANSPARENT, Color.TRANSPARENT),
+            navigationBarStyle = SystemBarStyle.light(Color.TRANSPARENT, Color.TRANSPARENT)
+        )
         super.onCreate(savedInstanceState)
         setContentView(R.layout.activity_main)
 
@@ -33,7 +41,7 @@ class MainActivity : AppCompatActivity() {
         // Setup drawer navigation
         navView.setupWithNavController(navController)
 
-        // Hide bottom nav on specific screens
+        // Hide bottom nav and lock drawer on specific screens
         navController.addOnDestinationChangedListener { _, destination, _ ->
             when (destination.id) {
                 R.id.nav_splash,
@@ -42,18 +50,24 @@ class MainActivity : AppCompatActivity() {
                 R.id.nav_get_started,
                 R.id.nav_sign_in,
                 R.id.nav_sign_up,
-                R.id.nav_lawyer_profile,
-                R.id.nav_chat_detail,
                 R.id.nav_privacy_policy -> {
                     bottomNav.visibility = View.GONE
+                    drawerLayout.setDrawerLockMode(DrawerLayout.LOCK_MODE_LOCKED_CLOSED)
+                }
+                R.id.nav_lawyer_profile,
+                R.id.nav_chat_detail -> {
+                    bottomNav.visibility = View.GONE
+                    drawerLayout.setDrawerLockMode(DrawerLayout.LOCK_MODE_UNLOCKED)
                 }
                 else -> {
                     bottomNav.visibility = View.VISIBLE
+                    drawerLayout.setDrawerLockMode(DrawerLayout.LOCK_MODE_UNLOCKED)
                 }
             }
         }
     }
 
+    @SuppressLint("GestureBackNavigation")
     override fun onBackPressed() {
         if (drawerLayout.isDrawerOpen(GravityCompat.START)) {
             drawerLayout.closeDrawer(GravityCompat.START)
