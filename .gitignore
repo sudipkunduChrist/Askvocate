@@ -1,0 +1,40 @@
+# Build outputs and generated reports
+**/build/
+**/target/
+
+# Gradle and Kotlin caches
+.gradle/
+**/.gradle/
+.kotlin/
+**/.kotlin/
+.freebuff/
+
+# IDE and local machine files
+.idea/
+.vscode/
+*.iml
+local.properties
+.DS_Store
+
+# Local environment and secrets
+.env
+.env.*
+!.env.example
+
+# Android generated files
+captures/
+.externalNativeBuild/
+.cxx/
+*.apk
+*.aab
+*.aar
+*.ap_
+
+# Python caches
+__pycache__/
+*.py[cod]
+.pytest_cache/
+
+# Temporary files
+*.swp
+*~
