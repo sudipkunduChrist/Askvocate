@@ -1,0 +1,667 @@
+query_id,language,messiness_level,true_domain,predicted_domain,top1_hit,top5_hit
+Q0001,Hindi,clean,Administrative Law,Consumer Protection,0,0
+Q0002,Hindi,light,Administrative Law,Consumer Protection,0,0
+Q0003,Hindi,medium,Administrative Law,Education Law,0,0
+Q0004,Hindi,medium,Administrative Law,Consumer Protection,0,0
+Q0005,Hindi,heavy,Administrative Law,Consumer Protection,0,0
+Q0006,Hindi,heavy,Administrative Law,Consumer Protection,0,0
+Q0007,Hindi,heavy,Administrative Law,Consumer Protection,0,0
+Q0008,English,clean,Administrative Law,Administrative Law,1,1
+Q0009,English,light,Administrative Law,Administrative Law,1,1
+Q0010,English,medium,Administrative Law,Administrative Law,1,1
+Q0011,English,medium,Administrative Law,Consumer Protection,0,0
+Q0012,Hinglish,clean,Administrative Law,Administrative Law,1,1
+Q0013,Hinglish,light,Administrative Law,Environmental Law,0,0
+Q0014,Hinglish,medium,Administrative Law,Administrative Law,1,1
+Q0015,Hinglish,medium,Administrative Law,Environmental Law,0,0
+Q0016,Hinglish,heavy,Administrative Law,Administrative Law,1,1
+Q0017,Hinglish,heavy,Administrative Law,Administrative Law,1,1
+Q0018,Hinglish,clean,Administrative Law,Environmental Law,0,0
+Q0019,Hinglish,light,Administrative Law,Environmental Law,0,0
+Q0020,Hinglish,medium,Administrative Law,Environmental Law,0,0
+Q0021,Hinglish,medium,Administrative Law,Environmental Law,0,0
+Q0022,Hinglish,heavy,Administrative Law,Environmental Law,0,0
+Q0023,Hinglish,heavy,Administrative Law,Environmental Law,0,0
+Q0024,Hindi,clean,Arbitration,Arbitration,1,1
+Q0025,Hindi,light,Arbitration,Arbitration,1,1
+Q0026,Hindi,medium,Arbitration,Arbitration,1,1
+Q0027,Hindi,medium,Arbitration,Arbitration,1,1
+Q0028,Hindi,heavy,Arbitration,Arbitration,1,1
+Q0029,Hindi,heavy,Arbitration,Arbitration,1,1
+Q0030,Hindi,heavy,Arbitration,Arbitration,1,1
+Q0031,English,clean,Arbitration,Arbitration,1,1
+Q0032,English,light,Arbitration,Arbitration,1,1
+Q0033,English,medium,Arbitration,Arbitration,1,1
+Q0034,English,medium,Arbitration,Arbitration,1,1
+Q0035,Hinglish,clean,Arbitration,Corporate & Commercial,0,0
+Q0036,Hinglish,light,Arbitration,Corporate & Commercial,0,0
+Q0037,Hinglish,medium,Arbitration,Corporate & Commercial,0,0
+Q0038,Hinglish,medium,Arbitration,Corporate & Commercial,0,0
+Q0039,Hinglish,heavy,Arbitration,Corporate & Commercial,0,0
+Q0040,Hinglish,heavy,Arbitration,Corporate & Commercial,0,0
+Q0041,Hinglish,clean,Arbitration,Arbitration,1,1
+Q0042,Hinglish,light,Arbitration,Arbitration,1,1
+Q0043,Hinglish,medium,Arbitration,Arbitration,1,1
+Q0044,Hinglish,medium,Arbitration,Arbitration,1,1
+Q0045,Hinglish,heavy,Arbitration,Arbitration,1,1
+Q0046,Hinglish,heavy,Arbitration,Arbitration,1,1
+Q0047,Hindi,clean,Banking & Finance,Banking & Finance,1,1
+Q0048,Hindi,light,Banking & Finance,Banking & Finance,1,1
+Q0049,Hindi,medium,Banking & Finance,Banking & Finance,1,1
+Q0050,Hindi,medium,Banking & Finance,Banking & Finance,1,1
+Q0051,Hindi,heavy,Banking & Finance,Banking & Finance,1,1
+Q0052,Hindi,heavy,Banking & Finance,Banking & Finance,1,1
+Q0053,Hindi,heavy,Banking & Finance,Banking & Finance,1,1
+Q0054,English,clean,Banking & Finance,Banking & Finance,1,1
+Q0055,English,light,Banking & Finance,Banking & Finance,1,1
+Q0056,English,medium,Banking & Finance,Banking & Finance,1,1
+Q0057,English,medium,Banking & Finance,Banking & Finance,1,1
+Q0058,Hinglish,clean,Banking & Finance,Banking & Finance,1,1
+Q0059,Hinglish,light,Banking & Finance,Banking & Finance,1,1
+Q0060,Hinglish,medium,Banking & Finance,Banking & Finance,1,1
+Q0061,Hinglish,medium,Banking & Finance,Banking & Finance,1,1
+Q0062,Hinglish,heavy,Banking & Finance,Banking & Finance,1,1
+Q0063,Hinglish,heavy,Banking & Finance,Banking & Finance,1,1
+Q0064,Hinglish,clean,Banking & Finance,Banking & Finance,1,1
+Q0065,Hinglish,light,Banking & Finance,Banking & Finance,1,1
+Q0066,Hinglish,medium,Banking & Finance,Banking & Finance,1,1
+Q0067,Hinglish,medium,Banking & Finance,Banking & Finance,1,1
+Q0068,Hinglish,heavy,Banking & Finance,Banking & Finance,1,1
+Q0069,Hinglish,heavy,Banking & Finance,Banking & Finance,1,1
+Q0070,Hindi,clean,Child Protection,Child Protection,1,1
+Q0071,Hindi,light,Child Protection,Child Protection,1,1
+Q0072,Hindi,medium,Child Protection,Child Protection,1,1
+Q0073,Hindi,medium,Child Protection,Child Protection,1,1
+Q0074,Hindi,heavy,Child Protection,Child Protection,1,1
+Q0075,Hindi,heavy,Child Protection,Child Protection,1,1
+Q0076,Hindi,heavy,Child Protection,Child Protection,1,1
+Q0077,English,clean,Child Protection,Child Protection,1,1
+Q0078,English,light,Child Protection,Child Protection,1,1
+Q0079,English,medium,Child Protection,Child Protection,1,1
+Q0080,English,medium,Child Protection,Child Protection,1,1
+Q0081,Hinglish,clean,Child Protection,Education Law,0,0
+Q0082,Hinglish,light,Child Protection,Education Law,0,0
+Q0083,Hinglish,medium,Child Protection,Education Law,0,0
+Q0084,Hinglish,medium,Child Protection,Administrative Law,0,0
+Q0085,Hinglish,heavy,Child Protection,Education Law,0,0
+Q0086,Hinglish,heavy,Child Protection,Education Law,0,0
+Q0087,Hinglish,clean,Child Protection,Education Law,0,0
+Q0088,Hinglish,light,Child Protection,Education Law,0,0
+Q0089,Hinglish,medium,Child Protection,Education Law,0,0
+Q0090,Hinglish,medium,Child Protection,Education Law,0,0
+Q0091,Hinglish,heavy,Child Protection,Education Law,0,0
+Q0092,Hinglish,heavy,Child Protection,Education Law,0,0
+Q0093,Hindi,clean,Constitutional Law,Administrative Law,0,0
+Q0094,Hindi,light,Constitutional Law,Administrative Law,0,0
+Q0095,Hindi,medium,Constitutional Law,Administrative Law,0,0
+Q0096,Hindi,medium,Constitutional Law,Administrative Law,0,0
+Q0097,Hindi,heavy,Constitutional Law,Administrative Law,0,0
+Q0098,Hindi,heavy,Constitutional Law,Administrative Law,0,0
+Q0099,Hindi,heavy,Constitutional Law,Administrative Law,0,0
+Q0100,English,clean,Constitutional Law,Environmental Law,0,0
+Q0101,English,light,Constitutional Law,Environmental Law,0,0
+Q0102,English,medium,Constitutional Law,Administrative Law,0,0
+Q0103,English,medium,Constitutional Law,Environmental Law,0,0
+Q0104,Hinglish,clean,Constitutional Law,Constitutional Law,1,1
+Q0105,Hinglish,light,Constitutional Law,Constitutional Law,1,1
+Q0106,Hinglish,medium,Constitutional Law,Constitutional Law,1,1
+Q0107,Hinglish,medium,Constitutional Law,Constitutional Law,1,1
+Q0108,Hinglish,heavy,Constitutional Law,Constitutional Law,1,1
+Q0109,Hinglish,heavy,Constitutional Law,Administrative Law,0,0
+Q0110,Hinglish,clean,Constitutional Law,Education Law,0,0
+Q0111,Hinglish,light,Constitutional Law,Education Law,0,0
+Q0112,Hinglish,medium,Constitutional Law,Education Law,0,0
+Q0113,Hinglish,medium,Constitutional Law,Education Law,0,0
+Q0114,Hinglish,heavy,Constitutional Law,Education Law,0,0
+Q0115,Hinglish,heavy,Constitutional Law,Education Law,0,0
+Q0116,Hindi,clean,Consumer Protection,Cybercrime & IT,0,0
+Q0117,Hindi,light,Consumer Protection,Cybercrime & IT,0,0
+Q0118,Hindi,medium,Consumer Protection,Banking & Finance,0,0
+Q0119,Hindi,medium,Consumer Protection,Cybercrime & IT,0,0
+Q0120,Hindi,heavy,Consumer Protection,Banking & Finance,0,0
+Q0121,Hindi,heavy,Consumer Protection,Cybercrime & IT,0,0
+Q0122,Hindi,heavy,Consumer Protection,Cybercrime & IT,0,0
+Q0123,English,clean,Consumer Protection,Banking & Finance,0,0
+Q0124,English,light,Consumer Protection,Banking & Finance,0,0
+Q0125,English,medium,Consumer Protection,Banking & Finance,0,0
+Q0126,English,medium,Consumer Protection,Banking & Finance,0,0
+Q0127,Hinglish,clean,Consumer Protection,Real Estate & Housing,0,0
+Q0128,Hinglish,light,Consumer Protection,Real Estate & Housing,0,0
+Q0129,Hinglish,medium,Consumer Protection,Real Estate & Housing,0,0
+Q0130,Hinglish,medium,Consumer Protection,Real Estate & Housing,0,0
+Q0131,Hinglish,heavy,Consumer Protection,Real Estate & Housing,0,0
+Q0132,Hinglish,heavy,Consumer Protection,Education Law,0,0
+Q0133,Hinglish,clean,Consumer Protection,Consumer Protection,1,1
+Q0134,Hinglish,light,Consumer Protection,Consumer Protection,1,1
+Q0135,Hinglish,medium,Consumer Protection,Education Law,0,0
+Q0136,Hinglish,medium,Consumer Protection,Consumer Protection,1,1
+Q0137,Hinglish,heavy,Consumer Protection,Contract & Agreement,0,0
+Q0138,Hinglish,heavy,Consumer Protection,Education Law,0,0
+Q0139,Hindi,clean,Contract & Agreement,Consumer Protection,0,0
+Q0140,Hindi,light,Contract & Agreement,Banking & Finance,0,0
+Q0141,Hindi,medium,Contract & Agreement,Corporate & Commercial,0,0
+Q0142,Hindi,medium,Contract & Agreement,Consumer Protection,0,0
+Q0143,Hindi,heavy,Contract & Agreement,Consumer Protection,0,0
+Q0144,Hindi,heavy,Contract & Agreement,Environmental Law,0,0
+Q0145,Hindi,heavy,Contract & Agreement,Banking & Finance,0,0
+Q0146,English,clean,Contract & Agreement,Contract & Agreement,1,1
+Q0147,English,light,Contract & Agreement,Contract & Agreement,1,1
+Q0148,English,medium,Contract & Agreement,Corporate & Commercial,0,0
+Q0149,English,medium,Contract & Agreement,Corporate & Commercial,0,0
+Q0150,Hinglish,clean,Contract & Agreement,Real Estate & Housing,0,0
+Q0151,Hinglish,light,Contract & Agreement,Real Estate & Housing,0,0
+Q0152,Hinglish,medium,Contract & Agreement,Real Estate & Housing,0,0
+Q0153,Hinglish,medium,Contract & Agreement,Real Estate & Housing,0,0
+Q0154,Hinglish,heavy,Contract & Agreement,Real Estate & Housing,0,0
+Q0155,Hinglish,heavy,Contract & Agreement,Real Estate & Housing,0,0
+Q0156,Hinglish,clean,Contract & Agreement,Corporate & Commercial,0,0
+Q0157,Hinglish,light,Contract & Agreement,Corporate & Commercial,0,0
+Q0158,Hinglish,medium,Contract & Agreement,Corporate & Commercial,0,0
+Q0159,Hinglish,medium,Contract & Agreement,Corporate & Commercial,0,0
+Q0160,Hinglish,heavy,Contract & Agreement,Corporate & Commercial,0,0
+Q0161,Hinglish,heavy,Contract & Agreement,Corporate & Commercial,0,0
+Q0162,Hindi,clean,Corporate & Commercial,Contract & Agreement,0,0
+Q0163,Hindi,light,Corporate & Commercial,Contract & Agreement,0,0
+Q0164,Hindi,medium,Corporate & Commercial,Contract & Agreement,0,0
+Q0165,Hindi,medium,Corporate & Commercial,Contract & Agreement,0,0
+Q0166,Hindi,heavy,Corporate & Commercial,Contract & Agreement,0,0
+Q0167,Hindi,heavy,Corporate & Commercial,Contract & Agreement,0,0
+Q0168,Hindi,heavy,Corporate & Commercial,Contract & Agreement,0,0
+Q0169,English,clean,Corporate & Commercial,Corporate & Commercial,1,1
+Q0170,English,light,Corporate & Commercial,Corporate & Commercial,1,1
+Q0171,English,medium,Corporate & Commercial,Corporate & Commercial,1,1
+Q0172,English,medium,Corporate & Commercial,Corporate & Commercial,1,1
+Q0173,Hinglish,clean,Corporate & Commercial,Insolvency & Bankruptcy,0,0
+Q0174,Hinglish,light,Corporate & Commercial,Corporate & Commercial,1,1
+Q0175,Hinglish,medium,Corporate & Commercial,Insolvency & Bankruptcy,0,0
+Q0176,Hinglish,medium,Corporate & Commercial,Insolvency & Bankruptcy,0,0
+Q0177,Hinglish,heavy,Corporate & Commercial,Insolvency & Bankruptcy,0,0
+Q0178,Hinglish,heavy,Corporate & Commercial,Insolvency & Bankruptcy,0,0
+Q0179,Hinglish,clean,Corporate & Commercial,Corporate & Commercial,1,1
+Q0180,Hinglish,light,Corporate & Commercial,Corporate & Commercial,1,1
+Q0181,Hinglish,medium,Corporate & Commercial,Corporate & Commercial,1,1
+Q0182,Hinglish,medium,Corporate & Commercial,Corporate & Commercial,1,1
+Q0183,Hinglish,heavy,Corporate & Commercial,Corporate & Commercial,1,1
+Q0184,Hinglish,heavy,Corporate & Commercial,Corporate & Commercial,1,1
+Q0185,Hindi,clean,Criminal Law,Cybercrime & IT,0,0
+Q0186,Hindi,light,Criminal Law,Banking & Finance,0,0
+Q0187,Hindi,medium,Criminal Law,Banking & Finance,0,0
+Q0188,Hindi,medium,Criminal Law,Banking & Finance,0,0
+Q0189,Hindi,heavy,Criminal Law,Banking & Finance,0,0
+Q0190,Hindi,heavy,Criminal Law,Banking & Finance,0,0
+Q0191,Hindi,heavy,Criminal Law,Child Protection,0,0
+Q0192,English,clean,Criminal Law,Banking & Finance,0,0
+Q0193,English,light,Criminal Law,Banking & Finance,0,0
+Q0194,English,medium,Criminal Law,Banking & Finance,0,0
+Q0195,English,medium,Criminal Law,Banking & Finance,0,0
+Q0196,Hinglish,clean,Criminal Law,Criminal Law,1,1
+Q0197,Hinglish,light,Criminal Law,Medical Negligence,0,0
+Q0198,Hinglish,medium,Criminal Law,Criminal Law,1,1
+Q0199,Hinglish,medium,Criminal Law,Medical Negligence,0,0
+Q0200,Hinglish,heavy,Criminal Law,Medical Negligence,0,0
+Q0201,Hinglish,heavy,Criminal Law,Real Estate & Housing,0,0
+Q0202,Hinglish,clean,Criminal Law,Criminal Law,1,1
+Q0203,Hinglish,light,Criminal Law,Criminal Law,1,1
+Q0204,Hinglish,medium,Criminal Law,Criminal Law,1,1
+Q0205,Hinglish,medium,Criminal Law,Criminal Law,1,1
+Q0206,Hinglish,heavy,Criminal Law,Criminal Law,1,1
+Q0207,Hinglish,heavy,Criminal Law,Criminal Law,1,1
+Q0208,Hindi,clean,Cybercrime & IT,Cybercrime & IT,1,1
+Q0209,Hindi,light,Cybercrime & IT,Cybercrime & IT,1,1
+Q0210,Hindi,medium,Cybercrime & IT,Cybercrime & IT,1,1
+Q0211,Hindi,medium,Cybercrime & IT,Cybercrime & IT,1,1
+Q0212,Hindi,heavy,Cybercrime & IT,Cybercrime & IT,1,1
+Q0213,Hindi,heavy,Cybercrime & IT,Cybercrime & IT,1,1
+Q0214,Hindi,heavy,Cybercrime & IT,Cybercrime & IT,1,1
+Q0215,English,clean,Cybercrime & IT,Cybercrime & IT,1,1
+Q0216,English,light,Cybercrime & IT,Cybercrime & IT,1,1
+Q0217,English,medium,Cybercrime & IT,Cybercrime & IT,1,1
+Q0218,English,medium,Cybercrime & IT,Cybercrime & IT,1,1
+Q0219,Hinglish,clean,Cybercrime & IT,Cybercrime & IT,1,1
+Q0220,Hinglish,light,Cybercrime & IT,Cybercrime & IT,1,1
+Q0221,Hinglish,medium,Cybercrime & IT,Cybercrime & IT,1,1
+Q0222,Hinglish,medium,Cybercrime & IT,Cybercrime & IT,1,1
+Q0223,Hinglish,heavy,Cybercrime & IT,Cybercrime & IT,1,1
+Q0224,Hinglish,heavy,Cybercrime & IT,Cybercrime & IT,1,1
+Q0225,Hinglish,clean,Cybercrime & IT,Real Estate & Housing,0,0
+Q0226,Hinglish,light,Cybercrime & IT,Real Estate & Housing,0,0
+Q0227,Hinglish,medium,Cybercrime & IT,Real Estate & Housing,0,0
+Q0228,Hinglish,medium,Cybercrime & IT,Real Estate & Housing,0,0
+Q0229,Hinglish,heavy,Cybercrime & IT,Real Estate & Housing,0,0
+Q0230,Hinglish,heavy,Cybercrime & IT,Real Estate & Housing,0,0
+Q0231,Hindi,clean,Data Privacy,Data Privacy,1,1
+Q0232,Hindi,light,Data Privacy,Corporate & Commercial,0,0
+Q0233,Hindi,medium,Data Privacy,Data Privacy,1,1
+Q0234,Hindi,medium,Data Privacy,Data Privacy,1,1
+Q0235,Hindi,heavy,Data Privacy,Data Privacy,1,1
+Q0236,Hindi,heavy,Data Privacy,Data Privacy,1,1
+Q0237,Hindi,heavy,Data Privacy,Corporate & Commercial,0,0
+Q0238,English,clean,Data Privacy,Data Privacy,1,1
+Q0239,English,light,Data Privacy,Data Privacy,1,1
+Q0240,English,medium,Data Privacy,Data Privacy,1,1
+Q0241,English,medium,Data Privacy,Data Privacy,1,1
+Q0242,Hinglish,clean,Data Privacy,Data Privacy,1,1
+Q0243,Hinglish,light,Data Privacy,Data Privacy,1,1
+Q0244,Hinglish,medium,Data Privacy,Data Privacy,1,1
+Q0245,Hinglish,medium,Data Privacy,Data Privacy,1,1
+Q0246,Hinglish,heavy,Data Privacy,Data Privacy,1,1
+Q0247,Hinglish,heavy,Data Privacy,Data Privacy,1,1
+Q0248,Hinglish,clean,Data Privacy,Data Privacy,1,1
+Q0249,Hinglish,light,Data Privacy,Data Privacy,1,1
+Q0250,Hinglish,medium,Data Privacy,Data Privacy,1,1
+Q0251,Hinglish,medium,Data Privacy,Data Privacy,1,1
+Q0252,Hinglish,heavy,Data Privacy,Employment & Labour,0,0
+Q0253,Hinglish,heavy,Data Privacy,Data Privacy,1,1
+Q0254,Hindi,clean,Divorce & Matrimonial,Divorce & Matrimonial,1,1
+Q0255,Hindi,light,Divorce & Matrimonial,Divorce & Matrimonial,1,1
+Q0256,Hindi,medium,Divorce & Matrimonial,Divorce & Matrimonial,1,1
+Q0257,Hindi,medium,Divorce & Matrimonial,Divorce & Matrimonial,1,1
+Q0258,Hindi,heavy,Divorce & Matrimonial,Divorce & Matrimonial,1,1
+Q0259,Hindi,heavy,Divorce & Matrimonial,Divorce & Matrimonial,1,1
+Q0260,Hindi,heavy,Divorce & Matrimonial,Divorce & Matrimonial,1,1
+Q0261,English,clean,Divorce & Matrimonial,Divorce & Matrimonial,1,1
+Q0262,English,light,Divorce & Matrimonial,Divorce & Matrimonial,1,1
+Q0263,English,medium,Divorce & Matrimonial,Divorce & Matrimonial,1,1
+Q0264,English,medium,Divorce & Matrimonial,Divorce & Matrimonial,1,1
+Q0265,Hinglish,clean,Divorce & Matrimonial,Divorce & Matrimonial,1,1
+Q0266,Hinglish,light,Divorce & Matrimonial,Divorce & Matrimonial,1,1
+Q0267,Hinglish,medium,Divorce & Matrimonial,Divorce & Matrimonial,1,1
+Q0268,Hinglish,medium,Divorce & Matrimonial,Divorce & Matrimonial,1,1
+Q0269,Hinglish,heavy,Divorce & Matrimonial,Divorce & Matrimonial,1,1
+Q0270,Hinglish,heavy,Divorce & Matrimonial,Divorce & Matrimonial,1,1
+Q0271,Hinglish,clean,Divorce & Matrimonial,Divorce & Matrimonial,1,1
+Q0272,Hinglish,light,Divorce & Matrimonial,Employment & Labour,0,0
+Q0273,Hinglish,medium,Divorce & Matrimonial,Divorce & Matrimonial,1,1
+Q0274,Hinglish,medium,Divorce & Matrimonial,Employment & Labour,0,0
+Q0275,Hinglish,heavy,Divorce & Matrimonial,Employment & Labour,0,0
+Q0276,Hinglish,heavy,Divorce & Matrimonial,Divorce & Matrimonial,1,1
+Q0277,Hindi,clean,Education Law,Education Law,1,1
+Q0278,Hindi,light,Education Law,Education Law,1,1
+Q0279,Hindi,medium,Education Law,Education Law,1,1
+Q0280,Hindi,medium,Education Law,Education Law,1,1
+Q0281,Hindi,heavy,Education Law,Education Law,1,1
+Q0282,Hindi,heavy,Education Law,Education Law,1,1
+Q0283,Hindi,heavy,Education Law,Education Law,1,1
+Q0284,English,clean,Education Law,Education Law,1,1
+Q0285,English,light,Education Law,Education Law,1,1
+Q0286,English,medium,Education Law,Education Law,1,1
+Q0287,English,medium,Education Law,Education Law,1,1
+Q0288,Hinglish,clean,Education Law,Education Law,1,1
+Q0289,Hinglish,light,Education Law,Education Law,1,1
+Q0290,Hinglish,medium,Education Law,Education Law,1,1
+Q0291,Hinglish,medium,Education Law,Education Law,1,1
+Q0292,Hinglish,heavy,Education Law,Education Law,1,1
+Q0293,Hinglish,heavy,Education Law,Education Law,1,1
+Q0294,Hinglish,clean,Education Law,Education Law,1,1
+Q0295,Hinglish,light,Education Law,Education Law,1,1
+Q0296,Hinglish,medium,Education Law,Education Law,1,1
+Q0297,Hinglish,medium,Education Law,Education Law,1,1
+Q0298,Hinglish,heavy,Education Law,Corporate & Commercial,0,0
+Q0299,Hinglish,heavy,Education Law,Education Law,1,1
+Q0300,Hindi,clean,Employment & Labour,Contract & Agreement,0,0
+Q0301,Hindi,light,Employment & Labour,Contract & Agreement,0,0
+Q0302,Hindi,medium,Employment & Labour,Banking & Finance,0,0
+Q0303,Hindi,medium,Employment & Labour,Banking & Finance,0,0
+Q0304,Hindi,heavy,Employment & Labour,Contract & Agreement,0,0
+Q0305,Hindi,heavy,Employment & Labour,Contract & Agreement,0,0
+Q0306,Hindi,heavy,Employment & Labour,Contract & Agreement,0,0
+Q0307,English,clean,Employment & Labour,Employment & Labour,1,1
+Q0308,English,light,Employment & Labour,Employment & Labour,1,1
+Q0309,English,medium,Employment & Labour,Contract & Agreement,0,0
+Q0310,English,medium,Employment & Labour,Contract & Agreement,0,0
+Q0311,Hinglish,clean,Employment & Labour,Corporate & Commercial,0,0
+Q0312,Hinglish,light,Employment & Labour,Employment & Labour,1,1
+Q0313,Hinglish,medium,Employment & Labour,Banking & Finance,0,0
+Q0314,Hinglish,medium,Employment & Labour,Corporate & Commercial,0,0
+Q0315,Hinglish,heavy,Employment & Labour,Banking & Finance,0,0
+Q0316,Hinglish,heavy,Employment & Labour,Banking & Finance,0,0
+Q0317,Hinglish,clean,Employment & Labour,Employment & Labour,1,1
+Q0318,Hinglish,light,Employment & Labour,Employment & Labour,1,1
+Q0319,Hinglish,medium,Employment & Labour,Employment & Labour,1,1
+Q0320,Hinglish,medium,Employment & Labour,Employment & Labour,1,1
+Q0321,Hinglish,heavy,Employment & Labour,Employment & Labour,1,1
+Q0322,Hinglish,heavy,Employment & Labour,Administrative Law,0,0
+Q0323,Hindi,clean,Environmental Law,Environmental Law,1,1
+Q0324,Hindi,light,Environmental Law,Environmental Law,1,1
+Q0325,Hindi,medium,Environmental Law,Environmental Law,1,1
+Q0326,Hindi,medium,Environmental Law,Environmental Law,1,1
+Q0327,Hindi,heavy,Environmental Law,Environmental Law,1,1
+Q0328,Hindi,heavy,Environmental Law,Environmental Law,1,1
+Q0329,Hindi,heavy,Environmental Law,Environmental Law,1,1
+Q0330,English,clean,Environmental Law,Environmental Law,1,1
+Q0331,English,light,Environmental Law,Environmental Law,1,1
+Q0332,English,medium,Environmental Law,Environmental Law,1,1
+Q0333,English,medium,Environmental Law,Environmental Law,1,1
+Q0334,Hinglish,clean,Environmental Law,Environmental Law,1,1
+Q0335,Hinglish,light,Environmental Law,Environmental Law,1,1
+Q0336,Hinglish,medium,Environmental Law,Environmental Law,1,1
+Q0337,Hinglish,medium,Environmental Law,Environmental Law,1,1
+Q0338,Hinglish,heavy,Environmental Law,Environmental Law,1,1
+Q0339,Hinglish,heavy,Environmental Law,Environmental Law,1,1
+Q0340,Hinglish,clean,Environmental Law,Environmental Law,1,1
+Q0341,Hinglish,light,Environmental Law,Environmental Law,1,1
+Q0342,Hinglish,medium,Environmental Law,Environmental Law,1,1
+Q0343,Hinglish,medium,Environmental Law,Environmental Law,1,1
+Q0344,Hinglish,heavy,Environmental Law,Environmental Law,1,1
+Q0345,Hinglish,heavy,Environmental Law,Environmental Law,1,1
+Q0346,Hindi,clean,Family & Succession,Family & Succession,1,1
+Q0347,Hindi,light,Family & Succession,Family & Succession,1,1
+Q0348,Hindi,medium,Family & Succession,Family & Succession,1,1
+Q0349,Hindi,medium,Family & Succession,Family & Succession,1,1
+Q0350,Hindi,heavy,Family & Succession,Property & Land,0,0
+Q0351,Hindi,heavy,Family & Succession,Family & Succession,1,1
+Q0352,Hindi,heavy,Family & Succession,Real Estate & Housing,0,0
+Q0353,English,clean,Family & Succession,Family & Succession,1,1
+Q0354,English,light,Family & Succession,Family & Succession,1,1
+Q0355,English,medium,Family & Succession,Family & Succession,1,1
+Q0356,English,medium,Family & Succession,Family & Succession,1,1
+Q0357,Hinglish,clean,Family & Succession,Family & Succession,1,1
+Q0358,Hinglish,light,Family & Succession,Real Estate & Housing,0,0
+Q0359,Hinglish,medium,Family & Succession,Family & Succession,1,1
+Q0360,Hinglish,medium,Family & Succession,Family & Succession,1,1
+Q0361,Hinglish,heavy,Family & Succession,Family & Succession,1,1
+Q0362,Hinglish,heavy,Family & Succession,Family & Succession,1,1
+Q0363,Hinglish,clean,Family & Succession,Family & Succession,1,1
+Q0364,Hinglish,light,Family & Succession,Family & Succession,1,1
+Q0365,Hinglish,medium,Family & Succession,Family & Succession,1,1
+Q0366,Hinglish,medium,Family & Succession,Family & Succession,1,1
+Q0367,Hinglish,heavy,Family & Succession,Family & Succession,1,1
+Q0368,Hinglish,heavy,Family & Succession,Family & Succession,1,1
+Q0369,Hindi,clean,Human Rights & PIL,Environmental Law,0,0
+Q0370,Hindi,light,Human Rights & PIL,Child Protection,0,0
+Q0371,Hindi,medium,Human Rights & PIL,Child Protection,0,0
+Q0372,Hindi,medium,Human Rights & PIL,Child Protection,0,0
+Q0373,Hindi,heavy,Human Rights & PIL,Environmental Law,0,0
+Q0374,Hindi,heavy,Human Rights & PIL,Environmental Law,0,0
+Q0375,Hindi,heavy,Human Rights & PIL,Child Protection,0,0
+Q0376,English,clean,Human Rights & PIL,Environmental Law,0,0
+Q0377,English,light,Human Rights & PIL,Environmental Law,0,0
+Q0378,English,medium,Human Rights & PIL,Environmental Law,0,0
+Q0379,English,medium,Human Rights & PIL,Environmental Law,0,0
+Q0380,Hinglish,clean,Human Rights & PIL,Criminal Law,0,0
+Q0381,Hinglish,light,Human Rights & PIL,Criminal Law,0,0
+Q0382,Hinglish,medium,Human Rights & PIL,Criminal Law,0,0
+Q0383,Hinglish,medium,Human Rights & PIL,Criminal Law,0,0
+Q0384,Hinglish,heavy,Human Rights & PIL,Constitutional Law,0,0
+Q0385,Hinglish,heavy,Human Rights & PIL,Criminal Law,0,0
+Q0386,Hinglish,clean,Human Rights & PIL,Environmental Law,0,0
+Q0387,Hinglish,light,Human Rights & PIL,Environmental Law,0,0
+Q0388,Hinglish,medium,Human Rights & PIL,Environmental Law,0,0
+Q0389,Hinglish,medium,Human Rights & PIL,Environmental Law,0,0
+Q0390,Hinglish,heavy,Human Rights & PIL,Environmental Law,0,0
+Q0391,Hinglish,heavy,Human Rights & PIL,Environmental Law,0,0
+Q0392,Hindi,clean,Immigration & Citizenship,Immigration & Citizenship,1,1
+Q0393,Hindi,light,Immigration & Citizenship,Immigration & Citizenship,1,1
+Q0394,Hindi,medium,Immigration & Citizenship,Immigration & Citizenship,1,1
+Q0395,Hindi,medium,Immigration & Citizenship,Immigration & Citizenship,1,1
+Q0396,Hindi,heavy,Immigration & Citizenship,Immigration & Citizenship,1,1
+Q0397,Hindi,heavy,Immigration & Citizenship,Immigration & Citizenship,1,1
+Q0398,Hindi,heavy,Immigration & Citizenship,Immigration & Citizenship,1,1
+Q0399,English,clean,Immigration & Citizenship,Immigration & Citizenship,1,1
+Q0400,English,light,Immigration & Citizenship,Immigration & Citizenship,1,1
+Q0401,English,medium,Immigration & Citizenship,Immigration & Citizenship,1,1
+Q0402,English,medium,Immigration & Citizenship,Immigration & Citizenship,1,1
+Q0403,Hinglish,clean,Immigration & Citizenship,Immigration & Citizenship,1,1
+Q0404,Hinglish,light,Immigration & Citizenship,Immigration & Citizenship,1,1
+Q0405,Hinglish,medium,Immigration & Citizenship,Immigration & Citizenship,1,1
+Q0406,Hinglish,medium,Immigration & Citizenship,Immigration & Citizenship,1,1
+Q0407,Hinglish,heavy,Immigration & Citizenship,Immigration & Citizenship,1,1
+Q0408,Hinglish,heavy,Immigration & Citizenship,Education Law,0,0
+Q0409,Hinglish,clean,Immigration & Citizenship,Education Law,0,0
+Q0410,Hinglish,light,Immigration & Citizenship,Education Law,0,0
+Q0411,Hinglish,medium,Immigration & Citizenship,Education Law,0,0
+Q0412,Hinglish,medium,Immigration & Citizenship,Immigration & Citizenship,1,1
+Q0413,Hinglish,heavy,Immigration & Citizenship,Education Law,0,0
+Q0414,Hinglish,heavy,Immigration & Citizenship,Education Law,0,0
+Q0415,Hindi,clean,Insolvency & Bankruptcy,Banking & Finance,0,0
+Q0416,Hindi,light,Insolvency & Bankruptcy,Insolvency & Bankruptcy,1,1
+Q0417,Hindi,medium,Insolvency & Bankruptcy,Banking & Finance,0,0
+Q0418,Hindi,medium,Insolvency & Bankruptcy,Insolvency & Bankruptcy,1,1
+Q0419,Hindi,heavy,Insolvency & Bankruptcy,Insolvency & Bankruptcy,1,1
+Q0420,Hindi,heavy,Insolvency & Bankruptcy,Insolvency & Bankruptcy,1,1
+Q0421,Hindi,heavy,Insolvency & Bankruptcy,Insolvency & Bankruptcy,1,1
+Q0422,English,clean,Insolvency & Bankruptcy,Insolvency & Bankruptcy,1,1
+Q0423,English,light,Insolvency & Bankruptcy,Insolvency & Bankruptcy,1,1
+Q0424,English,medium,Insolvency & Bankruptcy,Insolvency & Bankruptcy,1,1
+Q0425,English,medium,Insolvency & Bankruptcy,Insolvency & Bankruptcy,1,1
+Q0426,Hinglish,clean,Insolvency & Bankruptcy,Insolvency & Bankruptcy,1,1
+Q0427,Hinglish,light,Insolvency & Bankruptcy,Banking & Finance,0,0
+Q0428,Hinglish,medium,Insolvency & Bankruptcy,Insolvency & Bankruptcy,1,1
+Q0429,Hinglish,medium,Insolvency & Bankruptcy,Banking & Finance,0,0
+Q0430,Hinglish,heavy,Insolvency & Bankruptcy,Insolvency & Bankruptcy,1,1
+Q0431,Hinglish,heavy,Insolvency & Bankruptcy,Insolvency & Bankruptcy,1,1
+Q0432,Hinglish,clean,Insolvency & Bankruptcy,Banking & Finance,0,0
+Q0433,Hinglish,light,Insolvency & Bankruptcy,Banking & Finance,0,0
+Q0434,Hinglish,medium,Insolvency & Bankruptcy,Banking & Finance,0,0
+Q0435,Hinglish,medium,Insolvency & Bankruptcy,Banking & Finance,0,0
+Q0436,Hinglish,heavy,Insolvency & Bankruptcy,Banking & Finance,0,0
+Q0437,Hinglish,heavy,Insolvency & Bankruptcy,Banking & Finance,0,0
+Q0438,Hindi,clean,Intellectual Property,Intellectual Property,1,1
+Q0439,Hindi,light,Intellectual Property,Intellectual Property,1,1
+Q0440,Hindi,medium,Intellectual Property,Intellectual Property,1,1
+Q0441,Hindi,medium,Intellectual Property,Intellectual Property,1,1
+Q0442,Hindi,heavy,Intellectual Property,Intellectual Property,1,1
+Q0443,Hindi,heavy,Intellectual Property,Intellectual Property,1,1
+Q0444,Hindi,heavy,Intellectual Property,Intellectual Property,1,1
+Q0445,English,clean,Intellectual Property,Intellectual Property,1,1
+Q0446,English,light,Intellectual Property,Intellectual Property,1,1
+Q0447,English,medium,Intellectual Property,Intellectual Property,1,1
+Q0448,English,medium,Intellectual Property,Intellectual Property,1,1
+Q0449,Hinglish,clean,Intellectual Property,Intellectual Property,1,1
+Q0450,Hinglish,light,Intellectual Property,Intellectual Property,1,1
+Q0451,Hinglish,medium,Intellectual Property,Intellectual Property,1,1
+Q0452,Hinglish,medium,Intellectual Property,Intellectual Property,1,1
+Q0453,Hinglish,heavy,Intellectual Property,Intellectual Property,1,1
+Q0454,Hinglish,heavy,Intellectual Property,Intellectual Property,1,1
+Q0455,Hinglish,clean,Intellectual Property,Intellectual Property,1,1
+Q0456,Hinglish,light,Intellectual Property,Intellectual Property,1,1
+Q0457,Hinglish,medium,Intellectual Property,Intellectual Property,1,1
+Q0458,Hinglish,medium,Intellectual Property,Intellectual Property,1,1
+Q0459,Hinglish,heavy,Intellectual Property,Intellectual Property,1,1
+Q0460,Hinglish,heavy,Intellectual Property,Intellectual Property,1,1
+Q0461,Hindi,clean,Media & Defamation,Cybercrime & IT,0,0
+Q0462,Hindi,light,Media & Defamation,Cybercrime & IT,0,0
+Q0463,Hindi,medium,Media & Defamation,Cybercrime & IT,0,0
+Q0464,Hindi,medium,Media & Defamation,Cybercrime & IT,0,0
+Q0465,Hindi,heavy,Media & Defamation,Cybercrime & IT,0,0
+Q0466,Hindi,heavy,Media & Defamation,Cybercrime & IT,0,0
+Q0467,Hindi,heavy,Media & Defamation,Data Privacy,0,0
+Q0468,English,clean,Media & Defamation,Cybercrime & IT,0,0
+Q0469,English,light,Media & Defamation,Contract & Agreement,0,0
+Q0470,English,medium,Media & Defamation,Contract & Agreement,0,0
+Q0471,English,medium,Media & Defamation,Cybercrime & IT,0,0
+Q0472,Hinglish,clean,Media & Defamation,Data Privacy,0,0
+Q0473,Hinglish,light,Media & Defamation,Media & Defamation,1,1
+Q0474,Hinglish,medium,Media & Defamation,Data Privacy,0,0
+Q0475,Hinglish,medium,Media & Defamation,Data Privacy,0,0
+Q0476,Hinglish,heavy,Media & Defamation,Cybercrime & IT,0,0
+Q0477,Hinglish,heavy,Media & Defamation,Media & Defamation,1,1
+Q0478,Hinglish,clean,Media & Defamation,Arbitration,0,0
+Q0479,Hinglish,light,Media & Defamation,Arbitration,0,0
+Q0480,Hinglish,medium,Media & Defamation,Real Estate & Housing,0,0
+Q0481,Hinglish,medium,Media & Defamation,Arbitration,0,0
+Q0482,Hinglish,heavy,Media & Defamation,Real Estate & Housing,0,0
+Q0483,Hinglish,heavy,Media & Defamation,Real Estate & Housing,0,0
+Q0484,Hindi,clean,Medical Negligence,Medical Negligence,1,1
+Q0485,Hindi,light,Medical Negligence,Medical Negligence,1,1
+Q0486,Hindi,medium,Medical Negligence,Medical Negligence,1,1
+Q0487,Hindi,medium,Medical Negligence,Medical Negligence,1,1
+Q0488,Hindi,heavy,Medical Negligence,Medical Negligence,1,1
+Q0489,Hindi,heavy,Medical Negligence,Medical Negligence,1,1
+Q0490,Hindi,heavy,Medical Negligence,Medical Negligence,1,1
+Q0491,English,clean,Medical Negligence,Medical Negligence,1,1
+Q0492,English,light,Medical Negligence,Medical Negligence,1,1
+Q0493,English,medium,Medical Negligence,Medical Negligence,1,1
+Q0494,English,medium,Medical Negligence,Medical Negligence,1,1
+Q0495,Hinglish,clean,Medical Negligence,Medical Negligence,1,1
+Q0496,Hinglish,light,Medical Negligence,Medical Negligence,1,1
+Q0497,Hinglish,medium,Medical Negligence,Medical Negligence,1,1
+Q0498,Hinglish,medium,Medical Negligence,Medical Negligence,1,1
+Q0499,Hinglish,heavy,Medical Negligence,Medical Negligence,1,1
+Q0500,Hinglish,heavy,Medical Negligence,Medical Negligence,1,1
+Q0501,Hinglish,clean,Medical Negligence,Medical Negligence,1,1
+Q0502,Hinglish,light,Medical Negligence,Medical Negligence,1,1
+Q0503,Hinglish,medium,Medical Negligence,Medical Negligence,1,1
+Q0504,Hinglish,medium,Medical Negligence,Medical Negligence,1,1
+Q0505,Hinglish,heavy,Medical Negligence,Medical Negligence,1,1
+Q0506,Hinglish,heavy,Medical Negligence,Medical Negligence,1,1
+Q0507,Hindi,clean,Motor Accident Claims,Motor Accident Claims,1,1
+Q0508,Hindi,light,Motor Accident Claims,Motor Accident Claims,1,1
+Q0509,Hindi,medium,Motor Accident Claims,Motor Accident Claims,1,1
+Q0510,Hindi,medium,Motor Accident Claims,Motor Accident Claims,1,1
+Q0511,Hindi,heavy,Motor Accident Claims,Motor Accident Claims,1,1
+Q0512,Hindi,heavy,Motor Accident Claims,Motor Accident Claims,1,1
+Q0513,Hindi,heavy,Motor Accident Claims,Motor Accident Claims,1,1
+Q0514,English,clean,Motor Accident Claims,Motor Accident Claims,1,1
+Q0515,English,light,Motor Accident Claims,Motor Accident Claims,1,1
+Q0516,English,medium,Motor Accident Claims,Motor Accident Claims,1,1
+Q0517,English,medium,Motor Accident Claims,Motor Accident Claims,1,1
+Q0518,Hinglish,clean,Motor Accident Claims,Motor Accident Claims,1,1
+Q0519,Hinglish,light,Motor Accident Claims,Motor Accident Claims,1,1
+Q0520,Hinglish,medium,Motor Accident Claims,Motor Accident Claims,1,1
+Q0521,Hinglish,medium,Motor Accident Claims,Motor Accident Claims,1,1
+Q0522,Hinglish,heavy,Motor Accident Claims,Child Protection,0,0
+Q0523,Hinglish,heavy,Motor Accident Claims,Motor Accident Claims,1,1
+Q0524,Hinglish,clean,Motor Accident Claims,Motor Accident Claims,1,1
+Q0525,Hinglish,light,Motor Accident Claims,Motor Accident Claims,1,1
+Q0526,Hinglish,medium,Motor Accident Claims,Motor Accident Claims,1,1
+Q0527,Hinglish,medium,Motor Accident Claims,Motor Accident Claims,1,1
+Q0528,Hinglish,heavy,Motor Accident Claims,Motor Accident Claims,1,1
+Q0529,Hinglish,heavy,Motor Accident Claims,Motor Accident Claims,1,1
+Q0530,Hindi,clean,Property & Land,Immigration & Citizenship,0,0
+Q0531,Hindi,light,Property & Land,Real Estate & Housing,0,0
+Q0532,Hindi,medium,Property & Land,Immigration & Citizenship,0,0
+Q0533,Hindi,medium,Property & Land,Immigration & Citizenship,0,0
+Q0534,Hindi,heavy,Property & Land,Immigration & Citizenship,0,0
+Q0535,Hindi,heavy,Property & Land,Environmental Law,0,0
+Q0536,Hindi,heavy,Property & Land,Immigration & Citizenship,0,0
+Q0537,English,clean,Property & Land,Family & Succession,0,0
+Q0538,English,light,Property & Land,Family & Succession,0,0
+Q0539,English,medium,Property & Land,Family & Succession,0,0
+Q0540,English,medium,Property & Land,Family & Succession,0,0
+Q0541,Hinglish,clean,Property & Land,Real Estate & Housing,0,0
+Q0542,Hinglish,light,Property & Land,Real Estate & Housing,0,0
+Q0543,Hinglish,medium,Property & Land,Real Estate & Housing,0,0
+Q0544,Hinglish,medium,Property & Land,Real Estate & Housing,0,0
+Q0545,Hinglish,heavy,Property & Land,Real Estate & Housing,0,0
+Q0546,Hinglish,heavy,Property & Land,Real Estate & Housing,0,0
+Q0547,Hinglish,clean,Property & Land,Property & Land,1,1
+Q0548,Hinglish,light,Property & Land,Property & Land,1,1
+Q0549,Hinglish,medium,Property & Land,Property & Land,1,1
+Q0550,Hinglish,medium,Property & Land,Property & Land,1,1
+Q0551,Hinglish,heavy,Property & Land,Property & Land,1,1
+Q0552,Hinglish,heavy,Property & Land,Property & Land,1,1
+Q0553,Hindi,clean,Real Estate & Housing,Real Estate & Housing,1,1
+Q0554,Hindi,light,Real Estate & Housing,Real Estate & Housing,1,1
+Q0555,Hindi,medium,Real Estate & Housing,Real Estate & Housing,1,1
+Q0556,Hindi,medium,Real Estate & Housing,Real Estate & Housing,1,1
+Q0557,Hindi,heavy,Real Estate & Housing,Real Estate & Housing,1,1
+Q0558,Hindi,heavy,Real Estate & Housing,Real Estate & Housing,1,1
+Q0559,Hindi,heavy,Real Estate & Housing,Real Estate & Housing,1,1
+Q0560,English,clean,Real Estate & Housing,Real Estate & Housing,1,1
+Q0561,English,light,Real Estate & Housing,Real Estate & Housing,1,1
+Q0562,English,medium,Real Estate & Housing,Real Estate & Housing,1,1
+Q0563,English,medium,Real Estate & Housing,Real Estate & Housing,1,1
+Q0564,Hinglish,clean,Real Estate & Housing,Real Estate & Housing,1,1
+Q0565,Hinglish,light,Real Estate & Housing,Real Estate & Housing,1,1
+Q0566,Hinglish,medium,Real Estate & Housing,Real Estate & Housing,1,1
+Q0567,Hinglish,medium,Real Estate & Housing,Real Estate & Housing,1,1
+Q0568,Hinglish,heavy,Real Estate & Housing,Real Estate & Housing,1,1
+Q0569,Hinglish,heavy,Real Estate & Housing,Real Estate & Housing,1,1
+Q0570,Hinglish,clean,Real Estate & Housing,Real Estate & Housing,1,1
+Q0571,Hinglish,light,Real Estate & Housing,Real Estate & Housing,1,1
+Q0572,Hinglish,medium,Real Estate & Housing,Real Estate & Housing,1,1
+Q0573,Hinglish,medium,Real Estate & Housing,Real Estate & Housing,1,1
+Q0574,Hinglish,heavy,Real Estate & Housing,Real Estate & Housing,1,1
+Q0575,Hinglish,heavy,Real Estate & Housing,Real Estate & Housing,1,1
+Q0576,Hindi,clean,Tax & GST,Tax & GST,1,1
+Q0577,Hindi,light,Tax & GST,Tax & GST,1,1
+Q0578,Hindi,medium,Tax & GST,Tax & GST,1,1
+Q0579,Hindi,medium,Tax & GST,Tax & GST,1,1
+Q0580,Hindi,heavy,Tax & GST,Tax & GST,1,1
+Q0581,Hindi,heavy,Tax & GST,Tax & GST,1,1
+Q0582,Hindi,heavy,Tax & GST,Tax & GST,1,1
+Q0583,English,clean,Tax & GST,Tax & GST,1,1
+Q0584,English,light,Tax & GST,Tax & GST,1,1
+Q0585,English,medium,Tax & GST,Tax & GST,1,1
+Q0586,English,medium,Tax & GST,Tax & GST,1,1
+Q0587,Hinglish,clean,Tax & GST,Tax & GST,1,1
+Q0588,Hinglish,light,Tax & GST,Tax & GST,1,1
+Q0589,Hinglish,medium,Tax & GST,Tax & GST,1,1
+Q0590,Hinglish,medium,Tax & GST,Tax & GST,1,1
+Q0591,Hinglish,heavy,Tax & GST,Tax & GST,1,1
+Q0592,Hinglish,heavy,Tax & GST,Tax & GST,1,1
+Q0593,Hinglish,clean,Tax & GST,Banking & Finance,0,0
+Q0594,Hinglish,light,Tax & GST,Banking & Finance,0,0
+Q0595,Hinglish,medium,Tax & GST,Banking & Finance,0,0
+Q0596,Hinglish,medium,Tax & GST,Banking & Finance,0,0
+Q0597,Hinglish,heavy,Tax & GST,Banking & Finance,0,0
+Q0598,Hinglish,heavy,Tax & GST,Administrative Law,0,0
+Q0599,Hindi,clean,White Collar Crime,Banking & Finance,0,0
+Q0600,Hindi,light,White Collar Crime,Banking & Finance,0,0
+Q0601,Hindi,medium,White Collar Crime,Banking & Finance,0,0
+Q0602,Hindi,medium,White Collar Crime,White Collar Crime,1,1
+Q0603,Hindi,heavy,White Collar Crime,Corporate & Commercial,0,0
+Q0604,Hindi,heavy,White Collar Crime,Cybercrime & IT,0,0
+Q0605,Hindi,heavy,White Collar Crime,Banking & Finance,0,0
+Q0606,English,clean,White Collar Crime,White Collar Crime,1,1
+Q0607,English,light,White Collar Crime,White Collar Crime,1,1
+Q0608,English,medium,White Collar Crime,Cybercrime & IT,0,0
+Q0609,English,medium,White Collar Crime,White Collar Crime,1,1
+Q0610,Hinglish,clean,White Collar Crime,Banking & Finance,0,0
+Q0611,Hinglish,light,White Collar Crime,Banking & Finance,0,0
+Q0612,Hinglish,medium,White Collar Crime,Banking & Finance,0,0
+Q0613,Hinglish,medium,White Collar Crime,Banking & Finance,0,0
+Q0614,Hinglish,heavy,White Collar Crime,Banking & Finance,0,0
+Q0615,Hinglish,heavy,White Collar Crime,Tax & GST,0,0
+Q0616,Hinglish,clean,White Collar Crime,White Collar Crime,1,1
+Q0617,Hinglish,light,White Collar Crime,White Collar Crime,1,1
+Q0618,Hinglish,medium,White Collar Crime,White Collar Crime,1,1
+Q0619,Hinglish,medium,White Collar Crime,White Collar Crime,1,1
+Q0620,Hinglish,heavy,White Collar Crime,Corporate & Commercial,0,0
+Q0621,Hinglish,heavy,White Collar Crime,Banking & Finance,0,0
+QA001,Hindi,ambiguous,Consumer Protection / Real Estate & Housing,Real Estate & Housing,1,1
+QA002,English,ambiguous,Consumer Protection / Real Estate & Housing,Real Estate & Housing,1,1
+QA003,Hinglish,ambiguous,Consumer Protection / Real Estate & Housing,Real Estate & Housing,1,1
+QA004,Hindi,ambiguous,Criminal Law / White Collar Crime,Banking & Finance,0,0
+QA005,English,ambiguous,Criminal Law / White Collar Crime,Cybercrime & IT,0,0
+QA006,Hinglish,ambiguous,Criminal Law / White Collar Crime,Banking & Finance,0,0
+QA007,Hindi,ambiguous,Property & Land / Family & Succession,Family & Succession,1,1
+QA008,English,ambiguous,Property & Land / Family & Succession,Family & Succession,1,1
+QA009,Hinglish,ambiguous,Property & Land / Family & Succession,Family & Succession,1,1
+QA010,Hindi,ambiguous,Cybercrime & IT / Banking & Finance,Cybercrime & IT,1,1
+QA011,English,ambiguous,Cybercrime & IT / Banking & Finance,Cybercrime & IT,1,1
+QA012,Hinglish,ambiguous,Cybercrime & IT / Banking & Finance,Cybercrime & IT,1,1
+QA013,Hindi,ambiguous,Medical Negligence / Consumer Protection,Medical Negligence,1,1
+QA014,English,ambiguous,Medical Negligence / Consumer Protection,Medical Negligence,1,1
+QA015,Hinglish,ambiguous,Medical Negligence / Consumer Protection,Medical Negligence,1,1
+QA016,Hindi,ambiguous,Divorce & Matrimonial / Family & Succession,Divorce & Matrimonial,1,1
+QA017,English,ambiguous,Divorce & Matrimonial / Family & Succession,Divorce & Matrimonial,1,1
+QA018,Hinglish,ambiguous,Divorce & Matrimonial / Family & Succession,Family & Succession,1,1
+QA019,Hindi,ambiguous,Corporate & Commercial / Insolvency & Bankruptcy,Insolvency & Bankruptcy,1,1
+QA020,English,ambiguous,Corporate & Commercial / Insolvency & Bankruptcy,Corporate & Commercial,1,1
+QA021,Hinglish,ambiguous,Corporate & Commercial / Insolvency & Bankruptcy,Insolvency & Bankruptcy,1,1
+QA022,Hindi,ambiguous,Contract & Agreement / Consumer Protection,Consumer Protection,1,1
+QA023,English,ambiguous,Contract & Agreement / Consumer Protection,Contract & Agreement,1,1
+QA024,Hinglish,ambiguous,Contract & Agreement / Consumer Protection,Corporate & Commercial,0,0
+QA025,Hindi,ambiguous,Environmental Law / Human Rights & PIL,Environmental Law,1,1
+QA026,English,ambiguous,Environmental Law / Human Rights & PIL,Environmental Law,1,1
+QA027,Hinglish,ambiguous,Environmental Law / Human Rights & PIL,Environmental Law,1,1
+QA028,Hindi,ambiguous,Real Estate & Housing / Contract & Agreement,Real Estate & Housing,1,1
+QA029,English,ambiguous,Real Estate & Housing / Contract & Agreement,Real Estate & Housing,1,1
+QA030,Hinglish,ambiguous,Real Estate & Housing / Contract & Agreement,Real Estate & Housing,1,1
+QA031,Hindi,ambiguous,Tax & GST / Corporate & Commercial,Tax & GST,1,1
+QA032,English,ambiguous,Tax & GST / Corporate & Commercial,Tax & GST,1,1
+QA033,Hinglish,ambiguous,Tax & GST / Corporate & Commercial,Tax & GST,1,1
+QA034,Hindi,ambiguous,Intellectual Property / Media & Defamation,Intellectual Property,1,1
+QA035,English,ambiguous,Intellectual Property / Media & Defamation,Intellectual Property,1,1
+QA036,Hinglish,ambiguous,Intellectual Property / Media & Defamation,Intellectual Property,1,1
+QA037,Hindi,ambiguous,Child Protection / Criminal Law,Child Protection,1,1
+QA038,English,ambiguous,Child Protection / Criminal Law,Child Protection,1,1
+QA039,Hinglish,ambiguous,Child Protection / Criminal Law,Child Protection,1,1
+QA040,Hindi,ambiguous,Immigration & Citizenship / Constitutional Law,Immigration & Citizenship,1,1
+QA041,English,ambiguous,Immigration & Citizenship / Constitutional Law,Immigration & Citizenship,1,1
+QA042,Hinglish,ambiguous,Immigration & Citizenship / Constitutional Law,Immigration & Citizenship,1,1
+QA043,Hindi,ambiguous,Arbitration / Corporate & Commercial,Consumer Protection,0,0
+QA044,English,ambiguous,Arbitration / Corporate & Commercial,Corporate & Commercial,1,1
+QA045,Hinglish,ambiguous,Arbitration / Corporate & Commercial,Corporate & Commercial,1,1
