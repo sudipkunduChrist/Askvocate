@@ -1,43 +1,40 @@
-# IDE
-.idea/
-*.iml
-*.iws
-*.ipr
-
-# Gradle / build output
-.gradle/
-.kotlin/
+# Build outputs and generated reports
 **/build/
 **/target/
-/local.properties
 
-# Freebuff tool state
-/.freebuff/
+# Gradle and Kotlin caches
+.gradle/
+**/.gradle/
+.kotlin/
+**/.kotlin/
+.freebuff/
 
-# OS / editor
+# IDE and local machine files
+.idea/
+.vscode/
+*.iml
+local.properties
 .DS_Store
-Thumbs.db
-*.swp
-*~
-.lock-wscript
 
-# Android specific
+# Local environment and secrets
+.env
+.env.*
+!.env.example
+
+# Android generated files
 captures/
 .externalNativeBuild/
 .cxx/
-memory_heap.bin
 *.apk
+*.aab
 *.aar
 *.ap_
 
-# JNI
-libs/
-obj/
+# Python caches
+__pycache__/
+*.py[cod]
+.pytest_cache/
 
-target/
-*.class
-*.db
-*.db-shm
-.env
-*.db-wal
-*.log
+# Temporary files
+*.swp
+*~
