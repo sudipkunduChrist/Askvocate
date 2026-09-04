@@ -50,6 +50,7 @@ class MainActivity : AppCompatActivity() {
                 R.id.nav_get_started,
                 R.id.nav_sign_in,
                 R.id.nav_sign_up,
+                R.id.nav_lawyer_sign_up,
                 R.id.nav_privacy_policy -> {
                     bottomNav.visibility = View.GONE
                     drawerLayout.setDrawerLockMode(DrawerLayout.LOCK_MODE_LOCKED_CLOSED)
@@ -59,8 +60,18 @@ class MainActivity : AppCompatActivity() {
                     bottomNav.visibility = View.GONE
                     drawerLayout.setDrawerLockMode(DrawerLayout.LOCK_MODE_UNLOCKED)
                 }
-                else -> {
+                R.id.nav_home,
+                R.id.nav_find_lawyers,
+                R.id.nav_chat_list,
+                R.id.nav_client_profile,
+                R.id.nav_map,
+                R.id.nav_appointments,
+                R.id.nav_settings -> {
                     bottomNav.visibility = View.VISIBLE
+                    drawerLayout.setDrawerLockMode(DrawerLayout.LOCK_MODE_UNLOCKED)
+                }
+                else -> {
+                    bottomNav.visibility = View.GONE
                     drawerLayout.setDrawerLockMode(DrawerLayout.LOCK_MODE_UNLOCKED)
                 }
             }

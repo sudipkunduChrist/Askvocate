@@ -1,0 +1,22 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Selected segment pill: solid navy with elevation shadow effect -->
+<layer-list xmlns:android="http://schemas.android.com/apk/res/android">
+    <!-- Subtle shadow layer -->
+    <item
+        android:left="1dp"
+        android:top="2dp">
+        <shape android:shape="rectangle">
+            <corners android:radius="50dp" />
+            <solid android:color="#1A000000" />
+        </shape>
+    </item>
+    <!-- Main navy pill -->
+    <item
+        android:bottom="2dp"
+        android:right="1dp">
+        <shape android:shape="rectangle">
+            <corners android:radius="50dp" />
+            <solid android:color="#FF1F3A5F" />
+        </shape>
+    </item>
+</layer-list>

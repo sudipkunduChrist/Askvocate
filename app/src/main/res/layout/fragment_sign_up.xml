@@ -10,7 +10,7 @@
     <ImageView
         android:id="@+id/iv_curve_bg"
         android:layout_width="0dp"
-        android:layout_height="250dp"
+        android:layout_height="220dp"
         android:src="@drawable/bg_auth_header_white_curve"
         android:scaleType="fitXY"
         android:contentDescription="@null"
@@ -21,8 +21,8 @@
     <!-- App logo centered in the navy/curve area -->
     <ImageView
         android:id="@+id/iv_app_logo"
-        android:layout_width="164dp"
-        android:layout_height="129dp"
+        android:layout_width="110dp"
+        android:layout_height="86dp"
         android:contentDescription="@string/app_name"
         android:scaleType="fitCenter"
         android:src="@drawable/ic_auth_signup"
@@ -59,8 +59,8 @@
                 android:orientation="vertical"
                 android:gravity="center_horizontal"
                 android:paddingHorizontal="60dp"
-                android:paddingTop="10dp"
-                android:paddingBottom="16dp">
+                android:paddingTop="6dp"
+                android:paddingBottom="10dp">
 
                 <!-- Drag handle pill -->
                 <ImageView
@@ -68,7 +68,7 @@
                     android:layout_height="4dp"
                     android:src="@drawable/ic_drag_handle"
                     android:layout_gravity="center_horizontal"
-                    android:layout_marginBottom="17dp"
+                    android:layout_marginBottom="10dp"
                     android:contentDescription="@null" />
 
                 <!-- Sign Up title -->
@@ -77,11 +77,11 @@
                     android:layout_width="wrap_content"
                     android:layout_height="wrap_content"
                     android:text="@string/sign_up"
-                    android:textSize="26sp"
+                    android:textSize="24sp"
                     android:textStyle="bold"
                     android:textColor="@color/black"
                     android:fontFamily="sans-serif-medium"
-                    android:layout_marginBottom="20dp" />
+                    android:layout_marginBottom="8dp" />
 
                 <!-- Full Name -->
                 <EditText
@@ -201,19 +201,19 @@
                     android:id="@+id/btn_sign_up"
                     style="@style/Widget.Askvocate.Button.Primary"
                     android:layout_width="200dp"
-                    android:layout_height="52dp"
+                    android:layout_height="48dp"
                     android:text="@string/sign_up"
                     android:textSize="15sp"
                     android:layout_gravity="center_horizontal"
-                    android:layout_marginTop="28dp"
-                    android:layout_marginBottom="10dp" />
+                    android:layout_marginTop="16dp"
+                    android:layout_marginBottom="6dp" />
 
                 
                 <!-- Or divider -->
                 <LinearLayout
                     android:layout_width="match_parent"
                     android:layout_height="wrap_content"
-                    android:layout_marginTop="8dp"
+                    android:layout_marginTop="4dp"
                     android:gravity="center_vertical"
                     android:orientation="horizontal">
 
@@ -244,9 +244,9 @@
                     android:id="@+id/btn_google_sign_up"
                     style="@style/Widget.Material3.Button.OutlinedButton"
                     android:layout_width="match_parent"
-                    android:layout_height="46dp"
-                    android:layout_marginTop="8dp"
-                    android:layout_marginBottom="8dp"
+                    android:layout_height="44dp"
+                    android:layout_marginTop="6dp"
+                    android:layout_marginBottom="4dp"
                     android:text="@string/sign_up_with_google"
                     android:textColor="@color/text_primary"
                     android:textSize="15sp"

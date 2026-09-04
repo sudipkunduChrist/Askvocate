@@ -52,7 +52,14 @@ class SignInFragment : Fragment() {
 
         // Don't have an account? Sign Up
         view.findViewById<TextView>(R.id.tv_sign_up).setOnClickListener {
-            NavHostFragment.findNavController(this).navigate(R.id.action_sign_in_to_sign_up)
+            val hasArg = arguments?.containsKey("isLawyer") == true
+            if (hasArg) {
+                val isLawyer = arguments?.getBoolean("isLawyer", false) ?: false
+                val actionId = if (isLawyer) R.id.action_sign_in_to_lawyer_sign_up else R.id.action_sign_in_to_sign_up
+                NavHostFragment.findNavController(this).navigate(actionId)
+            } else {
+                NavHostFragment.findNavController(this).navigate(R.id.action_sign_in_to_role_selection)
+            }
         }
 
         // Forgot Password

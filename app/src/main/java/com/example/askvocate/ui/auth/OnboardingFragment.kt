@@ -22,6 +22,11 @@ class OnboardingFragment : Fragment() {
     private var isLawyer: Boolean = false
     private lateinit var dots: Array<View>
 
+    // When the user leaves the onboarding for Sign Up / Sign In, remember the page they
+    // were on (the final "Get Started" page) so that pressing Back returns them to that
+    // page instead of restarting at the first page.
+    private var pageToRestoreOnReturn = -1
+
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         isLawyer = arguments?.getBoolean("isLawyer", false) ?: false
@@ -106,6 +111,13 @@ class OnboardingFragment : Fragment() {
 
         // Skip button jumps to slide 5 (Let's start exploring)
         tvSkip.setOnClickListener { viewPager.currentItem = totalSlides - 1 }
+
+        // Coming back from Sign Up / Sign In: land on the "Get Started" page the user
+        // left from (the ViewPager would otherwise restart at the first page).
+        if (pageToRestoreOnReturn >= 0) {
+            viewPager.setCurrentItem(pageToRestoreOnReturn, false)
+            pageToRestoreOnReturn = -1
+        }
     }
 
     // ── Dot helpers ──────────────────────────────────────────────────────────
@@ -136,8 +148,13 @@ class OnboardingFragment : Fragment() {
     // ── Navigation ───────────────────────────────────────────────────────────
 
     private fun navigateToSignUp() {
-        NavHostFragment.findNavController(this)
-            .navigate(R.id.action_onboarding_to_sign_up)
+        pageToRestoreOnReturn =
+            view?.findViewById<ViewPager2>(R.id.viewPager)?.currentItem ?: -1
+        val actionId = if (isLawyer)
+            R.id.action_onboarding_to_lawyer_sign_up
+        else
+            R.id.action_onboarding_to_sign_up
+        NavHostFragment.findNavController(this).navigate(actionId)
     }
 
     // ── Data Class ───────────────────────────────────────────────────────────
