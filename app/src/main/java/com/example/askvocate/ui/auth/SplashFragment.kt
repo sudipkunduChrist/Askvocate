@@ -12,9 +12,11 @@ import android.view.View
 import android.view.ViewGroup
 import android.view.animation.DecelerateInterpolator
 import androidx.fragment.app.Fragment
+import androidx.navigation.NavOptions
 import androidx.navigation.fragment.NavHostFragment
-import com.example.askvocate.databinding.FragmentSplashBinding
 import com.example.askvocate.R
+import com.example.askvocate.databinding.FragmentSplashBinding
+import com.example.askvocate.util.SessionManager
 
 class SplashFragment : Fragment() {
 
@@ -37,10 +39,22 @@ class SplashFragment : Fragment() {
 
         startAnimations()
 
-        // 4 second delay to allow animations to play before navigating
+        // 4 second delay to allow animations to play before navigating.
+        // The account is always signed in by default, so the app boots straight
+        // into Home unless the user logged out from the profile page.
         Handler(Looper.getMainLooper()).postDelayed({
             if (isAdded && _binding != null) {
-                NavHostFragment.findNavController(this).navigate(R.id.action_splash_to_role_selection)
+                val navController = NavHostFragment.findNavController(this)
+                if (SessionManager.isLoggedIn(requireContext())) {
+                    val options = NavOptions.Builder()
+                        .setPopUpTo(R.id.nav_splash, inclusive = true)
+                        .setEnterAnim(R.anim.fade_in)
+                        .setExitAnim(R.anim.fade_out)
+                        .build()
+                    navController.navigate(R.id.nav_home, null, options)
+                } else {
+                    navController.navigate(R.id.action_splash_to_role_selection)
+                }
             }
         }, 4000)
     }

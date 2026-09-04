@@ -58,3 +58,26 @@ Thumbs.db
 ### Test Reports ###
 test-output/
 surefire-reports/
+
+### Android app testing via ADB reverse (wired device / emulator) ###
+#
+# The Android app's ApiConfig.BASE_URL points to http://localhost:8080/api,
+# i.e. the Spring Boot backend running on the developer's machine.
+#
+# When testing the app on a physical device connected by USB (wired), run the
+# following command ONCE in a terminal while the device is connected (USB
+# debugging enabled):
+#
+#     adb reverse tcp:8080 tcp:8080
+#
+# This forwards localhost:8080 from the phone to localhost:8080 on this PC, so
+# the app reaches the backend without hardcoding an IP or configuring Wi-Fi.
+#
+# Note: the same command is also required when testing on an Android Studio
+# emulator as long as BASE_URL uses localhost — inside the emulator "localhost"
+# is the emulator itself, not your PC. (Alternative for emulators only: point
+# BASE_URL at http://10.0.2.2:8080/api, the alias that reaches the host PC,
+# then adb reverse is not needed — but physical devices then need a LAN IP.)
+#
+# Rerun the adb reverse command after reconnecting the device or restarting
+# the emulator, since the forwarding is cleared when the connection drops.

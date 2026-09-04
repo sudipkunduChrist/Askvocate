@@ -1,0 +1,87 @@
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="400dp"
+    android:height="180dp"
+    android:viewportWidth="400"
+    android:viewportHeight="180">
+
+    <!-- land -->
+    <path
+        android:pathData="M0,0h400v180h-400z"
+        android:fillColor="@color/home_map_land" />
+
+    <!-- park areas -->
+    <path
+        android:pathData="M16,14h78v64h-78z"
+        android:fillColor="@color/home_map_park" />
+    <path
+        android:pathData="M306,12h70v48h-70z"
+        android:fillColor="@color/home_map_park" />
+    <path
+        android:pathData="M238,118h64v42h-64z"
+        android:fillColor="@color/home_map_park" />
+
+    <!-- building blocks -->
+    <path
+        android:pathData="M118,16h46v34h-46z"
+        android:fillColor="@color/home_map_block" />
+    <path
+        android:pathData="M176,60h42v30h-42z"
+        android:fillColor="@color/home_map_block" />
+    <path
+        android:pathData="M14,108h50v26h-50z"
+        android:fillColor="@color/home_map_block" />
+    <path
+        android:pathData="M150,126h48v26h-48z"
+        android:fillColor="@color/home_map_block" />
+    <path
+        android:pathData="M330,74h42v28h-42z"
+        android:fillColor="@color/home_map_block" />
+
+    <!-- roads -->
+    <path
+        android:pathData="M-10,94 C120,86 250,102 410,92"
+        android:strokeColor="@color/home_map_road"
+        android:strokeWidth="9"
+        android:strokeLineCap="round" />
+    <path
+        android:pathData="M150,-12 C152,60 146,120 152,196"
+        android:strokeColor="@color/home_map_road"
+        android:strokeWidth="8"
+        android:strokeLineCap="round" />
+    <path
+        android:pathData="M266,-12 C268,70 260,130 272,196"
+        android:strokeColor="@color/home_map_road"
+        android:strokeWidth="8"
+        android:strokeLineCap="round" />
+    <path
+        android:pathData="M-8,38 L72,6"
+        android:strokeColor="@color/home_map_road"
+        android:strokeWidth="6"
+        android:strokeLineCap="round" />
+    <path
+        android:pathData="M344,-8 C360,30 356,50 382,62"
+        android:strokeColor="@color/home_map_road"
+        android:strokeWidth="6"
+        android:strokeLineCap="round" />
+
+    <!-- river -->
+    <path
+        android:pathData="M-20,166 C60,148 130,176 200,154 C260,136 330,124 420,142"
+        android:strokeColor="@color/home_map_water"
+        android:strokeWidth="16"
+        android:strokeLineCap="round" />
+
+    <!-- lawyer location markers -->
+    <path
+        android:pathData="M212,36 m-10,0 a10,10 0 1,1 20,0 a10,10 0 1,1 -20,0"
+        android:fillColor="#FFFFFFFF" />
+    <path
+        android:pathData="M212,36 m-6,0 a6,6 0 1,1 12,0 a6,6 0 1,1 -12,0"
+        android:fillColor="@color/amber_accent" />
+    <path
+        android:pathData="M330,104 m-10,0 a10,10 0 1,1 20,0 a10,10 0 1,1 -20,0"
+        android:fillColor="#FFFFFFFF" />
+    <path
+        android:pathData="M330,104 m-6,0 a6,6 0 1,1 12,0 a6,6 0 1,1 -12,0"
+        android:fillColor="@color/amber_accent" />
+</vector>

@@ -193,4 +193,37 @@
     <string name="cd_verified">Verified professional</string>
     <string name="askvocate">ASKVOCATE</string>
     <string name="sign_up_with_google">Sign up with Google</string>
+
+    <!-- Home redesign -->
+    <string name="home_screen_title">Home</string>
+    <string name="greeting_name">Rewa</string>
+    <string name="greeting_line">Hi %1$s!</string>
+    <string name="good_morning">Good morning</string>
+    <string name="search_hint">Search for lawyers, cases</string>
+    <string name="continue_your_case">Continue your case</string>
+    <string name="view_all">View all</string>
+    <string name="verified_lawyers_near_you">Verified lawyers near you</string>
+    <string name="verified_nearby_count">24 verified nearby</string>
+    <string name="verified_nearby_sub">Within 5 km of Sector 62</string>
+    <string name="top_rated_this_week">Top rated this week</string>
+    <string name="find_your_lawyer">Find your lawyer</string>
+    <string name="find_your_lawyer_sub">Tell us about your case and we\'ll match you with verified advocates nearby.</string>
+    <string name="describe_your_case">Describe your case</string>
+    <string name="describe_your_case_sub">Our AI assistant reads what you share and matches you with the right specialization, no legal jargon needed.</string>
+    <string name="case_description_hint">e.g. My landlord won\'t return my deposit...</string>
+    <string name="category_label">Category</string>
+    <string name="find_matching_lawyers">Find matching lawyers \u2192</string>
+    <string name="dummy_data_note">Showing dummy data for preview — sample cases &amp; lawyers</string>
+    <string name="tab_cases">Cases</string>
+    <string name="tab_messages">Messages</string>
+    <string name="home_map_cd">Map preview of nearby verified lawyers</string>
+    <string name="cd_notifications">Notifications</string>
+    <string name="cd_chevron">Open</string>
+    <string name="marriage">Marriage</string>
+    <string name="employment">Employment</string>
+    <string name="cat_family_personal">Family &amp; personal</string>
+    <string name="cat_property_real_estate">Property &amp; real estate</string>
+    <string name="cat_employment">Employment</string>
+    <string name="cat_civil_consumer">Civil &amp; consumer</string>
+    <string name="no_new_notifications">No new notifications</string>
 </resources>

@@ -18,16 +18,173 @@
             android:layout_width="match_parent"
             android:layout_height="match_parent"
             app:defaultNavHost="true"
-            app:navGraph="@navigation/nav_graph"
-            app:layout_behavior="@string/appbar_scrolling_view_behavior" />
+            app:navGraph="@navigation/nav_graph" />
 
-        <com.google.android.material.bottomnavigation.BottomNavigationView
-            android:id="@+id/bottom_navigation"
-            style="@style/Widget.Askvocate.BottomNavigation"
+        <!-- Bottom bar: Home | Cases | (center ask button) | Messages | Profile -->
+        <FrameLayout
+            android:id="@+id/bottom_nav_container"
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
             android:layout_gravity="bottom"
-            app:menu="@menu/bottom_nav_menu" />
+            android:background="@color/surface_white">
+
+            <View
+                android:layout_width="match_parent"
+                android:layout_height="1dp"
+                android:background="@color/home_outline" />
+
+            <LinearLayout
+                android:layout_width="match_parent"
+                android:layout_height="78dp"
+                android:background="@color/surface_white"
+                android:orientation="horizontal">
+
+                <!-- Home -->
+                <LinearLayout
+                    android:id="@+id/tab_home"
+                    android:layout_width="0dp"
+                    android:layout_height="match_parent"
+                    android:layout_weight="1"
+                    android:clickable="true"
+                    android:focusable="true"
+                    android:foreground="?attr/selectableItemBackground"
+                    android:gravity="center_horizontal"
+                    android:orientation="vertical">
+
+                    <ImageView
+                        android:id="@+id/icon_home"
+                        android:layout_width="24dp"
+                        android:layout_height="24dp"
+                        android:layout_marginTop="11dp"
+                        android:contentDescription="@string/nav_home"
+                        android:src="@drawable/ic_home"
+                        app:tint="@color/home_blue" />
+
+                    <TextView
+                        android:id="@+id/label_home"
+                        android:layout_width="wrap_content"
+                        android:layout_height="wrap_content"
+                        android:layout_marginTop="3dp"
+                        android:text="@string/nav_home"
+                        android:textColor="@color/home_blue"
+                        android:textSize="10.5sp"
+                        android:textStyle="bold" />
+                </LinearLayout>
+
+                <!-- Cases -->
+                <LinearLayout
+                    android:id="@+id/tab_cases"
+                    android:layout_width="0dp"
+                    android:layout_height="match_parent"
+                    android:layout_weight="1"
+                    android:clickable="true"
+                    android:focusable="true"
+                    android:foreground="?attr/selectableItemBackground"
+                    android:gravity="center_horizontal"
+                    android:orientation="vertical">
+
+                    <ImageView
+                        android:id="@+id/icon_cases"
+                        android:layout_width="24dp"
+                        android:layout_height="24dp"
+                        android:layout_marginTop="11dp"
+                        android:contentDescription="@string/tab_cases"
+                        android:src="@drawable/ic_case_work"
+                        app:tint="@color/text_tertiary" />
+
+                    <TextView
+                        android:id="@+id/label_cases"
+                        android:layout_width="wrap_content"
+                        android:layout_height="wrap_content"
+                        android:layout_marginTop="3dp"
+                        android:text="@string/tab_cases"
+                        android:textColor="@color/text_tertiary"
+                        android:textSize="10.5sp" />
+                </LinearLayout>
+
+                <!-- Center slot (floating ask button lives here) -->
+                <LinearLayout
+                    android:layout_width="0dp"
+                    android:layout_height="match_parent"
+                    android:layout_weight="1"
+                    android:orientation="vertical" />
+
+                <!-- Messages -->
+                <LinearLayout
+                    android:id="@+id/tab_messages"
+                    android:layout_width="0dp"
+                    android:layout_height="match_parent"
+                    android:layout_weight="1"
+                    android:clickable="true"
+                    android:focusable="true"
+                    android:foreground="?attr/selectableItemBackground"
+                    android:gravity="center_horizontal"
+                    android:orientation="vertical">
+
+                    <ImageView
+                        android:id="@+id/icon_messages"
+                        android:layout_width="24dp"
+                        android:layout_height="24dp"
+                        android:layout_marginTop="11dp"
+                        android:contentDescription="@string/tab_messages"
+                        android:src="@drawable/ic_chat"
+                        app:tint="@color/text_tertiary" />
+
+                    <TextView
+                        android:id="@+id/label_messages"
+                        android:layout_width="wrap_content"
+                        android:layout_height="wrap_content"
+                        android:layout_marginTop="3dp"
+                        android:text="@string/tab_messages"
+                        android:textColor="@color/text_tertiary"
+                        android:textSize="10.5sp" />
+                </LinearLayout>
+
+                <!-- Profile -->
+                <LinearLayout
+                    android:id="@+id/tab_profile"
+                    android:layout_width="0dp"
+                    android:layout_height="match_parent"
+                    android:layout_weight="1"
+                    android:clickable="true"
+                    android:focusable="true"
+                    android:foreground="?attr/selectableItemBackground"
+                    android:gravity="center_horizontal"
+                    android:orientation="vertical">
+
+                    <ImageView
+                        android:id="@+id/icon_profile"
+                        android:layout_width="24dp"
+                        android:layout_height="24dp"
+                        android:layout_marginTop="11dp"
+                        android:contentDescription="@string/nav_profile"
+                        android:src="@drawable/ic_profile"
+                        app:tint="@color/text_tertiary" />
+
+                    <TextView
+                        android:id="@+id/label_profile"
+                        android:layout_width="wrap_content"
+                        android:layout_height="wrap_content"
+                        android:layout_marginTop="3dp"
+                        android:text="@string/nav_profile"
+                        android:textColor="@color/text_tertiary"
+                        android:textSize="10.5sp" />
+                </LinearLayout>
+            </LinearLayout>
+
+            <!-- Floating center ask button -->
+            <ImageButton
+                android:id="@+id/fab_center_ask"
+                android:layout_width="58dp"
+                android:layout_height="58dp"
+                android:layout_gravity="center_horizontal|bottom"
+                android:layout_marginBottom="10dp"
+                android:background="@drawable/bg_fab_center"
+                android:contentDescription="@string/find_your_lawyer"
+                android:elevation="6dp"
+                android:padding="15dp"
+                android:src="@drawable/ic_sparkle" />
+        </FrameLayout>
 
     </androidx.coordinatorlayout.widget.CoordinatorLayout>
 

@@ -93,4 +93,24 @@
     <color name="journey_text_body">@color/justitia_on_surface_variant</color>
     <color name="journey_card_bg">@color/justitia_surface_elevated</color>
     <color name="journey_timeline_line">@color/justitia_secondary_container</color>
+
+    <!-- Home screen redesign (matched to product mockups) -->
+    <color name="home_blue">#FF063E8A</color>
+    <color name="home_section_header">#FF2B2B2B</color>
+    <color name="home_outline">#FFE3E3E3</color>
+    <color name="home_input_bg">#FFF4F4F4</color>
+    <color name="pill_selected_bg">#FFF8EEDC</color>
+    <color name="pill_selected_text">#FFA7834D</color>
+    <color name="pill_unselected_text">#FF454545</color>
+    <color name="status_warm_bg">#FFF8EEDC</color>
+    <color name="status_warm_text">#FFA7834D</color>
+    <color name="home_map_water">#FFBCD8EE</color>
+    <color name="home_map_park">#FFD3E6C9</color>
+    <color name="home_map_land">#FFE9EDF1</color>
+    <color name="home_map_block">#FFDADFE6</color>
+    <color name="home_map_road">#FFFFFFFF</color>
+    <color name="avatar_pastel_blue">#FFDCE7F3</color>
+    <color name="avatar_pastel_peach">#FFF3E3D9</color>
+    <color name="avatar_pastel_mint">#FFDCEFDF</color>
+    <color name="avatar_pastel_lilac">#FFE9E0F2</color>
 </resources>

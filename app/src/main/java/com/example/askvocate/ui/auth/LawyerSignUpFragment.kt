@@ -15,6 +15,7 @@ import androidx.core.content.ContextCompat
 import androidx.fragment.app.Fragment
 import androidx.navigation.fragment.NavHostFragment
 import com.example.askvocate.R
+import com.example.askvocate.util.SessionManager
 import com.example.askvocate.util.ToastType
 import com.example.askvocate.util.hideLoading
 import com.example.askvocate.util.showCustomToast
@@ -137,6 +138,7 @@ class LawyerSignUpFragment : Fragment() {
             register(name, email, pass, confirm) { success ->
                 btnSignUp.hideLoading()
                 if (success) {
+                    SessionManager.setLoggedIn(requireContext(), true)
                     NavHostFragment.findNavController(this)
                         .navigate(R.id.action_lawyer_sign_up_to_home)
                 }
