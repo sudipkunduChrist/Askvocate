@@ -36,12 +36,13 @@ public class LawyerExperiencedService {
                 .name(dto.getName())
                 .emailOrPhone(dto.getEmailOrPhone())
                 .passwordHash(passwordEncoder.encode(dto.getPassword()))
-                .university(dto.getUniversity())
-                .graduationYear(dto.getGraduationYear())
-                .specialization(dto.getSpecialization())
-                .barCouncilId(dto.getBarCouncilId())
-                .practiceAreas(dto.getPracticeAreas())
-                .currentFirm(dto.getCurrentFirm())
+                .university(dto.getUniversity() != null ? dto.getUniversity() : "")
+                .graduationYear(dto.getGraduationYear() != null ? dto.getGraduationYear() : 0)
+                .specialization(dto.getSpecialization() != null ? dto.getSpecialization() : "")
+                .barCouncilId(dto.getBarCouncilId() != null ? dto.getBarCouncilId() : "")
+                .practiceAreas(dto.getPracticeAreas() != null ? dto.getPracticeAreas() : new java.util.ArrayList<>())
+                .currentFirm(dto.getCurrentFirm() != null ? dto.getCurrentFirm() : "")
+                .createdAt(java.time.Instant.now().toString())
                 .build();   // verificationStatus defaults to PENDING via @Builder.Default
 
         return lawyerExperiencedProfileRepository.save(profile);

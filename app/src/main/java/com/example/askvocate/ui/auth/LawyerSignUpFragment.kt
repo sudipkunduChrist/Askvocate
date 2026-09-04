@@ -15,6 +15,10 @@ import androidx.core.content.ContextCompat
 import androidx.fragment.app.Fragment
 import androidx.navigation.fragment.NavHostFragment
 import com.example.askvocate.R
+import com.example.askvocate.util.ToastType
+import com.example.askvocate.util.hideLoading
+import com.example.askvocate.util.showCustomToast
+import com.example.askvocate.util.showLoading
 import com.google.android.material.button.MaterialButton
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
@@ -40,7 +44,7 @@ class LawyerSignUpFragment : Fragment() {
     /** true = Experienced, false = Fresher (default) */
     private var isExperienced: Boolean = false
 
-    private val BASE_URL = "http://10.0.2.2:8080/api/users"
+    private val BASE_URL = "${com.example.askvocate.network.ApiConfig.BASE_URL}/users"
 
     override fun onCreateView(
         inflater: LayoutInflater,
@@ -117,17 +121,21 @@ class LawyerSignUpFragment : Fragment() {
             val confirm = etConfirmPassword.text.toString()
 
             if (name.isEmpty() || email.isEmpty() || pass.isEmpty() || confirm.isEmpty()) {
-                Toast.makeText(requireContext(), "Please fill in all fields", Toast.LENGTH_SHORT).show()
+                requireContext().showCustomToast("Please fill in all fields", ToastType.ERROR)
+                return@setOnClickListener
+            }
+            if (!android.util.Patterns.EMAIL_ADDRESS.matcher(email).matches()) {
+                requireContext().showCustomToast("Please enter a valid email address", ToastType.ERROR)
                 return@setOnClickListener
             }
             if (pass != confirm) {
-                Toast.makeText(requireContext(), "Passwords do not match", Toast.LENGTH_SHORT).show()
+                requireContext().showCustomToast("Passwords do not match", ToastType.ERROR)
                 return@setOnClickListener
             }
 
-            btnSignUp.isEnabled = false
+            btnSignUp.showLoading(requireContext())
             register(name, email, pass, confirm) { success ->
-                btnSignUp.isEnabled = true
+                btnSignUp.hideLoading()
                 if (success) {
                     NavHostFragment.findNavController(this)
                         .navigate(R.id.action_lawyer_sign_up_to_home)
@@ -198,21 +206,22 @@ class LawyerSignUpFragment : Fragment() {
                 Log.d("LawyerSignUp", "[$responseCode] $endpoint → $responseText")
 
                 withContext(Dispatchers.Main) {
-                    if (responseCode == HttpURLConnection.HTTP_CREATED) {
-                        Toast.makeText(requireContext(), "Account created! Welcome.", Toast.LENGTH_SHORT).show()
+                    val json = runCatching { JSONObject(responseText) }.getOrNull()
+                    val isSuccess = responseCode in 200..299 && json?.optBoolean("success", false) == true
+
+                    if (isSuccess) {
+                        requireContext().showCustomToast("Account created! Welcome.", ToastType.SUCCESS)
                         onResult(true)
                     } else {
-                        val errorMsg = runCatching {
-                            JSONObject(responseText).optString("error", "Registration failed")
-                        }.getOrDefault("Registration failed")
-                        Toast.makeText(requireContext(), errorMsg, Toast.LENGTH_LONG).show()
+                        val errorMsg = json?.optString("error", "Registration failed") ?: "Registration failed"
+                        requireContext().showCustomToast(errorMsg, ToastType.ERROR)
                         onResult(false)
                     }
                 }
             } catch (e: Exception) {
                 Log.e("LawyerSignUp", "Network error", e)
                 withContext(Dispatchers.Main) {
-                    Toast.makeText(requireContext(), "Network error: ${e.message}", Toast.LENGTH_LONG).show()
+                    requireContext().showCustomToast("Network error: ${e.message}", ToastType.ERROR)
                     onResult(false)
                 }
             }

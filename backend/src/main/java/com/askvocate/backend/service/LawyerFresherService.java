@@ -36,9 +36,10 @@ public class LawyerFresherService {
                 .name(dto.getName())
                 .emailOrPhone(dto.getEmailOrPhone())
                 .passwordHash(passwordEncoder.encode(dto.getPassword()))
-                .university(dto.getUniversity())
-                .graduationYear(dto.getGraduationYear())
-                .specialization(dto.getSpecialization())
+                .university(dto.getUniversity() != null ? dto.getUniversity() : "")
+                .graduationYear(dto.getGraduationYear() != null ? dto.getGraduationYear() : 0)
+                .specialization(dto.getSpecialization() != null ? dto.getSpecialization() : "")
+                .createdAt(java.time.Instant.now().toString())
                 .build();   // verificationStatus defaults to PENDING via @Builder.Default
 
         return lawyerFresherProfileRepository.save(profile);

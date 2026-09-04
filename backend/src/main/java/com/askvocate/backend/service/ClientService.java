@@ -33,6 +33,7 @@ public class ClientService {
                 .name(dto.getName())
                 .emailOrPhone(dto.getEmailOrPhone())
                 .passwordHash(passwordEncoder.encode(dto.getPassword()))
+                .createdAt(java.time.Instant.now().toString())
                 .build();
 
         return clientProfileRepository.save(profile);

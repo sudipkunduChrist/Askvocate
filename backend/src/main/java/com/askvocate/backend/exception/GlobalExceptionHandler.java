@@ -44,27 +44,34 @@ public class GlobalExceptionHandler {
                 "File size exceeds the maximum allowed limit of 10 MB per file.");
     }
 
+    @ExceptionHandler(org.springframework.web.bind.MethodArgumentNotValidException.class)
+    public ResponseEntity<Map<String, Object>> handleMethodArgumentNotValid(org.springframework.web.bind.MethodArgumentNotValidException ex) {
+        String errorMessage = ex.getBindingResult().getFieldErrors().stream()
+                .findFirst()
+                .map(err -> err.getDefaultMessage())
+                .orElse("Invalid request parameter");
+        return buildResponse(HttpStatus.OK, errorMessage);
+    }
+
     @ExceptionHandler(IllegalArgumentException.class)
     public ResponseEntity<Map<String, Object>> handleIllegalArgument(IllegalArgumentException ex) {
-        return buildResponse(HttpStatus.BAD_REQUEST, ex.getMessage());
+        return buildResponse(HttpStatus.OK, ex.getMessage());
     }
 
     @ExceptionHandler(Exception.class)
     public ResponseEntity<Map<String, Object>> handleGeneral(Exception ex) {
-        // Never leak internal details
         log.error("Unhandled exception", ex);
-        return buildResponse(HttpStatus.INTERNAL_SERVER_ERROR,
-                "An unexpected error occurred. Please try again later.");
+        return buildResponse(HttpStatus.OK, ex.getMessage() != null ? ex.getMessage() : "An unexpected error occurred.");
     }
 
     // ── Helpers ─────────────────────────────────────────────────────────
 
     private ResponseEntity<Map<String, Object>> buildResponse(HttpStatus status, String message) {
         Map<String, Object> body = new LinkedHashMap<>();
+        body.put("success", false);
         body.put("timestamp", Instant.now().toString());
         body.put("status", status.value());
-        body.put("error", status.getReasonPhrase());
-        body.put("message", message);
-        return ResponseEntity.status(status).body(body);
+        body.put("error", message);
+        return ResponseEntity.ok(body);
     }
 }

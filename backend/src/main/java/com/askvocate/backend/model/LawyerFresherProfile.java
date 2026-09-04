@@ -38,9 +38,12 @@ public class LawyerFresherProfile {
     private String passwordHash;
 
     // --- Fresher-specific fields (from LawyerFresherSignup DTO) ---
-    private String university;
-    private Integer graduationYear;
-    private String specialization;
+    @Builder.Default
+    private String university = "";
+    @Builder.Default
+    private Integer graduationYear = 0;
+    @Builder.Default
+    private String specialization = "";
 
     // --- Verification ---
     @Builder.Default
@@ -50,5 +53,5 @@ public class LawyerFresherProfile {
     private Long verifiedAt;
 
     @Builder.Default
-    private Long createdAt = Instant.now().toEpochMilli();
+    private String createdAt = Instant.now().toString();
 }

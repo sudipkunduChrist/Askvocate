@@ -36,5 +36,5 @@ public class ClientProfile {
     private String passwordHash;
 
     @Builder.Default
-    private Long createdAt = Instant.now().toEpochMilli();
+    private String createdAt = Instant.now().toString();
 }

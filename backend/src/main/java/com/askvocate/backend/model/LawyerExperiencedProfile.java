@@ -38,13 +38,19 @@ public class LawyerExperiencedProfile {
 
     private String passwordHash;
 
-    private String university;
-    private Integer graduationYear;
-    private String specialization;
+    @Builder.Default
+    private String university = "";
+    @Builder.Default
+    private Integer graduationYear = 0;
+    @Builder.Default
+    private String specialization = "";
 
-    private String barCouncilId;
-    private List<String> practiceAreas;
-    private String currentFirm;
+    @Builder.Default
+    private String barCouncilId = "";
+    @Builder.Default
+    private List<String> practiceAreas = new java.util.ArrayList<>();
+    @Builder.Default
+    private String currentFirm = "";
 
     // --- Verification ---
     @Builder.Default
@@ -54,5 +60,5 @@ public class LawyerExperiencedProfile {
     private Long verifiedAt;
 
     @Builder.Default
-    private Long createdAt = Instant.now().toEpochMilli();
+    private String createdAt = Instant.now().toString();
 }
