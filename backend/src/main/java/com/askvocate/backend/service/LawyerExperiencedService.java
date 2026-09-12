@@ -36,6 +36,7 @@ public class LawyerExperiencedService {
                 .name(dto.getName())
                 .emailOrPhone(dto.getEmailOrPhone())
                 .passwordHash(passwordEncoder.encode(dto.getPassword()))
+                .provider(dto.getProvider() != null ? dto.getProvider() : com.askvocate.backend.entity.AuthProvider.LOCAL)
                 .university(dto.getUniversity() != null ? dto.getUniversity() : "")
                 .graduationYear(dto.getGraduationYear() != null ? dto.getGraduationYear() : 0)
                 .specialization(dto.getSpecialization() != null ? dto.getSpecialization() : "")
@@ -84,6 +85,11 @@ public class LawyerExperiencedService {
 
         profile.setVerificationStatus(Verification_Status.REJECTED);
         profile.setRejectionReason(reason);
+        return lawyerExperiencedProfileRepository.save(profile);
+    }
+
+    /** Saves an experienced lawyer created via Google Sign-In (no local password). */
+    public LawyerExperiencedProfile saveGoogleLawyerExperienced(LawyerExperiencedProfile profile) {
         return lawyerExperiencedProfileRepository.save(profile);
     }
 }

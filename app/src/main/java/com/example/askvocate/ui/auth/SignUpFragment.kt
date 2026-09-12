@@ -117,6 +117,14 @@ class SignUpFragment : Fragment() {
             }
         }
 
+        // ── Sign up with Google (auto-registers as client on first sign-in) ──
+        view.findViewById<MaterialButton>(R.id.btn_google_sign_up).setOnClickListener {
+            com.example.askvocate.network.GoogleAuthHelper.launchGoogleSignIn(requireActivity(), targetRole = "CLIENT") {
+                SessionManager.setLoggedIn(requireContext(), true)
+                NavHostFragment.findNavController(this).navigate(R.id.action_sign_up_to_home)
+            }
+        }
+
         // ── Already have an account? → Sign In ───────────────────────────────
         view.findViewById<TextView>(R.id.tv_sign_in).setOnClickListener {
             NavHostFragment.findNavController(this).navigate(R.id.action_sign_up_to_sign_in)

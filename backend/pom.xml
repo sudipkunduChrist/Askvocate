@@ -67,6 +67,13 @@
 			<optional>true</optional>
 		</dependency>
 
+		<!-- ✅ Google ID token verification for Sign in with Google -->
+		<dependency>
+			<groupId>com.google.api-client</groupId>
+			<artifactId>google-api-client</artifactId>
+			<version>2.6.0</version>
+		</dependency>
+
 		<!-- ✅ Cloudinary -->
 		<dependency>
 			<groupId>com.cloudinary</groupId>

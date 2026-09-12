@@ -4,6 +4,7 @@ import jakarta.validation.constraints.Email;
 import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.Size;
 import lombok.Data;
+import com.askvocate.backend.entity.AuthProvider;
 
 @Data
 public class BaseSignup {
@@ -20,4 +21,11 @@ public class BaseSignup {
 
     @NotBlank(message = "Confirm password is required")
     private String confirmPassword;
+
+    /**
+     * How this account authenticates. Defaults to LOCAL when the app doesn't send it,
+     * so the existing signup flow keeps working unchanged. GOOGLE is used by the
+     * Google sign-up flow (which sends no password).
+     */
+    private AuthProvider provider = AuthProvider.LOCAL;
 }

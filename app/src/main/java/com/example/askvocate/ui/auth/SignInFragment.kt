@@ -88,6 +88,14 @@ class SignInFragment : Fragment() {
             }
         }
 
+        // Sign in with Google
+        view.findViewById<MaterialButton>(R.id.btn_google_sign_in).setOnClickListener {
+            com.example.askvocate.network.GoogleAuthHelper.launchGoogleSignIn(requireActivity()) {
+                SessionManager.setLoggedIn(requireContext(), true)
+                NavHostFragment.findNavController(this).navigate(R.id.action_sign_in_to_home)
+            }
+        }
+
         // Don't have an account? Sign Up
         view.findViewById<TextView>(R.id.tv_sign_up).setOnClickListener {
             val hasArg = arguments?.containsKey("isLawyer") == true

@@ -33,6 +33,7 @@ public class ClientService {
                 .name(dto.getName())
                 .emailOrPhone(dto.getEmailOrPhone())
                 .passwordHash(passwordEncoder.encode(dto.getPassword()))
+                .provider(dto.getProvider() != null ? dto.getProvider() : com.askvocate.backend.entity.AuthProvider.LOCAL)
                 .createdAt(java.time.Instant.now().toString())
                 .build();
 
@@ -47,5 +48,13 @@ public class ClientService {
     /** Fetch a client by their MongoDB ID. */
     public Optional<ClientProfile> findById(String id) {
         return clientProfileRepository.findById(id);
+    }
+
+    /**
+     * Saves a client created via Google Sign-In (no local password).
+     * Assumes uniqueness was checked by the caller right before construction.
+     */
+    public ClientProfile saveGoogleClient(ClientProfile profile) {
+        return clientProfileRepository.save(profile);
     }
 }

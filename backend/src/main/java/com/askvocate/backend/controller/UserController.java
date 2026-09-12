@@ -53,6 +53,42 @@ public class UserController {
         ));
     }
 
+    // ─── Google Sign-In ──────────────────────────────────────────────
+
+    /**
+     * POST /api/users/auth/google
+     * Body: { "idToken": "<Google ID token from Credential Manager>" }
+     * Verifies the token, logs the user in, or auto-registers them as a CLIENT on first sign-in.
+     */
+    @PostMapping("/auth/google")
+    public ResponseEntity<?> googleAuth(@Valid @RequestBody com.askvocate.backend.dto.GoogleAuthRequest dto) {
+        log.info("--> Endpoint Hit: POST /api/users/auth/google | targetRole: {}", dto.getTargetRole());
+        try {
+            var data = authService.loginWithGoogle(dto.getIdToken(), dto.getTargetRole());
+            log.info("<-- Google auth successful | Role: {} | isNewUser: {}",
+                    data.get("role"), data.get("isNewUser"));
+            return ResponseEntity.ok(Map.of(
+                    "success", true,
+                    "message", data.get("isNewUser").equals(true)
+                            ? "Account created with Google" : "Login successful",
+                    "role", data.get("role"),
+                    "user", data.get("user")
+            ));
+        } catch (IllegalArgumentException e) {
+            log.warn("<-- Google auth rejected: {}", e.getMessage());
+            return ResponseEntity.status(HttpStatus.UNAUTHORIZED).body(Map.of(
+                    "success", false,
+                    "error", e.getMessage()
+            ));
+        } catch (Exception e) {
+            log.error("<-- Google auth failed unexpectedly", e);
+            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body(Map.of(
+                    "success", false,
+                    "error", "Could not verify Google sign-in. Try again."
+            ));
+        }
+    }
+
     // ─── Registration ────────────────────────────────────────────────────────
 
     @PostMapping("/register/client")

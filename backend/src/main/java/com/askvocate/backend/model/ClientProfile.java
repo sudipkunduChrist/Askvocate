@@ -1,5 +1,6 @@
 package com.askvocate.backend.model;
 
+import com.askvocate.backend.entity.AuthProvider;
 import com.askvocate.backend.entity.Role;
 import lombok.AllArgsConstructor;
 import lombok.Builder;
@@ -34,6 +35,10 @@ public class ClientProfile {
     private String emailOrPhone;
 
     private String passwordHash;
+
+    /** How this account authenticates — LOCAL (password) or GOOGLE. */
+    @Builder.Default
+    private AuthProvider provider = AuthProvider.LOCAL;
 
     @Builder.Default
     private String createdAt = Instant.now().toString();
