@@ -118,8 +118,14 @@ class SignUpFragment : Fragment() {
         }
 
         // ── Sign up with Google (auto-registers as client on first sign-in) ──
-        view.findViewById<MaterialButton>(R.id.btn_google_sign_up).setOnClickListener {
-            com.example.askvocate.network.GoogleAuthHelper.launchGoogleSignIn(requireActivity(), targetRole = "CLIENT") {
+        val btnGoogleSignUp = view.findViewById<MaterialButton>(R.id.btn_google_sign_up)
+        btnGoogleSignUp.setOnClickListener {
+            btnGoogleSignUp.showLoading(requireContext(), isDarkSpinner = true)
+            com.example.askvocate.network.GoogleAuthHelper.launchGoogleSignIn(
+                context = requireActivity(),
+                targetRole = "CLIENT",
+                onComplete = { btnGoogleSignUp.hideLoading() }
+            ) {
                 SessionManager.setLoggedIn(requireContext(), true)
                 NavHostFragment.findNavController(this).navigate(R.id.action_sign_up_to_home)
             }

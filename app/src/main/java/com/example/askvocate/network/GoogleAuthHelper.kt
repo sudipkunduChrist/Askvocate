@@ -45,20 +45,27 @@ object GoogleAuthHelper {
     /**
      * Launches the Google account picker and, on success, runs the whole sign-in:
      * token exchange with the backend + [onSuccess] on the main thread.
-     * Shows a toast and calls nothing on failure/cancel.
+     * Invokes [onComplete] when finished regardless of success, error, or cancellation.
      */
-    fun launchGoogleSignIn(context: Context, targetRole: String? = null, onSuccess: () -> Unit) {
+    fun launchGoogleSignIn(
+        context: Context,
+        targetRole: String? = null,
+        onComplete: (() -> Unit)? = null,
+        onSuccess: () -> Unit
+    ) {
         if (WEB_CLIENT_ID.isBlank()) {
             context.showCustomToast(
                 "Google sign-in not configured — add GOOGLE_WEB_CLIENT_ID to app/local.properties",
                 ToastType.ERROR
             )
+            onComplete?.invoke()
             return
         }
 
         val activity = context.findActivity() ?: run {
             Log.e("GoogleAuth", "Context is not an Activity")
             context.showCustomToast("Google sign-in failed: Invalid Activity context", ToastType.ERROR)
+            onComplete?.invoke()
             return
         }
 
@@ -73,55 +80,59 @@ object GoogleAuthHelper {
             .build()
 
         CoroutineScope(Dispatchers.Main).launch {
-            var attempts = 0
-            while (attempts < 2) {
-                attempts++
-                try {
-                    val result = credentialManager.getCredential(activity, request)
-                    val credential = result.credential
-                    val googleIdTokenCredential = try {
-                        GoogleIdTokenCredential.createFrom(credential.data)
+            try {
+                var attempts = 0
+                while (attempts < 2) {
+                    attempts++
+                    try {
+                        val result = credentialManager.getCredential(activity, request)
+                        val credential = result.credential
+                        val googleIdTokenCredential = try {
+                            GoogleIdTokenCredential.createFrom(credential.data)
+                        } catch (e: Exception) {
+                            Log.e("GoogleAuth", "Failed to parse GoogleIdTokenCredential", e)
+                            null
+                        }
+                        val idToken = googleIdTokenCredential?.idToken
+                        if (idToken.isNullOrEmpty()) {
+                            context.showCustomToast("Google sign-in returned no token", ToastType.ERROR)
+                            return@launch
+                        }
+                        // Network work off the main thread
+                        withContext(Dispatchers.IO) {
+                            sendTokenToBackend(idToken, targetRole, context, onSuccess)
+                        }
+                        return@launch
+                    } catch (e: GetCredentialException) {
+                        Log.w("GoogleAuth", "Google sign-in cancelled or failed (attempt $attempts): ${e.type}")
+                        when (e) {
+                            is androidx.credentials.exceptions.GetCredentialCancellationException -> {
+                                // User closed the picker — not an error worth a toast
+                                return@launch
+                            }
+                            is androidx.credentials.exceptions.NoCredentialException -> {
+                                if (attempts < 2) {
+                                    continue // retry once instantly if Play Services was warming up
+                                }
+                                context.showCustomToast(
+                                    "No Google account available. Make sure a Google account is added on this device.",
+                                    ToastType.ERROR
+                                )
+                                return@launch
+                            }
+                            else -> {
+                                context.showCustomToast("Google sign-in failed: ${e.localizedMessage}", ToastType.ERROR)
+                                return@launch
+                            }
+                        }
                     } catch (e: Exception) {
-                        Log.e("GoogleAuth", "Failed to parse GoogleIdTokenCredential", e)
-                        null
-                    }
-                    val idToken = googleIdTokenCredential?.idToken
-                    if (idToken.isNullOrEmpty()) {
-                        context.showCustomToast("Google sign-in returned no token", ToastType.ERROR)
+                        Log.e("GoogleAuth", "Google sign-in error", e)
+                        context.showCustomToast("Google sign-in failed: ${e.message}", ToastType.ERROR)
                         return@launch
                     }
-                    // Network work off the main thread
-                    withContext(Dispatchers.IO) {
-                        sendTokenToBackend(idToken, targetRole, context, onSuccess)
-                    }
-                    return@launch
-                } catch (e: GetCredentialException) {
-                    Log.w("GoogleAuth", "Google sign-in cancelled or failed (attempt $attempts): ${e.type}")
-                    when (e) {
-                        is androidx.credentials.exceptions.GetCredentialCancellationException -> {
-                            // User closed the picker — not an error worth a toast
-                            return@launch
-                        }
-                        is androidx.credentials.exceptions.NoCredentialException -> {
-                            if (attempts < 2) {
-                                continue // retry once instantly if Play Services was warming up
-                            }
-                            context.showCustomToast(
-                                "No Google account available. Make sure a Google account is added on this device.",
-                                ToastType.ERROR
-                            )
-                            return@launch
-                        }
-                        else -> {
-                            context.showCustomToast("Google sign-in failed: ${e.localizedMessage}", ToastType.ERROR)
-                            return@launch
-                        }
-                    }
-                } catch (e: Exception) {
-                    Log.e("GoogleAuth", "Google sign-in error", e)
-                    context.showCustomToast("Google sign-in failed: ${e.message}", ToastType.ERROR)
-                    return@launch
                 }
+            } finally {
+                onComplete?.invoke()
             }
         }
     }

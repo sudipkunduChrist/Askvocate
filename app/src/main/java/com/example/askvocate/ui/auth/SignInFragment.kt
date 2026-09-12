@@ -89,8 +89,13 @@ class SignInFragment : Fragment() {
         }
 
         // Sign in with Google
-        view.findViewById<MaterialButton>(R.id.btn_google_sign_in).setOnClickListener {
-            com.example.askvocate.network.GoogleAuthHelper.launchGoogleSignIn(requireActivity()) {
+        val btnGoogleSignIn = view.findViewById<MaterialButton>(R.id.btn_google_sign_in)
+        btnGoogleSignIn.setOnClickListener {
+            btnGoogleSignIn.showLoading(requireContext(), isDarkSpinner = true)
+            com.example.askvocate.network.GoogleAuthHelper.launchGoogleSignIn(
+                context = requireActivity(),
+                onComplete = { btnGoogleSignIn.hideLoading() }
+            ) {
                 SessionManager.setLoggedIn(requireContext(), true)
                 NavHostFragment.findNavController(this).navigate(R.id.action_sign_in_to_home)
             }

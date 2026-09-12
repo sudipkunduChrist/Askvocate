@@ -146,9 +146,15 @@ class LawyerSignUpFragment : Fragment() {
         }
 
         // ── Sign up with Google (auto-registers as lawyer on first sign-in) ──
-        view.findViewById<MaterialButton>(R.id.btn_google_sign_up).setOnClickListener {
+        val btnGoogleSignUp = view.findViewById<MaterialButton>(R.id.btn_google_sign_up)
+        btnGoogleSignUp.setOnClickListener {
             val role = if (isExperienced) "LAWYER_EXPERIENCED" else "LAWYER_FRESHER"
-            com.example.askvocate.network.GoogleAuthHelper.launchGoogleSignIn(requireActivity(), targetRole = role) {
+            btnGoogleSignUp.showLoading(requireContext(), isDarkSpinner = true)
+            com.example.askvocate.network.GoogleAuthHelper.launchGoogleSignIn(
+                context = requireActivity(),
+                targetRole = role,
+                onComplete = { btnGoogleSignUp.hideLoading() }
+            ) {
                 SessionManager.setLoggedIn(requireContext(), true)
                 NavHostFragment.findNavController(this).navigate(R.id.action_lawyer_sign_up_to_home)
             }
