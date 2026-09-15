@@ -19,6 +19,7 @@ local.properties
 # Local environment and secrets
 .env
 .env.*
+*.env
 !.env.example
 
 # Android generated files
@@ -30,10 +31,14 @@ captures/
 *.aar
 *.ap_
 
-# Python caches
+# Python virtual environments and caches
 __pycache__/
 *.py[cod]
 .pytest_cache/
+*env/
+*.venv/
+venv/
+.venv/
 
 # Temporary files
 *.swp
