@@ -19,8 +19,32 @@ android {
 
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
 
+        // Helper to resolve secret from environment or local config files (.env, local.properties)
+        fun getSecret(key: String): String {
+            System.getenv(key)?.takeIf { it.isNotBlank() }?.let { return it.trim() }
+
+            val candidateFiles = listOf(
+                project.file(".env"),
+                rootProject.file("app/.env"),
+                rootProject.file(".env"),
+                rootProject.file("backend/.env"),
+                rootProject.file("local.properties"),
+                project.file("local.properties")
+            )
+
+            for (f in candidateFiles) {
+                if (f.exists()) {
+                    val props = Properties().apply { f.inputStream().use { load(it) } }
+                    props.getProperty(key)?.takeIf { it.isNotBlank() }?.let { return it.trim() }
+                }
+            }
+
+            return ""
+        }
+
         // same value as GOOGLE_WEB_CLIENT_ID in backend/.env.
-        val webClientId = System.getenv("GOOGLE_CLIENT_ID") ?: ""
+        val webClientId = getSecret("GOOGLE_CLIENT_ID").ifEmpty { getSecret("GOOGLE_WEB_CLIENT_ID") }
+        println("[Askvocate Build] GOOGLE_WEB_CLIENT_ID = " + (if (webClientId.isNotBlank()) webClientId else "<NOT CONFIGURED>"))
         buildConfigField("String", "GOOGLE_WEB_CLIENT_ID", "\"$webClientId\"")
     }
 

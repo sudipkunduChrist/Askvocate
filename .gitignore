@@ -19,7 +19,14 @@ local.properties
 # Local environment and secrets
 .env
 .env.*
+*.env
 !.env.example
+
+# Python virtual environments
+*venv/
+*-env/
+.venv/
+env/
 
 # Android generated files
 captures/
