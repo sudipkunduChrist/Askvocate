@@ -20,12 +20,22 @@ Follow these instructions to get a copy of the project up and running on your lo
    git clone https://github.com/sudipkunduChrist/Askvocate.git
    ```
 
-2. **Open the project:**
+2. **Configure Environment (`app/.env`):**
+   Create a `.env` file inside the `app` folder (or copy from `app/.env.example`):
+   ```bash
+   cp app/.env.example app/.env
+   ```
+   Add your Google Web Client ID for authentication:
+   ```env
+   GOOGLE_CLIENT_ID=your_google_client_id_here.apps.googleusercontent.com
+   ```
+
+3. **Open the project:**
    - Launch Android Studio.
    - Select **Open** and navigate to the cloned folder.
    - Wait for the Gradle sync to complete.
 
-3. **Check Branch:**
+4. **Check Branch:**
    - Ensure you are working on the `develop` branch for integration or create a new feature branch.
    ```bash
    git checkout develop
