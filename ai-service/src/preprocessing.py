@@ -13,9 +13,10 @@ def detect_language(text: str) -> str:
         return "Hindi"
 
     hinglish_markers = {
-        "hai", "nahi", "nahin", "kya", "mera", "meri", "mujhe", "karna",
-        "kiya", "gaya", "raha", "rahi", "hoga", "kaise", "kyunki", "bahut",
-        "wala", "wali", "chahiye", "hua", "hui", "liye", "diya", "kar"
+        "hai", "nahi", "nahin", "nhi", "kya", "mera", "meri", "mujhe", "karna",
+        "kiya", "gaya", "raha", "rahi", "hoga", "kaise", "kese", "kyunki", "bahut",
+        "wala", "wali", "chahiye", "hua", "hui", "liye", "diya", "kar", "kr", "karu",
+        "karun", "kru", "hum", "hm"
     }
     tokens = set(re.findall(r"[a-zA-Z]+", text.lower()))
     overlap = tokens & hinglish_markers
@@ -46,6 +47,9 @@ def preprocess_query(text: str) -> dict:
 
 
 if __name__ == "__main__":
+    import sys
+    if hasattr(sys.stdout, "reconfigure"):   # Windows cp1252 consoles can't print Devanagari
+        sys.stdout.reconfigure(encoding="utf-8", errors="replace")
     samples = [
         "m aj nhi aungi office late ho jaunga",
         "मेरे बैंक अकाउंट से पैसे किसी ने ऑनलाइन फ्रॉड करके निकाल लिए",
