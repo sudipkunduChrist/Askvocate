@@ -29,14 +29,12 @@ class AppointmentAdapter(private val onClick: (Appointment) -> Unit) :
     }
 
     override fun onCreateViewHolder(parent: ViewGroup, viewType: Int): ViewHolder {
-        return ViewHolder(
-            ItemAppointmentCardBinding.inflate(
-                LayoutInflater.from(parent.context),
-                parent,
-                false
-            ),
-            onClick
+        val binding = ItemAppointmentCardBinding.inflate(
+            LayoutInflater.from(parent.context),
+            parent,
+            false
         )
+        return ViewHolder(binding, onClick)
     }
 
     override fun onBindViewHolder(holder: ViewHolder, position: Int) {

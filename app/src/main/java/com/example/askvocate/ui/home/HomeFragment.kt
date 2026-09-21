@@ -64,13 +64,26 @@ class HomeFragment : Fragment() {
         }
         binding.btnAskAiHero.setOnClickListener {
             // Navigate to AI chat
-            findNavController().navigate(R.id.nav_chat)
+            findNavController().navigate(R.id.nav_chat_list)
         }
     }
 
     private fun setupSearch() {
         binding.btnFilter.setOnClickListener {
             Toast.makeText(requireContext(), "Filter coming soon!", Toast.LENGTH_SHORT).show()
+        }
+
+        binding.etSearch.setOnEditorActionListener { v, actionId, event ->
+            if (actionId == android.view.inputmethod.EditorInfo.IME_ACTION_SEARCH) {
+                val query = v.text.toString()
+                if (query.isNotEmpty()) {
+                    val bundle = Bundle().apply { putString("searchQuery", query) }
+                    findNavController().navigate(R.id.nav_find_lawyers, bundle)
+                }
+                true
+            } else {
+                false
+            }
         }
     }
 
@@ -79,7 +92,7 @@ class HomeFragment : Fragment() {
             findNavController().navigate(R.id.nav_find_lawyers)
         }
         binding.actionAskAi.setOnClickListener {
-            findNavController().navigate(R.id.nav_chat)
+            findNavController().navigate(R.id.nav_chat_list)
         }
         binding.actionAppointments.setOnClickListener {
             findNavController().navigate(R.id.nav_appointments)
