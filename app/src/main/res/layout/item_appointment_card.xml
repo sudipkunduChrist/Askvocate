@@ -1,0 +1,97 @@
+<?xml version="1.0" encoding="utf-8"?>
+<com.google.android.material.card.MaterialCardView xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:app="http://schemas.android.com/apk/res-auto"
+    xmlns:tools="http://schemas.android.com/tools"
+    style="@style/Widget.Askvocate.Card"
+    android:layout_width="280dp"
+    android:layout_height="wrap_content"
+    android:layout_marginEnd="@dimen/spacing_md"
+    android:layout_marginBottom="@dimen/spacing_sm">
+
+    <androidx.constraintlayout.widget.ConstraintLayout
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:padding="@dimen/spacing_lg">
+
+        <de.hdodenhof.circleimageview.CircleImageView
+            android:id="@+id/iv_lawyer"
+            android:layout_width="48dp"
+            android:layout_height="48dp"
+            android:src="@drawable/ic_profile"
+            app:layout_constraintStart_toStartOf="parent"
+            app:layout_constraintTop_toTopOf="parent" />
+
+        <TextView
+            android:id="@+id/tv_lawyer_name"
+            android:layout_width="0dp"
+            android:layout_height="wrap_content"
+            android:layout_marginStart="@dimen/spacing_md"
+            android:textAppearance="@style/TextAppearance.Askvocate.Title"
+            app:layout_constraintEnd_toEndOf="parent"
+            app:layout_constraintStart_toEndOf="@id/iv_lawyer"
+            app:layout_constraintTop_toTopOf="parent"
+            tools:text="Adv. Anjali Sharma" />
+
+        <TextView
+            android:id="@+id/tv_appointment_type"
+            android:layout_width="0dp"
+            android:layout_height="wrap_content"
+            android:textAppearance="@style/TextAppearance.Askvocate.Caption"
+            app:layout_constraintEnd_toEndOf="parent"
+            app:layout_constraintStart_toStartOf="@id/tv_lawyer_name"
+            app:layout_constraintTop_toBottomOf="@id/tv_lawyer_name"
+            tools:text="Online Consultation" />
+
+        <View
+            android:id="@+id/divider"
+            android:layout_width="match_parent"
+            android:layout_height="1dp"
+            android:layout_marginTop="@dimen/spacing_md"
+            android:background="@color/divider"
+            app:layout_constraintTop_toBottomOf="@id/iv_lawyer" />
+
+        <ImageView
+            android:id="@+id/iv_calendar"
+            android:layout_width="16dp"
+            android:layout_height="16dp"
+            android:layout_marginTop="@dimen/spacing_md"
+            android:src="@drawable/ic_onboard_lawyer_schedule"
+            app:layout_constraintStart_toStartOf="parent"
+            app:layout_constraintTop_toBottomOf="@id/divider"
+            app:tint="@color/text_secondary" />
+
+        <TextView
+            android:id="@+id/tv_date"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:layout_marginStart="8dp"
+            android:textAppearance="@style/TextAppearance.Askvocate.Caption"
+            app:layout_constraintBottom_toBottomOf="@id/iv_calendar"
+            app:layout_constraintStart_toEndOf="@id/iv_calendar"
+            app:layout_constraintTop_toTopOf="@id/iv_calendar"
+            tools:text="Sept 25, 2026" />
+
+        <ImageView
+            android:id="@+id/iv_time"
+            android:layout_width="16dp"
+            android:layout_height="16dp"
+            android:layout_marginStart="@dimen/spacing_xl"
+            android:src="@drawable/ic_onboard_security"
+            app:layout_constraintBottom_toBottomOf="@id/iv_calendar"
+            app:layout_constraintStart_toEndOf="@id/tv_date"
+            app:layout_constraintTop_toTopOf="@id/iv_calendar"
+            app:tint="@color/text_secondary" />
+
+        <TextView
+            android:id="@+id/tv_time"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:layout_marginStart="8dp"
+            android:textAppearance="@style/TextAppearance.Askvocate.Caption"
+            app:layout_constraintBottom_toBottomOf="@id/iv_time"
+            app:layout_constraintStart_toEndOf="@id/iv_time"
+            app:layout_constraintTop_toTopOf="@id/iv_time"
+            tools:text="10:00 AM" />
+
+    </androidx.constraintlayout.widget.ConstraintLayout>
+</com.google.android.material.card.MaterialCardView>

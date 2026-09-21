@@ -3,7 +3,9 @@ package com.example.askvocate.ui.home
 import androidx.lifecycle.LiveData
 import androidx.lifecycle.MutableLiveData
 import androidx.lifecycle.ViewModel
+import com.example.askvocate.data.model.Appointment
 import com.example.askvocate.data.model.Category
+import com.example.askvocate.data.model.KnowledgeItem
 import com.example.askvocate.data.model.Lawyer
 import com.example.askvocate.data.repository.LawyerRepository
 
@@ -16,6 +18,12 @@ class HomeViewModel : ViewModel() {
     private val _topLawyers = MutableLiveData<List<Lawyer>>()
     val topLawyers: LiveData<List<Lawyer>> = _topLawyers
 
+    private val _upcomingAppointments = MutableLiveData<List<Appointment>>()
+    val upcomingAppointments: LiveData<List<Appointment>> = _upcomingAppointments
+
+    private val _knowledgeItems = MutableLiveData<List<KnowledgeItem>>()
+    val knowledgeItems: LiveData<List<KnowledgeItem>> = _knowledgeItems
+
     init {
         loadHomeData()
     }
@@ -23,5 +31,7 @@ class HomeViewModel : ViewModel() {
     private fun loadHomeData() {
         _categories.value = repository.getCategories()
         _topLawyers.value = repository.getTopLawyers()
+        _upcomingAppointments.value = repository.getUpcomingAppointments()
+        _knowledgeItems.value = repository.getKnowledgeItems()
     }
 }

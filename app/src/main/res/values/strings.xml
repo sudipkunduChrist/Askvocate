@@ -25,6 +25,30 @@
     <string name="recent_consultations">Recent Consultations</string>
     <string name="see_all">See All</string>
     <string name="quick_categories">Quick Categories</string>
+    <string name="hello_user_format">Hello, %s!</string>
+    <string name="legal_assistance_simplified">Your legal assistance,\nsimplified.</string>
+    <string name="hero_subtitle">Find the right advocate or get preliminary guidance for your legal concerns.</string>
+    <string name="search_placeholder">Search lawyers, services, or topics...</string>
+    <string name="find_lawyer">Find a Lawyer</string>
+    <string name="ask_ai">Ask AI</string>
+    <string name="my_appointments_short">Appointments</string>
+    <string name="legal_documents">Legal Docs</string>
+    <string name="explore_legal_services">Explore Legal Services</string>
+    <string name="upcoming_consultations">Upcoming Consultations</string>
+    <string name="no_upcoming_consultations">No upcoming consultations</string>
+    <string name="confirmed_appointments_desc">Your confirmed appointments will appear here.</string>
+    <string name="have_legal_question">Have a legal question?</string>
+    <string name="ai_assistant_promo_desc">Get preliminary information and understand which type of legal professional may be relevant to your concern.</string>
+    <string name="start_ai_chat">Start AI Chat</string>
+    <string name="legal_knowledge_hub">Legal Knowledge Hub</string>
+    <string name="ai_disclaimer">AI responses are informational and not a substitute for professional legal advice.</string>
+    <string name="view_all">View All</string>
+    <string name="know_your_rights">Know Your Rights</string>
+    <string name="legal_process_guides">Legal Process Guides</string>
+    <string name="frequently_asked_questions">FAQs</string>
+    <string name="legal_terminology">Legal Terminology</string>
+    <string name="general_legal_updates">Legal Updates</string>
+    <string name="cd_notifications">Notifications</string>
 
     <!-- Find Lawyers Screen -->
     <string name="search_lawyers">Search lawyers…</string>

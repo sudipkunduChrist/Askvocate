@@ -1,6 +1,8 @@
 package com.example.askvocate.data.repository
 
+import com.example.askvocate.data.model.Appointment
 import com.example.askvocate.data.model.Category
+import com.example.askvocate.data.model.KnowledgeItem
 import com.example.askvocate.data.model.Lawyer
 import com.example.askvocate.data.model.Review
 
@@ -52,6 +54,21 @@ class LawyerRepository {
                 yearsExperience = 12,
                 isVerified = false
             )
+        )
+    }
+
+    fun getUpcomingAppointments(): List<Appointment> {
+        return listOf(
+            Appointment("1", "Adv. Anjali Sharma", "Sept 25, 2026", "10:00 AM", "Online", "Confirmed"),
+            Appointment("2", "Adv. Rajesh Kumar", "Sept 28, 2026", "02:30 PM", "In-person", "Confirmed")
+        )
+    }
+
+    fun getKnowledgeItems(): List<KnowledgeItem> {
+        return listOf(
+            KnowledgeItem("1", "Know Your Rights", "Basic legal rights every citizen should know.", null, "General"),
+            KnowledgeItem("2", "Legal Process Guide", "Step-by-step guide to filing a civil suit.", null, "Civil"),
+            KnowledgeItem("3", "Cyber Crime Laws", "Understanding the IT Act and your protection.", null, "Cyber")
         )
     }
 
