@@ -25,7 +25,7 @@
     <string name="recent_consultations">Recent Consultations</string>
     <string name="see_all">See All</string>
     <string name="quick_categories">Quick Categories</string>
-    <string name="hello_user_format">Good to see you, %s</string>
+    <string name="hello_user_format">Good to see you, &lt;b&gt;%s&lt;/b&gt;</string>
     <string name="legal_assistance_simplified">Legal guidance,\nmade simpler.</string>
     <string name="hero_subtitle">Find the right advocate or get preliminary information about your legal concern.</string>
     <string name="search_placeholder">Search advocates, legal areas, or services...</string>

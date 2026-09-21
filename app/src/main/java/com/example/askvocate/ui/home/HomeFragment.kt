@@ -1,10 +1,12 @@
 package com.example.askvocate.ui.home
 
 import android.os.Bundle
+import android.text.Html
 import android.view.LayoutInflater
 import android.view.View
 import android.view.ViewGroup
 import android.widget.Toast
+import androidx.core.text.HtmlCompat
 import androidx.core.view.isVisible
 import androidx.fragment.app.Fragment
 import androidx.fragment.app.viewModels
@@ -49,9 +51,6 @@ class HomeFragment : Fragment() {
     }
 
     private fun setupToolbar() {
-        binding.tvGreeting.isVisible = true
-        // In a real app, get name from UserSession or Repository
-        binding.tvGreeting.text = getString(R.string.hello_user_format, "Sudip")
         
         binding.btnNotifications.setOnClickListener {
             // Navigate to notifications if available
@@ -60,6 +59,9 @@ class HomeFragment : Fragment() {
     }
 
     private fun setupHeroSection() {
+        val greeting = getString(R.string.hello_user_format, "Sudip")
+        binding.tvHeroTitle.text = HtmlCompat.fromHtml(greeting, HtmlCompat.FROM_HTML_MODE_LEGACY)
+
         binding.btnFindLawyerHero.setOnClickListener {
             findNavController().navigate(R.id.nav_find_lawyers)
         }

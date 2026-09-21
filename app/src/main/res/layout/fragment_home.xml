@@ -28,7 +28,7 @@
                 <ImageView
                     android:id="@+id/iv_logo"
                     android:layout_width="100dp"
-                    android:layout_height="32dp"
+                    android:layout_height="50dp"
                     android:contentDescription="@string/app_name"
                     android:scaleType="fitCenter"
                     android:src="@drawable/app_logo"
@@ -101,26 +101,17 @@
                     android:padding="@dimen/spacing_xl">
 
                     <TextView
-                        android:id="@+id/tv_greeting"
-                        android:layout_width="wrap_content"
-                        android:layout_height="wrap_content"
-                        android:textAppearance="@style/TextAppearance.Askvocate.Label"
-                        android:textColor="#E0E0E0"
-                        app:layout_constraintStart_toStartOf="parent"
-                        app:layout_constraintTop_toTopOf="parent"
-                        tools:text="Good to see you, Sudip" />
-
-                    <TextView
                         android:id="@+id/tv_hero_title"
                         android:layout_width="0dp"
                         android:layout_height="wrap_content"
                         android:layout_marginTop="@dimen/spacing_xs"
-                        android:text="@string/legal_assistance_simplified"
+                        android:fontFamily="sans-serif"
                         android:textAppearance="@style/TextAppearance.Askvocate.Headline"
                         android:textColor="@color/white"
                         app:layout_constraintEnd_toEndOf="parent"
                         app:layout_constraintStart_toStartOf="parent"
-                        app:layout_constraintTop_toBottomOf="@id/tv_greeting" />
+                        app:layout_constraintTop_toTopOf="parent"
+                        tools:text="Good to see you, Sudip" />
 
                     <TextView
                         android:id="@+id/tv_hero_subtitle"
