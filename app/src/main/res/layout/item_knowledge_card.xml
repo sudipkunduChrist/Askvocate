@@ -13,13 +13,23 @@
         android:layout_height="wrap_content"
         android:orientation="vertical">
 
-        <ImageView
-            android:id="@+id/iv_thumbnail"
+        <com.google.android.material.card.MaterialCardView
             android:layout_width="match_parent"
             android:layout_height="100dp"
-            android:scaleType="centerCrop"
-            android:src="@drawable/bg_journey_hero"
-            android:alpha="0.8" />
+            app:cardCornerRadius="0dp"
+            app:cardElevation="0dp"
+            app:cardBackgroundColor="#f0f4f9">
+
+            <ImageView
+                android:id="@+id/iv_thumbnail"
+                android:layout_width="match_parent"
+                android:layout_height="match_parent"
+                android:scaleType="centerCrop"
+                android:src="@drawable/ic_description"
+                android:padding="32dp"
+                android:alpha="0.5"
+                app:tint="@color/navy_primary" />
+        </com.google.android.material.card.MaterialCardView>
 
         <LinearLayout
             android:layout_width="match_parent"
@@ -33,18 +43,21 @@
                 android:layout_height="wrap_content"
                 android:textAppearance="@style/TextAppearance.Askvocate.Label"
                 android:textColor="@color/amber_accent"
-                android:textSize="10sp"
+                android:textSize="11sp"
+                android:textStyle="bold"
                 tools:text="GENERAL" />
 
             <TextView
                 android:id="@+id/tv_title"
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
-                android:layout_marginTop="2dp"
+                android:layout_marginTop="4dp"
                 android:ellipsize="end"
                 android:maxLines="2"
                 android:textAppearance="@style/TextAppearance.Askvocate.Title"
+                android:textColor="@color/text_primary"
                 android:textSize="14sp"
+                android:textStyle="bold"
                 tools:text="Know Your Rights as a Citizen" />
 
             <TextView

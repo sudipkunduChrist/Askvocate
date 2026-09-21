@@ -50,6 +50,7 @@ class HomeFragment : Fragment() {
 
     private fun setupToolbar() {
         binding.tvGreeting.isVisible = true
+        // In a real app, get name from UserSession or Repository
         binding.tvGreeting.text = getString(R.string.hello_user_format, "Sudip")
         
         binding.btnNotifications.setOnClickListener {
@@ -63,7 +64,7 @@ class HomeFragment : Fragment() {
             findNavController().navigate(R.id.nav_find_lawyers)
         }
         binding.btnAskAiHero.setOnClickListener {
-            // Navigate to AI chat
+            // Navigate to AI Assistant
             findNavController().navigate(R.id.nav_chat_list)
         }
     }

@@ -11,6 +11,7 @@
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
         android:background="@color/background_cream"
+        android:fitsSystemWindows="true"
         app:elevation="0dp">
 
         <com.google.android.material.appbar.MaterialToolbar
@@ -37,22 +38,24 @@
 
                 <TextView
                     android:id="@+id/tv_greeting"
-                    android:layout_width="wrap_content"
+                    android:layout_width="0dp"
                     android:layout_height="wrap_content"
                     android:layout_marginStart="@dimen/spacing_md"
+                    android:layout_marginEnd="@dimen/spacing_md"
                     android:textAppearance="@style/TextAppearance.Askvocate.Label"
                     android:textColor="@color/text_secondary"
-                    android:visibility="gone"
+                    android:maxLines="1"
+                    android:ellipsize="end"
                     app:layout_constraintBottom_toBottomOf="parent"
+                    app:layout_constraintEnd_toStartOf="@id/btn_notifications"
                     app:layout_constraintStart_toEndOf="@id/iv_logo"
                     app:layout_constraintTop_toTopOf="parent"
-                    tools:text="Hello, Sudip!"
-                    tools:visibility="visible" />
+                    tools:text="Good to see you, Sudip" />
 
                 <FrameLayout
                     android:id="@+id/btn_notifications"
-                    android:layout_width="40dp"
-                    android:layout_height="40dp"
+                    android:layout_width="44dp"
+                    android:layout_height="44dp"
                     android:background="?attr/selectableItemBackgroundBorderless"
                     app:layout_constraintBottom_toBottomOf="parent"
                     app:layout_constraintEnd_toEndOf="parent"
@@ -101,8 +104,12 @@
                 style="@style/Widget.Askvocate.Card"
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
-                android:layout_margin="@dimen/spacing_lg"
-                app:cardBackgroundColor="@color/navy_primary">
+                android:layout_marginHorizontal="@dimen/spacing_lg"
+                android:layout_marginTop="@dimen/spacing_md"
+                android:layout_marginBottom="@dimen/spacing_xl"
+                app:cardBackgroundColor="@color/navy_primary"
+                app:cardCornerRadius="@dimen/radius_xl"
+                app:cardElevation="4dp">
 
                 <androidx.constraintlayout.widget.ConstraintLayout
                     android:layout_width="match_parent"
@@ -158,14 +165,15 @@
                 </androidx.constraintlayout.widget.ConstraintLayout>
             </com.google.android.material.card.MaterialCardView>
 
-            <!-- Search Bar -->
+            <!-- Search Experience -->
             <LinearLayout
                 android:id="@+id/search_container"
                 android:layout_width="match_parent"
-                android:layout_height="@dimen/search_bar_height"
+                android:layout_height="56dp"
                 android:layout_marginHorizontal="@dimen/spacing_lg"
-                android:layout_marginBottom="@dimen/spacing_xl"
+                android:layout_marginBottom="@dimen/spacing_xxl"
                 android:background="@drawable/bg_search_bar"
+                android:elevation="2dp"
                 android:gravity="center_vertical"
                 android:orientation="horizontal"
                 android:paddingHorizontal="@dimen/spacing_md">
@@ -212,7 +220,7 @@
                 android:layout_marginBottom="@dimen/spacing_xxl"
                 android:columnCount="4">
 
-                <!-- Action 1: Find Lawyer -->
+                <!-- Action 1: Advocates -->
                 <LinearLayout
                     android:id="@+id/action_find_lawyer"
                     android:layout_width="0dp"
@@ -236,12 +244,12 @@
                         android:layout_width="wrap_content"
                         android:layout_height="wrap_content"
                         android:layout_marginTop="@dimen/spacing_xs"
-                        android:text="@string/find_lawyer"
+                        android:text="@string/action_advocates"
                         android:textAppearance="@style/TextAppearance.Askvocate.Caption"
                         android:textColor="@color/text_primary" />
                 </LinearLayout>
 
-                <!-- Action 2: Ask AI -->
+                <!-- Action 2: AI Assistant -->
                 <LinearLayout
                     android:id="@+id/action_ask_ai"
                     android:layout_width="0dp"
@@ -299,7 +307,7 @@
                         android:textColor="@color/text_primary" />
                 </LinearLayout>
 
-                <!-- Action 4: Documents -->
+                <!-- Action 4: My Documents -->
                 <LinearLayout
                     android:id="@+id/action_documents"
                     android:layout_width="0dp"
@@ -372,7 +380,8 @@
                     android:layout_height="wrap_content"
                     android:layout_weight="1"
                     android:text="@string/explore_legal_services"
-                    android:textAppearance="@style/TextAppearance.Askvocate.Title" />
+                    android:textAppearance="@style/TextAppearance.Askvocate.Title"
+                    android:textColor="@color/text_primary" />
 
                 <TextView
                     android:id="@+id/btn_view_all_categories"
@@ -409,7 +418,8 @@
                     android:layout_height="wrap_content"
                     android:layout_weight="1"
                     android:text="@string/top_rated_lawyers"
-                    android:textAppearance="@style/TextAppearance.Askvocate.Title" />
+                    android:textAppearance="@style/TextAppearance.Askvocate.Title"
+                    android:textColor="@color/text_primary" />
 
                 <TextView
                     android:id="@+id/btn_see_all_lawyers"
@@ -509,14 +519,15 @@
                 </androidx.constraintlayout.widget.ConstraintLayout>
             </com.google.android.material.card.MaterialCardView>
 
-            <!-- Legal Knowledge Hub -->
+            <!-- Legal Insights -->
             <TextView
                 android:layout_width="wrap_content"
                 android:layout_height="wrap_content"
                 android:layout_marginHorizontal="@dimen/spacing_lg"
                 android:layout_marginBottom="@dimen/spacing_md"
                 android:text="@string/legal_knowledge_hub"
-                android:textAppearance="@style/TextAppearance.Askvocate.Title" />
+                android:textAppearance="@style/TextAppearance.Askvocate.Title"
+                android:textColor="@color/text_primary" />
 
             <androidx.recyclerview.widget.RecyclerView
                 android:id="@+id/rv_knowledge_hub"
