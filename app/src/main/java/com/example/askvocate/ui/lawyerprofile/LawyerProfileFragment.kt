@@ -4,12 +4,14 @@ import android.os.Bundle
 import android.view.LayoutInflater
 import android.view.View
 import android.view.ViewGroup
+import android.widget.ImageView
 import android.widget.TextView
 import androidx.appcompat.widget.Toolbar
 import androidx.fragment.app.Fragment
 import androidx.fragment.app.viewModels
 import androidx.navigation.fragment.findNavController
 import androidx.recyclerview.widget.RecyclerView
+import coil.load
 import com.example.askvocate.R
 import com.example.askvocate.ui.adapters.ReviewAdapter
 import com.example.askvocate.util.AnimationUtils
@@ -44,6 +46,11 @@ class LawyerProfileFragment : Fragment() {
             view.findViewById<TextView>(R.id.tv_review_count).text = "${lawyer.reviewCount} reviews"
             view.findViewById<TextView>(R.id.tv_location).text = lawyer.location
             view.findViewById<TextView>(R.id.tv_bio).text = lawyer.bio
+            
+            view.findViewById<ImageView>(R.id.iv_lawyer_avatar).load(lawyer.imageResId ?: lawyer.imageUrl) {
+                placeholder(R.drawable.ic_profile)
+                error(R.drawable.ic_profile)
+            }
         }
 
         viewModel.reviews.observe(viewLifecycleOwner) { reviews ->

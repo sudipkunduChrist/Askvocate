@@ -7,5 +7,6 @@ data class Appointment(
     val time: String,
     val type: String, // Online, In-person
     val status: String,
-    val lawyerImageUrl: String? = null
+    val lawyerImageUrl: String? = null,
+    val lawyerImageResId: Int? = null
 )

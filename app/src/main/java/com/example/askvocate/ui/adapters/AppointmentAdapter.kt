@@ -20,7 +20,7 @@ class AppointmentAdapter(private val onClick: (Appointment) -> Unit) :
             binding.tvAppointmentType.text = appointment.type
             binding.tvDate.text = appointment.date
             binding.tvTime.text = appointment.time
-            binding.ivLawyer.load(appointment.lawyerImageUrl) {
+            binding.ivLawyer.load(appointment.lawyerImageResId ?: appointment.lawyerImageUrl) {
                 placeholder(R.drawable.ic_profile)
                 error(R.drawable.ic_profile)
             }

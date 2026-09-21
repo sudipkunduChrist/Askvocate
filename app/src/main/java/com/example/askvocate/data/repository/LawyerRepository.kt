@@ -30,7 +30,8 @@ class LawyerRepository {
                 location = "2.5 km away",
                 bio = "Anjali Sharma is a senior corporate lawyer with over 10 years of experience helping startups and enterprises with compliance, contracts, and mergers.",
                 yearsExperience = 10,
-                isVerified = true
+                isVerified = true,
+                imageResId = com.example.askvocate.R.drawable.pfp_female_1
             ),
             Lawyer(
                 id = "2",
@@ -41,7 +42,8 @@ class LawyerRepository {
                 location = "5.0 km away",
                 bio = "Rajesh specializes in family law and dispute resolution, offering compassionate legal support for divorce, custody, and inheritance issues.",
                 yearsExperience = 8,
-                isVerified = true
+                isVerified = true,
+                imageResId = com.example.askvocate.R.drawable.pfp_male_1
             ),
             Lawyer(
                 id = "3",
@@ -52,15 +54,56 @@ class LawyerRepository {
                 location = "3.2 km away",
                 bio = "Priya is an expert in real estate and property disputes, helping clients navigate complex property transactions and litigation.",
                 yearsExperience = 12,
-                isVerified = false
+                isVerified = false,
+                imageResId = com.example.askvocate.R.drawable.pfp_female_2
+            ),
+            Lawyer(
+                id = "4",
+                name = "Adv. Vikram Malhotra",
+                specialty = "Criminal Law",
+                rating = 4.6,
+                reviewCount = 72,
+                location = "4.1 km away",
+                bio = "Vikram is a dedicated criminal defense attorney with a track record of handling high-stakes cases and protecting civil liberties.",
+                yearsExperience = 7,
+                isVerified = true,
+                imageResId = com.example.askvocate.R.drawable.pfp_male_2
+            ),
+            Lawyer(
+                id = "5",
+                name = "Adv. Sneha Reddy",
+                specialty = "Business Law",
+                rating = 4.9,
+                reviewCount = 110,
+                location = "1.8 km away",
+                bio = "Sneha provides comprehensive legal services for small to medium businesses, focusing on intellectual property and commercial contracts.",
+                yearsExperience = 9,
+                isVerified = true,
+                imageResId = com.example.askvocate.R.drawable.pfp_female_3
             )
         )
     }
 
     fun getUpcomingAppointments(): List<Appointment> {
         return listOf(
-            Appointment("1", "Adv. Anjali Sharma", "Sept 25, 2026", "10:00 AM", "Online", "Confirmed"),
-            Appointment("2", "Adv. Rajesh Kumar", "Sept 28, 2026", "02:30 PM", "In-person", "Confirmed")
+            Appointment(
+                "1",
+                "Adv. Anjali Sharma",
+                "Sept 25, 2026",
+                "10:00 AM",
+                "Online",
+                "Confirmed",
+                lawyerImageResId = com.example.askvocate.R.drawable.pfp_female_1
+            ),
+            Appointment(
+                "2",
+                "Adv. Rajesh Kumar",
+                "Sept 28, 2026",
+                "02:30 PM",
+                "In-person",
+                "Confirmed",
+                lawyerImageResId = com.example.askvocate.R.drawable.pfp_male_1
+            )
         )
     }
 
