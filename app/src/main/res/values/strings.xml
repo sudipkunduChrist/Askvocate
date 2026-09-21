@@ -31,7 +31,7 @@
     <string name="search_placeholder">Search lawyers, services, or topics...</string>
     <string name="find_lawyer">Find a Lawyer</string>
     <string name="ask_ai">Ask AI</string>
-    <string name="my_appointments_short">Appointments</string>
+    <string name="my_appointments_short">Schedule</string>
     <string name="legal_documents">Legal Docs</string>
     <string name="explore_legal_services">Explore Legal Services</string>
     <string name="upcoming_consultations">Upcoming Consultations</string>

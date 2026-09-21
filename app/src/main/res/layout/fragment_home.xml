@@ -30,6 +30,7 @@
                     android:layout_height="32dp"
                     android:src="@drawable/app_logo"
                     android:scaleType="fitCenter"
+                    android:contentDescription="@string/app_name"
                     app:layout_constraintBottom_toBottomOf="parent"
                     app:layout_constraintStart_toStartOf="parent"
                     app:layout_constraintTop_toTopOf="parent" />
@@ -173,6 +174,7 @@
                     android:layout_width="20dp"
                     android:layout_height="20dp"
                     android:src="@drawable/ic_search"
+                    android:contentDescription="@string/cd_search"
                     app:tint="@color/text_tertiary" />
 
                 <EditText
@@ -185,6 +187,7 @@
                     android:hint="@string/search_placeholder"
                     android:imeOptions="actionSearch"
                     android:inputType="text"
+                    android:autofillHints="none"
                     android:maxLines="1"
                     android:textAppearance="@style/TextAppearance.Askvocate.Body"
                     android:textColor="@color/text_primary"
@@ -197,6 +200,7 @@
                     android:background="?attr/selectableItemBackgroundBorderless"
                     android:padding="2dp"
                     android:src="@drawable/ic_filter"
+                    android:contentDescription="@string/cd_filter_options"
                     app:tint="@color/navy_primary" />
             </LinearLayout>
 
@@ -225,6 +229,7 @@
                         android:layout_width="32dp"
                         android:layout_height="32dp"
                         android:src="@drawable/ic_lawyer"
+                        android:contentDescription="@null"
                         app:tint="@color/navy_primary" />
 
                     <TextView
@@ -253,6 +258,7 @@
                         android:layout_width="32dp"
                         android:layout_height="32dp"
                         android:src="@drawable/ic_psychology"
+                        android:contentDescription="@null"
                         app:tint="@color/navy_primary" />
 
                     <TextView
@@ -281,6 +287,7 @@
                         android:layout_width="32dp"
                         android:layout_height="32dp"
                         android:src="@drawable/ic_onboard_consultation"
+                        android:contentDescription="@null"
                         app:tint="@color/navy_primary" />
 
                     <TextView
@@ -309,6 +316,7 @@
                         android:layout_width="32dp"
                         android:layout_height="32dp"
                         android:src="@drawable/ic_description"
+                        android:contentDescription="@null"
                         app:tint="@color/navy_primary" />
 
                     <TextView
@@ -322,14 +330,12 @@
             </GridLayout>
 
             <!-- Upcoming Consultations (Conditional) -->
-
-            <!-- Legal Categories -->
             <LinearLayout
                 android:id="@+id/upcoming_consultations_container"
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
-                android:layout_marginBottom="@dimen/spacing_xl"
                 android:orientation="vertical"
+                android:layout_marginBottom="@dimen/spacing_xl"
                 android:visibility="gone"
                 tools:visibility="visible">
 
@@ -349,9 +355,10 @@
                     android:orientation="horizontal"
                     android:paddingHorizontal="@dimen/spacing_lg"
                     app:layoutManager="androidx.recyclerview.widget.LinearLayoutManager"
-                    tools:listitem="@layout/item_review" />
+                    tools:listitem="@layout/item_appointment_card" />
             </LinearLayout>
 
+            <!-- Legal Categories -->
             <LinearLayout
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
@@ -448,7 +455,8 @@
                         android:src="@drawable/ic_psychology"
                         app:layout_constraintStart_toStartOf="parent"
                         app:layout_constraintTop_toTopOf="parent"
-                        app:tint="@color/white" />
+                        app:tint="@color/white"
+                        android:contentDescription="@null" />
 
                     <TextView
                         android:id="@+id/tv_ai_promo_title"
@@ -493,7 +501,7 @@
                         android:text="@string/ai_disclaimer"
                         android:textAppearance="@style/TextAppearance.Askvocate.Caption"
                         android:textColor="@color/white"
-                        android:textSize="10sp"
+                        android:textSize="11sp"
                         app:layout_constraintEnd_toEndOf="parent"
                         app:layout_constraintStart_toStartOf="parent"
                         app:layout_constraintTop_toBottomOf="@id/btn_start_ai_chat" />
@@ -518,7 +526,7 @@
                 android:orientation="horizontal"
                 android:paddingHorizontal="@dimen/spacing_lg"
                 app:layoutManager="androidx.recyclerview.widget.LinearLayoutManager"
-                tools:listitem="@layout/item_lawyer_horizontal" />
+                tools:listitem="@layout/item_knowledge_card" />
 
         </LinearLayout>
     </androidx.core.widget.NestedScrollView>
