@@ -181,21 +181,21 @@
                 <ImageView
                     android:layout_width="20dp"
                     android:layout_height="20dp"
-                    android:src="@drawable/ic_search"
                     android:contentDescription="@string/cd_search"
+                    android:src="@drawable/ic_search"
                     app:tint="@color/text_tertiary" />
 
                 <EditText
                     android:id="@+id/et_search"
                     android:layout_width="0dp"
-                    android:layout_height="match_parent"
+                    android:layout_height="wrap_content"
                     android:layout_marginHorizontal="@dimen/spacing_sm"
                     android:layout_weight="1"
+                    android:autofillHints="none"
                     android:background="@null"
                     android:hint="@string/search_placeholder"
                     android:imeOptions="actionSearch"
                     android:inputType="text"
-                    android:autofillHints="none"
                     android:maxLines="1"
                     android:textAppearance="@style/TextAppearance.Askvocate.Body"
                     android:textColor="@color/text_primary"
@@ -206,9 +206,9 @@
                     android:layout_width="24dp"
                     android:layout_height="24dp"
                     android:background="?attr/selectableItemBackgroundBorderless"
+                    android:contentDescription="@string/cd_filter_options"
                     android:padding="2dp"
                     android:src="@drawable/ic_filter"
-                    android:contentDescription="@string/cd_filter_options"
                     app:tint="@color/navy_primary" />
             </LinearLayout>
 
@@ -236,8 +236,8 @@
                     <ImageView
                         android:layout_width="32dp"
                         android:layout_height="32dp"
-                        android:src="@drawable/ic_lawyer"
                         android:contentDescription="@null"
+                        android:src="@drawable/ic_lawyer"
                         app:tint="@color/navy_primary" />
 
                     <TextView
@@ -265,8 +265,8 @@
                     <ImageView
                         android:layout_width="32dp"
                         android:layout_height="32dp"
-                        android:src="@drawable/ic_psychology"
                         android:contentDescription="@null"
+                        android:src="@drawable/ic_psychology"
                         app:tint="@color/navy_primary" />
 
                     <TextView
@@ -294,8 +294,8 @@
                     <ImageView
                         android:layout_width="32dp"
                         android:layout_height="32dp"
-                        android:src="@drawable/ic_onboard_consultation"
                         android:contentDescription="@null"
+                        android:src="@drawable/ic_onboard_consultation"
                         app:tint="@color/navy_primary" />
 
                     <TextView
@@ -323,8 +323,8 @@
                     <ImageView
                         android:layout_width="32dp"
                         android:layout_height="32dp"
-                        android:src="@drawable/ic_description"
                         android:contentDescription="@null"
+                        android:src="@drawable/ic_description"
                         app:tint="@color/navy_primary" />
 
                     <TextView
@@ -338,12 +338,14 @@
             </GridLayout>
 
             <!-- Upcoming Consultations (Conditional) -->
+
+            <!-- Legal Categories -->
             <LinearLayout
                 android:id="@+id/upcoming_consultations_container"
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
-                android:orientation="vertical"
                 android:layout_marginBottom="@dimen/spacing_xl"
+                android:orientation="vertical"
                 android:visibility="gone"
                 tools:visibility="visible">
 
@@ -358,7 +360,7 @@
                 <androidx.recyclerview.widget.RecyclerView
                     android:id="@+id/rv_appointments"
                     android:layout_width="match_parent"
-                    android:layout_height="wrap_content"
+                    android:layout_height="match_parent"
                     android:clipToPadding="false"
                     android:orientation="horizontal"
                     android:paddingHorizontal="@dimen/spacing_lg"
@@ -366,13 +368,12 @@
                     tools:listitem="@layout/item_appointment_card" />
             </LinearLayout>
 
-            <!-- Legal Categories -->
             <LinearLayout
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
-                android:gravity="center_vertical"
                 android:layout_marginHorizontal="@dimen/spacing_lg"
                 android:layout_marginBottom="@dimen/spacing_md"
+                android:gravity="center_vertical"
                 android:orientation="horizontal">
 
                 <TextView
@@ -408,9 +409,9 @@
             <LinearLayout
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
-                android:gravity="center_vertical"
                 android:layout_marginHorizontal="@dimen/spacing_lg"
                 android:layout_marginBottom="@dimen/spacing_md"
+                android:gravity="center_vertical"
                 android:orientation="horizontal">
 
                 <TextView
@@ -462,11 +463,11 @@
                         android:id="@+id/iv_ai_icon"
                         android:layout_width="48dp"
                         android:layout_height="48dp"
+                        android:contentDescription="@null"
                         android:src="@drawable/ic_psychology"
                         app:layout_constraintStart_toStartOf="parent"
                         app:layout_constraintTop_toTopOf="parent"
-                        app:tint="@color/white"
-                        android:contentDescription="@null" />
+                        app:tint="@color/white" />
 
                     <TextView
                         android:id="@+id/tv_ai_promo_title"

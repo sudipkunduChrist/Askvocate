@@ -3,33 +3,33 @@
     xmlns:app="http://schemas.android.com/apk/res-auto"
     xmlns:tools="http://schemas.android.com/tools"
     style="@style/Widget.Askvocate.Card"
-    android:layout_width="200dp"
+    android:layout_width="220dp"
     android:layout_height="wrap_content"
     android:layout_marginEnd="@dimen/spacing_md"
-    android:layout_marginBottom="@dimen/spacing_sm">
+    android:layout_marginBottom="@dimen/spacing_sm"
+    app:cardCornerRadius="@dimen/radius_lg"
+    app:cardElevation="2dp">
 
     <LinearLayout
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
         android:orientation="vertical">
 
-        <com.google.android.material.card.MaterialCardView
+        <FrameLayout
             android:layout_width="match_parent"
-            android:layout_height="100dp"
-            app:cardCornerRadius="0dp"
-            app:cardElevation="0dp"
-            app:cardBackgroundColor="#f0f4f9">
+            android:layout_height="120dp"
+            android:background="#F1F5F9">
 
             <ImageView
                 android:id="@+id/iv_thumbnail"
-                android:layout_width="match_parent"
-                android:layout_height="match_parent"
-                android:scaleType="centerCrop"
+                android:layout_width="48dp"
+                android:layout_height="48dp"
+                android:layout_gravity="center"
                 android:src="@drawable/ic_description"
-                android:padding="32dp"
-                android:alpha="0.5"
-                app:tint="@color/navy_primary" />
-        </com.google.android.material.card.MaterialCardView>
+                android:alpha="0.3"
+                app:tint="@color/navy_primary"
+                android:contentDescription="@null" />
+        </FrameLayout>
 
         <LinearLayout
             android:layout_width="match_parent"
@@ -53,12 +53,12 @@
                 android:layout_height="wrap_content"
                 android:layout_marginTop="4dp"
                 android:ellipsize="end"
-                android:maxLines="2"
+                android:maxLines="1"
                 android:textAppearance="@style/TextAppearance.Askvocate.Title"
                 android:textColor="@color/text_primary"
-                android:textSize="14sp"
+                android:textSize="15sp"
                 android:textStyle="bold"
-                tools:text="Know Your Rights as a Citizen" />
+                tools:text="Know Your Rights" />
 
             <TextView
                 android:id="@+id/tv_desc"
@@ -68,7 +68,9 @@
                 android:ellipsize="end"
                 android:maxLines="2"
                 android:textAppearance="@style/TextAppearance.Askvocate.Caption"
-                android:textSize="12sp"
+                android:textColor="@color/text_secondary"
+                android:textSize="13sp"
+                android:lineHeight="18sp"
                 tools:text="Basic legal rights every citizen should know and exercise." />
 
         </LinearLayout>
