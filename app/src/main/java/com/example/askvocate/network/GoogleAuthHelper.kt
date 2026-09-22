@@ -6,6 +6,7 @@ import androidx.credentials.ClearCredentialStateRequest
 import androidx.credentials.CredentialManager
 import androidx.credentials.GetCredentialRequest
 import androidx.credentials.exceptions.GetCredentialException
+import com.example.askvocate.util.SessionManager
 import com.example.askvocate.util.ToastType
 import com.example.askvocate.util.showCustomToast
 import com.google.android.libraries.identity.googleid.GetGoogleIdOption
@@ -180,6 +181,16 @@ object GoogleAuthHelper {
 
             withContext(Dispatchers.Main) {
                 if (isSuccess) {
+                    val userObj = json?.optJSONObject("user")
+                    if (userObj != null) {
+                        SessionManager.saveUser(
+                            context = context,
+                            userId = userObj.optString("id", ""),
+                            name = userObj.optString("name", "User"),
+                            emailOrPhone = userObj.optString("emailOrPhone", ""),
+                            role = json.optString("role", "")
+                        )
+                    }
                     val message = json?.optString("message", "Signed in with Google") ?: "Signed in with Google"
                     context.showCustomToast(message, ToastType.SUCCESS)
                     onSuccess()

@@ -18,6 +18,7 @@ import com.example.askvocate.ui.adapters.CategoryAdapter
 import com.example.askvocate.ui.adapters.KnowledgeHubAdapter
 import com.example.askvocate.ui.adapters.LawyerAdapter
 import com.example.askvocate.util.AnimationUtils
+import com.example.askvocate.util.SessionManager
 
 class HomeFragment : Fragment() {
 
@@ -59,7 +60,13 @@ class HomeFragment : Fragment() {
     }
 
     private fun setupHeroSection() {
-        val greeting = getString(R.string.hello_user_format, "Sudip")
+        val fullName = SessionManager.getUserName(requireContext())
+        val firstName = fullName.trim().split(Regex("\\s+"))
+            .firstOrNull()
+            ?.takeIf { it.isNotEmpty() }
+            ?: "User"
+
+        val greeting = getString(R.string.hello_user_format, firstName)
         binding.tvHeroTitle.text = HtmlCompat.fromHtml(greeting, HtmlCompat.FROM_HTML_MODE_LEGACY)
 
         binding.btnFindLawyerHero.setOnClickListener {

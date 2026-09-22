@@ -176,6 +176,16 @@ class SignUpFragment : Fragment() {
                     val isSuccess = responseCode in 200..299 && json?.optBoolean("success", false) == true
 
                     if (isSuccess) {
+                        val userObj = json?.optJSONObject("user")
+                        if (userObj != null) {
+                            SessionManager.saveUser(
+                                context = requireContext(),
+                                userId = userObj.optString("id", ""),
+                                name = userObj.optString("name", "User"),
+                                emailOrPhone = userObj.optString("emailOrPhone", ""),
+                                role = "CLIENT"
+                            )
+                        }
                         requireContext().showCustomToast("Account created! Welcome.", ToastType.SUCCESS)
                         onResult(true)
                     } else {
