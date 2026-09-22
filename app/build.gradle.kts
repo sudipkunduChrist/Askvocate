@@ -1,9 +1,34 @@
-import java.util.Properties
+import java.io.File
 import org.jetbrains.kotlin.gradle.dsl.JvmTarget
 
 plugins {
     alias(libs.plugins.androidApplication)
     alias(libs.plugins.kotlinAndroid)
+}
+
+fun loadEnvFile(file: File): Map<String, String> {
+    if (!file.exists()) return emptyMap()
+
+    val values = mutableMapOf<String, String>()
+    file.readLines().forEach { rawLine ->
+        val line = rawLine.trim()
+        if (line.isEmpty() || line.startsWith("#")) return@forEach
+
+        val separatorIndex = line.indexOf('=')
+        if (separatorIndex <= 0) return@forEach
+
+        val key = line.substring(0, separatorIndex).trim()
+        val value = line.substring(separatorIndex + 1).trim()
+            .removePrefix("\"")
+            .removeSuffix("\"")
+            .removePrefix("'")
+            .removeSuffix("'")
+
+        if (key.isNotEmpty()) {
+            values[key] = value
+        }
+    }
+    return values
 }
 
 android {
@@ -19,8 +44,8 @@ android {
 
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
 
-        // same value as GOOGLE_WEB_CLIENT_ID in backend/.env.
-        val webClientId = System.getenv("GOOGLE_CLIENT_ID") ?: ""
+        val envValues = loadEnvFile(rootProject.file("app/.env"))
+        val webClientId = envValues["GOOGLE_CLIENT_ID"] ?: ""
         buildConfigField("String", "GOOGLE_WEB_CLIENT_ID", "\"$webClientId\"")
     }
 
