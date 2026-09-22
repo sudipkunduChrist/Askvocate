@@ -8,6 +8,7 @@ data class Lawyer(
     val reviewCount: Int,
     val location: String,
     val imageUrl: String? = null,
+    val imageResId: Int? = null,
     val bio: String,
     val yearsExperience: Int,
     val isVerified: Boolean = false,

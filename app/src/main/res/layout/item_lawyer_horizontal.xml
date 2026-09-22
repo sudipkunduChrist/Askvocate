@@ -3,64 +3,78 @@
     xmlns:app="http://schemas.android.com/apk/res-auto"
     xmlns:tools="http://schemas.android.com/tools"
     style="@style/Widget.Askvocate.Card"
-    android:layout_width="@dimen/lawyer_horizontal_card_width"
-    android:layout_height="@dimen/lawyer_horizontal_card_height"
+    android:layout_width="160dp"
+    android:layout_height="wrap_content"
     android:layout_marginEnd="@dimen/spacing_md"
-    android:layout_marginBottom="@dimen/spacing_xs">
+    android:layout_marginBottom="@dimen/spacing_sm">
 
-    <LinearLayout
+    <androidx.constraintlayout.widget.ConstraintLayout
         android:layout_width="match_parent"
-        android:layout_height="match_parent"
-        android:gravity="center_horizontal"
-        android:orientation="vertical"
+        android:layout_height="wrap_content"
         android:padding="@dimen/spacing_md">
 
         <de.hdodenhof.circleimageview.CircleImageView
             android:id="@+id/iv_lawyer"
             android:layout_width="64dp"
             android:layout_height="64dp"
-            android:layout_marginBottom="@dimen/spacing_sm"
-            tools:src="@drawable/ic_profile" />
+            android:src="@drawable/ic_profile"
+            app:layout_constraintEnd_toEndOf="parent"
+            app:layout_constraintStart_toStartOf="parent"
+            app:layout_constraintTop_toTopOf="parent" />
 
         <TextView
             android:id="@+id/tv_name"
-            android:layout_width="match_parent"
+            android:layout_width="0dp"
             android:layout_height="wrap_content"
+            android:layout_marginTop="@dimen/spacing_sm"
             android:gravity="center"
-            android:maxLines="1"
+            android:maxLines="2"
             android:ellipsize="end"
             android:textAppearance="@style/TextAppearance.Askvocate.Title"
+            android:textSize="14sp"
+            android:textStyle="bold"
+            android:textColor="@color/text_primary"
+            app:layout_constraintEnd_toEndOf="parent"
+            app:layout_constraintStart_toStartOf="parent"
+            app:layout_constraintTop_toBottomOf="@id/iv_lawyer"
             tools:text="Adv. Anjali Sharma" />
 
         <TextView
             android:id="@+id/tv_specialty"
-            android:layout_width="match_parent"
+            android:layout_width="0dp"
             android:layout_height="wrap_content"
             android:layout_marginTop="2dp"
             android:gravity="center"
             android:maxLines="1"
             android:ellipsize="end"
             android:textAppearance="@style/TextAppearance.Askvocate.Caption"
+            android:textColor="@color/text_secondary"
+            android:textSize="12sp"
+            app:layout_constraintEnd_toEndOf="parent"
+            app:layout_constraintStart_toStartOf="parent"
+            app:layout_constraintTop_toBottomOf="@id/tv_name"
             tools:text="Corporate Law" />
-            
-        <View
-            android:layout_width="match_parent"
-            android:layout_height="0dp"
-            android:layout_weight="1" />
 
         <LinearLayout
+            android:id="@+id/rating_container"
             android:layout_width="wrap_content"
             android:layout_height="wrap_content"
+            android:layout_marginTop="@dimen/spacing_md"
             android:background="@drawable/bg_search_field"
             android:gravity="center"
             android:orientation="horizontal"
             android:paddingHorizontal="8dp"
-            android:paddingVertical="4dp">
+            android:paddingVertical="4dp"
+            app:layout_constraintBottom_toBottomOf="parent"
+            app:layout_constraintEnd_toEndOf="parent"
+            app:layout_constraintStart_toStartOf="parent"
+            app:layout_constraintTop_toBottomOf="@id/tv_specialty">
 
             <ImageView
                 android:layout_width="12dp"
                 android:layout_height="12dp"
                 android:src="@drawable/ic_star"
+                android:contentDescription="@null"
                 app:tint="@color/amber_accent" />
 
             <TextView
@@ -69,8 +83,10 @@
                 android:layout_height="wrap_content"
                 android:layout_marginStart="4dp"
                 android:textAppearance="@style/TextAppearance.Askvocate.Caption"
+                android:textColor="@color/text_primary"
+                android:textSize="12sp"
                 android:textStyle="bold"
-                tools:text="4.8" />
+                tools:text="4.9" />
         </LinearLayout>
-    </LinearLayout>
+    </androidx.constraintlayout.widget.ConstraintLayout>
 </com.google.android.material.card.MaterialCardView>

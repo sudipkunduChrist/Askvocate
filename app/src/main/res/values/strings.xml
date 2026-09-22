@@ -17,14 +17,39 @@
     <string name="navigation_drawer_open">Open navigation drawer</string>
     <string name="navigation_drawer_close">Close navigation drawer</string>
 
-    <!-- Home Screen -->
+    <!-- Home Screen (Refined) -->
     <string name="welcome_message">Hello, Welcome!</string>
     <string name="welcome_subtitle">Find your trusted legal advocate today</string>
     <string name="continue_button">Continue</string>
-    <string name="top_rated_lawyers">Top Rated Lawyers</string>
+    <string name="top_rated_lawyers">Advocates to Explore</string>
     <string name="recent_consultations">Recent Consultations</string>
     <string name="see_all">See All</string>
     <string name="quick_categories">Quick Categories</string>
+    <string name="hello_user_format">Good to see you, &lt;b&gt;%s&lt;/b&gt;</string>
+    <string name="legal_assistance_simplified">Legal guidance,\nmade simpler.</string>
+    <string name="hero_subtitle">Find the right advocate or get preliminary information about your legal concern.</string>
+    <string name="search_placeholder">Search advocates, legal areas, or services...</string>
+    <string name="find_lawyer">Find an Advocate</string>
+    <string name="ask_ai">AI Assistant</string>
+    <string name="my_appointments_short">Appointments</string>
+    <string name="legal_documents">My Documents</string>
+    <string name="explore_legal_services">Explore Legal Areas</string>
+    <string name="upcoming_consultations">Upcoming Appointments</string>
+    <string name="no_upcoming_consultations">No upcoming appointments</string>
+    <string name="confirmed_appointments_desc">Your confirmed appointments will appear here.</string>
+    <string name="have_legal_question">Have a legal question?</string>
+    <string name="ai_assistant_promo_desc">Get preliminary information and understand which type of legal professional may be relevant to your concern.</string>
+    <string name="start_ai_chat">Start a Conversation</string>
+    <string name="legal_knowledge_hub">Legal Insights</string>
+    <string name="ai_disclaimer">AI responses are informational and are not a substitute for advice from a qualified legal professional.</string>
+    <string name="view_all">View All</string>
+    <string name="know_your_rights">Know Your Rights</string>
+    <string name="legal_process_guides">Legal Process Guide</string>
+    <string name="frequently_asked_questions">FAQs</string>
+    <string name="legal_terminology">Legal Terminology</string>
+    <string name="general_legal_updates">Legal Updates</string>
+    <string name="cd_notifications">Notifications</string>
+    <string name="action_advocates">Advocates</string>
 
     <!-- Find Lawyers Screen -->
     <string name="search_lawyers">Search lawyers…</string>

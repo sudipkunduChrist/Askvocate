@@ -8,6 +8,7 @@ import android.widget.TextView
 import androidx.recyclerview.widget.DiffUtil
 import androidx.recyclerview.widget.ListAdapter
 import androidx.recyclerview.widget.RecyclerView
+import coil.load
 import com.example.askvocate.R
 import com.example.askvocate.data.model.Lawyer
 
@@ -28,6 +29,7 @@ class LawyerAdapter(
     }
 
     inner class LawyerViewHolder(itemView: View) : RecyclerView.ViewHolder(itemView) {
+        private val ivLawyer: ImageView = itemView.findViewById(R.id.iv_lawyer)
         private val tvName: TextView = itemView.findViewById(R.id.tv_name)
         private val tvSpecialty: TextView = itemView.findViewById(R.id.tv_specialty)
         private val tvRating: TextView = itemView.findViewById(R.id.tv_rating)
@@ -37,6 +39,11 @@ class LawyerAdapter(
         fun bind(lawyer: Lawyer) {
             tvName.text = lawyer.name
             tvSpecialty.text = lawyer.specialty
+
+            ivLawyer.load(lawyer.imageResId ?: lawyer.imageUrl) {
+                placeholder(R.drawable.ic_profile)
+                error(R.drawable.ic_profile)
+            }
             
             if (isHorizontal) {
                 tvRating.text = lawyer.rating.toString()

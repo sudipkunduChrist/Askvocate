@@ -1,504 +1,533 @@
 <?xml version="1.0" encoding="utf-8"?>
-<FrameLayout xmlns:android="http://schemas.android.com/apk/res/android"
+<androidx.coordinatorlayout.widget.CoordinatorLayout xmlns:android="http://schemas.android.com/apk/res/android"
     xmlns:app="http://schemas.android.com/apk/res-auto"
     xmlns:tools="http://schemas.android.com/tools"
-    android:id="@+id/home_root"
     android:layout_width="match_parent"
     android:layout_height="match_parent"
-    android:background="@color/surface_white">
+    android:background="@color/background_cream">
 
-    <LinearLayout
-        android:id="@+id/home_content_container"
+    <com.google.android.material.appbar.AppBarLayout
+        android:id="@+id/app_bar"
         android:layout_width="match_parent"
-        android:layout_height="match_parent"
-        android:orientation="vertical">
+        android:layout_height="wrap_content"
+        android:background="@color/background_cream"
+        android:fitsSystemWindows="true"
+        app:elevation="0dp">
 
-        <!-- Top bar: menu grid | Home title | bell -->
-        <FrameLayout
-            android:id="@+id/top_bar"
+        <com.google.android.material.appbar.MaterialToolbar
+            android:id="@+id/toolbar"
             android:layout_width="match_parent"
-            android:layout_height="56dp"
-            android:paddingHorizontal="16dp">
+            android:layout_height="?attr/actionBarSize"
+            app:contentInsetStart="0dp">
 
-            <ImageView
-                android:id="@+id/btn_menu_open"
-                android:layout_width="wrap_content"
-                android:layout_height="wrap_content"
-                android:layout_gravity="center_vertical|start"
-                android:background="?attr/selectableItemBackgroundBorderless"
-                android:contentDescription="@string/cd_open_menu"
-                android:padding="8dp"
-                android:src="@drawable/ic_grid_menu"
-                app:tint="@color/navy_primary" />
-
-            <TextView
-                android:layout_width="wrap_content"
-                android:layout_height="wrap_content"
-                android:layout_gravity="center"
-                android:text="@string/home_screen_title"
-                android:textAppearance="@style/TextAppearance.Askvocate.HomeTitleSerif" />
-
-            <FrameLayout
-                android:layout_width="wrap_content"
-                android:layout_height="wrap_content"
-                android:layout_gravity="center_vertical|end">
+            <androidx.constraintlayout.widget.ConstraintLayout
+                android:layout_width="match_parent"
+                android:layout_height="match_parent"
+                android:paddingHorizontal="@dimen/spacing_lg">
 
                 <ImageView
+                    android:id="@+id/iv_logo"
+                    android:layout_width="100dp"
+                    android:layout_height="50dp"
+                    android:contentDescription="@string/app_name"
+                    android:scaleType="fitCenter"
+                    android:src="@drawable/app_logo"
+                    app:layout_constraintBottom_toBottomOf="parent"
+                    app:layout_constraintStart_toStartOf="parent"
+                    app:layout_constraintTop_toTopOf="parent" />
+
+                <FrameLayout
                     android:id="@+id/btn_notifications"
+                    android:layout_width="44dp"
+                    android:layout_height="44dp"
+                    android:background="?attr/selectableItemBackgroundBorderless"
+                    app:layout_constraintBottom_toBottomOf="parent"
+                    app:layout_constraintEnd_toEndOf="parent"
+                    app:layout_constraintTop_toTopOf="parent">
+
+                    <ImageView
+                        android:layout_width="24dp"
+                        android:layout_height="24dp"
+                        android:layout_gravity="center"
+                        android:contentDescription="@string/cd_notifications"
+                        android:src="@drawable/ic_notifications"
+                        app:tint="@color/navy_primary" />
+
+                    <View
+                        android:id="@+id/notification_indicator"
+                        android:layout_width="8dp"
+                        android:layout_height="8dp"
+                        android:layout_gravity="top|end"
+                        android:layout_marginTop="8dp"
+                        android:layout_marginEnd="8dp"
+                        android:background="@drawable/bg_timeline_dot"
+                        android:backgroundTint="@color/error_red"
+                        android:visibility="gone"
+                        tools:visibility="visible" />
+                </FrameLayout>
+
+            </androidx.constraintlayout.widget.ConstraintLayout>
+        </com.google.android.material.appbar.MaterialToolbar>
+    </com.google.android.material.appbar.AppBarLayout>
+
+    <androidx.core.widget.NestedScrollView
+        android:id="@+id/nested_scroll_view"
+        android:layout_width="match_parent"
+        android:layout_height="match_parent"
+        android:clipToPadding="false"
+        android:paddingBottom="80dp"
+        app:layout_behavior="@string/appbar_scrolling_view_behavior">
+
+        <LinearLayout
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:orientation="vertical">
+
+            <!-- Hero Section -->
+            <com.google.android.material.card.MaterialCardView
+                style="@style/Widget.Askvocate.Card"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginHorizontal="@dimen/spacing_lg"
+                android:layout_marginTop="@dimen/spacing_md"
+                android:layout_marginBottom="@dimen/spacing_xl"
+                app:cardBackgroundColor="@color/navy_primary"
+                app:cardCornerRadius="@dimen/radius_xl"
+                app:cardElevation="4dp">
+
+                <androidx.constraintlayout.widget.ConstraintLayout
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:padding="@dimen/spacing_xl">
+
+                    <TextView
+                        android:id="@+id/tv_hero_title"
+                        android:layout_width="0dp"
+                        android:layout_height="wrap_content"
+                        android:layout_marginTop="@dimen/spacing_xs"
+                        android:fontFamily="sans-serif"
+                        android:textAppearance="@style/TextAppearance.Askvocate.Headline"
+                        android:textColor="@color/white"
+                        app:layout_constraintEnd_toEndOf="parent"
+                        app:layout_constraintStart_toStartOf="parent"
+                        app:layout_constraintTop_toTopOf="parent"
+                        tools:text="Good to see you, Sudip" />
+
+                    <TextView
+                        android:id="@+id/tv_hero_subtitle"
+                        android:layout_width="0dp"
+                        android:layout_height="wrap_content"
+                        android:layout_marginTop="@dimen/spacing_md"
+                        android:text="@string/hero_subtitle"
+                        android:textAppearance="@style/TextAppearance.Askvocate.Body"
+                        android:textColor="#CCFFFFFF"
+                        app:layout_constraintEnd_toEndOf="parent"
+                        app:layout_constraintStart_toStartOf="parent"
+                        app:layout_constraintTop_toBottomOf="@id/tv_hero_title" />
+
+                    <com.google.android.material.button.MaterialButton
+                        android:id="@+id/btn_find_lawyer_hero"
+                        style="@style/Widget.Askvocate.Button.Primary"
+                        android:layout_width="wrap_content"
+                        android:layout_height="wrap_content"
+                        android:layout_marginTop="@dimen/spacing_xl"
+                        android:text="@string/find_lawyer"
+                        app:backgroundTint="@color/amber_accent"
+                        app:layout_constraintStart_toStartOf="parent"
+                        app:layout_constraintTop_toBottomOf="@id/tv_hero_subtitle" />
+
+                    <com.google.android.material.button.MaterialButton
+                        android:id="@+id/btn_ask_ai_hero"
+                        style="@style/Widget.Askvocate.Button.Text"
+                        android:layout_width="wrap_content"
+                        android:layout_height="wrap_content"
+                        android:layout_marginStart="@dimen/spacing_md"
+                        android:text="@string/ask_ai"
+                        android:textColor="@color/white"
+                        app:layout_constraintBottom_toBottomOf="@id/btn_find_lawyer_hero"
+                        app:layout_constraintStart_toEndOf="@id/btn_find_lawyer_hero"
+                        app:layout_constraintTop_toTopOf="@id/btn_find_lawyer_hero" />
+
+                </androidx.constraintlayout.widget.ConstraintLayout>
+            </com.google.android.material.card.MaterialCardView>
+
+            <!-- Search Experience -->
+            <LinearLayout
+                android:id="@+id/search_container"
+                android:layout_width="match_parent"
+                android:layout_height="56dp"
+                android:layout_marginHorizontal="@dimen/spacing_lg"
+                android:layout_marginBottom="@dimen/spacing_xxl"
+                android:background="@drawable/bg_search_bar"
+                android:elevation="2dp"
+                android:gravity="center_vertical"
+                android:orientation="horizontal"
+                android:paddingHorizontal="@dimen/spacing_md">
+
+                <ImageView
+                    android:layout_width="20dp"
+                    android:layout_height="20dp"
+                    android:contentDescription="@string/cd_search"
+                    android:src="@drawable/ic_search"
+                    app:tint="@color/text_tertiary" />
+
+                <EditText
+                    android:id="@+id/et_search"
+                    android:layout_width="0dp"
+                    android:layout_height="wrap_content"
+                    android:layout_marginHorizontal="@dimen/spacing_sm"
+                    android:layout_weight="1"
+                    android:autofillHints="none"
+                    android:background="@null"
+                    android:hint="@string/search_placeholder"
+                    android:imeOptions="actionSearch"
+                    android:inputType="text"
+                    android:maxLines="1"
+                    android:textAppearance="@style/TextAppearance.Askvocate.Body"
+                    android:textColor="@color/text_primary"
+                    android:textColorHint="@color/text_tertiary" />
+
+                <ImageView
+                    android:id="@+id/btn_filter"
+                    android:layout_width="24dp"
+                    android:layout_height="24dp"
+                    android:background="?attr/selectableItemBackgroundBorderless"
+                    android:contentDescription="@string/cd_filter_options"
+                    android:padding="2dp"
+                    android:src="@drawable/ic_filter"
+                    app:tint="@color/navy_primary" />
+            </LinearLayout>
+
+            <!-- Quick Actions -->
+            <GridLayout
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginHorizontal="@dimen/spacing_lg"
+                android:layout_marginBottom="@dimen/spacing_xxl"
+                android:columnCount="4">
+
+                <!-- Action 1: Advocates -->
+                <LinearLayout
+                    android:id="@+id/action_find_lawyer"
+                    android:layout_width="0dp"
+                    android:layout_height="90dp"
+                    android:layout_columnWeight="1"
+                    android:background="@drawable/bg_quick_action"
+                    android:clickable="true"
+                    android:focusable="true"
+                    android:gravity="center"
+                    android:orientation="vertical"
+                    android:padding="@dimen/spacing_md">
+
+                    <ImageView
+                        android:layout_width="32dp"
+                        android:layout_height="32dp"
+                        android:contentDescription="@null"
+                        android:src="@drawable/ic_lawyer"
+                        app:tint="@color/navy_primary" />
+
+                    <TextView
+                        android:layout_width="wrap_content"
+                        android:layout_height="wrap_content"
+                        android:layout_marginTop="@dimen/spacing_xs"
+                        android:text="@string/action_advocates"
+                        android:textAppearance="@style/TextAppearance.Askvocate.Caption"
+                        android:textColor="@color/text_primary" />
+                </LinearLayout>
+
+                <!-- Action 2: AI Assistant -->
+                <LinearLayout
+                    android:id="@+id/action_ask_ai"
+                    android:layout_width="0dp"
+                    android:layout_height="90dp"
+                    android:layout_columnWeight="1"
+                    android:background="@drawable/bg_quick_action"
+                    android:clickable="true"
+                    android:focusable="true"
+                    android:gravity="center"
+                    android:orientation="vertical"
+                    android:padding="@dimen/spacing_md">
+
+                    <ImageView
+                        android:layout_width="32dp"
+                        android:layout_height="32dp"
+                        android:contentDescription="@null"
+                        android:src="@drawable/ic_psychology"
+                        app:tint="@color/navy_primary" />
+
+                    <TextView
+                        android:layout_width="wrap_content"
+                        android:layout_height="wrap_content"
+                        android:layout_marginTop="@dimen/spacing_xs"
+                        android:text="@string/ask_ai"
+                        android:textAppearance="@style/TextAppearance.Askvocate.Caption"
+                        android:textColor="@color/text_primary" />
+                </LinearLayout>
+
+                <!-- Action 3: Appointments -->
+                <LinearLayout
+                    android:id="@+id/action_appointments"
+                    android:layout_width="0dp"
+                    android:layout_height="90dp"
+                    android:layout_columnWeight="1"
+                    android:background="@drawable/bg_quick_action"
+                    android:clickable="true"
+                    android:focusable="true"
+                    android:gravity="center"
+                    android:orientation="vertical"
+                    android:padding="@dimen/spacing_md">
+
+                    <ImageView
+                        android:layout_width="32dp"
+                        android:layout_height="32dp"
+                        android:contentDescription="@null"
+                        android:src="@drawable/ic_onboard_consultation"
+                        app:tint="@color/navy_primary" />
+
+                    <TextView
+                        android:layout_width="wrap_content"
+                        android:layout_height="wrap_content"
+                        android:layout_marginTop="@dimen/spacing_xs"
+                        android:text="@string/my_appointments_short"
+                        android:textAppearance="@style/TextAppearance.Askvocate.Caption"
+                        android:textColor="@color/text_primary" />
+                </LinearLayout>
+
+                <!-- Action 4: My Documents -->
+                <LinearLayout
+                    android:id="@+id/action_documents"
+                    android:layout_width="0dp"
+                    android:layout_height="90dp"
+                    android:layout_columnWeight="1"
+                    android:background="@drawable/bg_quick_action"
+                    android:clickable="true"
+                    android:focusable="true"
+                    android:gravity="center"
+                    android:orientation="vertical"
+                    android:padding="@dimen/spacing_md">
+
+                    <ImageView
+                        android:layout_width="32dp"
+                        android:layout_height="32dp"
+                        android:contentDescription="@null"
+                        android:src="@drawable/ic_description"
+                        app:tint="@color/navy_primary" />
+
+                    <TextView
+                        android:layout_width="wrap_content"
+                        android:layout_height="wrap_content"
+                        android:layout_marginTop="@dimen/spacing_xs"
+                        android:text="@string/legal_documents"
+                        android:textAlignment="center"
+                        android:textAppearance="@style/TextAppearance.Askvocate.Caption"
+                        android:textColor="@color/text_primary" />
+                </LinearLayout>
+            </GridLayout>
+
+            <!-- Upcoming Consultations (Conditional) -->
+
+            <!-- Legal Categories -->
+            <LinearLayout
+                android:id="@+id/upcoming_consultations_container"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginBottom="@dimen/spacing_xl"
+                android:orientation="vertical"
+                android:visibility="gone"
+                tools:visibility="visible">
+
+                <TextView
                     android:layout_width="wrap_content"
                     android:layout_height="wrap_content"
-                    android:background="?attr/selectableItemBackgroundBorderless"
-                    android:contentDescription="@string/cd_notifications"
-                    android:padding="8dp"
-                    android:src="@drawable/ic_bell"
-                    app:tint="@color/navy_primary" />
+                    android:layout_marginHorizontal="@dimen/spacing_lg"
+                    android:layout_marginBottom="@dimen/spacing_md"
+                    android:text="@string/upcoming_consultations"
+                    android:textAppearance="@style/TextAppearance.Askvocate.Title" />
 
-                <View
-                    android:layout_width="9dp"
-                    android:layout_height="9dp"
-                    android:layout_gravity="top|end"
-                    android:layout_marginTop="5dp"
-                    android:layout_marginEnd="3dp"
-                    android:background="@drawable/bg_bell_dot" />
-            </FrameLayout>
-        </FrameLayout>
-
-        <androidx.core.widget.NestedScrollView
-            android:id="@+id/home_scroll"
-            android:layout_width="match_parent"
-            android:layout_height="0dp"
-            android:layout_weight="1"
-            android:clipToPadding="false"
-            android:fillViewport="true"
-            android:overScrollMode="never"
-            android:scrollbars="none">
+                <androidx.recyclerview.widget.RecyclerView
+                    android:id="@+id/rv_appointments"
+                    android:layout_width="match_parent"
+                    android:layout_height="match_parent"
+                    android:clipToPadding="false"
+                    android:orientation="horizontal"
+                    android:paddingHorizontal="@dimen/spacing_lg"
+                    app:layoutManager="androidx.recyclerview.widget.LinearLayoutManager"
+                    tools:listitem="@layout/item_appointment_card" />
+            </LinearLayout>
 
             <LinearLayout
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
-                android:orientation="vertical"
-                android:paddingStart="20dp"
-                android:paddingEnd="20dp">
+                android:layout_marginHorizontal="@dimen/spacing_lg"
+                android:layout_marginBottom="@dimen/spacing_md"
+                android:gravity="center_vertical"
+                android:orientation="horizontal">
 
-                <!-- Greeting -->
                 <TextView
-                    android:id="@+id/tv_greeting"
+                    android:layout_width="0dp"
+                    android:layout_height="wrap_content"
+                    android:layout_weight="1"
+                    android:text="@string/explore_legal_services"
+                    android:textAppearance="@style/TextAppearance.Askvocate.Title"
+                    android:textColor="@color/text_primary" />
+
+                <TextView
+                    android:id="@+id/btn_view_all_categories"
                     android:layout_width="wrap_content"
                     android:layout_height="wrap_content"
-                    android:layout_marginTop="10dp"
-                    android:textAppearance="@style/TextAppearance.Askvocate.Greeting"
-                    tools:text="Hi Rewa!" />
-
-                <TextView
-                    android:layout_width="wrap_content"
-                    android:layout_height="wrap_content"
-                    android:layout_marginTop="5dp"
-                    android:text="@string/good_morning"
-                    android:textColor="@color/text_secondary"
-                    android:textSize="14sp" />
-
-                <!-- Search -->
-                <LinearLayout
-                    android:id="@+id/search_container"
-                    android:layout_width="match_parent"
-                    android:layout_height="52dp"
-                    android:layout_marginTop="18dp"
-                    android:background="@drawable/bg_home_search"
-                    android:clickable="true"
-                    android:focusable="true"
-                    android:gravity="center_vertical"
-                    android:orientation="horizontal"
-                    android:paddingHorizontal="15dp">
-
-                    <ImageView
-                        android:layout_width="20dp"
-                        android:layout_height="20dp"
-                        android:contentDescription="@string/cd_search"
-                        android:src="@drawable/ic_search"
-                        app:tint="@color/text_tertiary" />
-
-                    <TextView
-                        android:layout_width="wrap_content"
-                        android:layout_height="wrap_content"
-                        android:layout_marginStart="9dp"
-                        android:text="@string/search_hint"
-                        android:textColor="@color/text_tertiary"
-                        android:textSize="14.5sp" />
-                </LinearLayout>
-
-                <!-- Filter chips -->
-                <HorizontalScrollView
-                    android:layout_width="match_parent"
-                    android:layout_height="wrap_content"
-                    android:layout_marginTop="16dp"
-                    android:clipToPadding="false"
-                    android:scrollbars="none">
-
-                    <LinearLayout
-                        android:layout_width="wrap_content"
-                        android:layout_height="wrap_content"
-                        android:orientation="horizontal">
-
-                        <TextView
-                            android:id="@+id/chip_all"
-                            style="@style/AskvocateHomeChip"
-                            android:text="@string/all" />
-
-                        <TextView
-                            android:id="@+id/chip_business"
-                            style="@style/AskvocateHomeChip"
-                            android:text="@string/business" />
-
-                        <TextView
-                            android:id="@+id/chip_marriage"
-                            style="@style/AskvocateHomeChip"
-                            android:text="@string/marriage" />
-
-                        <TextView
-                            android:id="@+id/chip_criminal"
-                            style="@style/AskvocateHomeChip"
-                            android:text="@string/criminal" />
-
-                        <TextView
-                            android:id="@+id/chip_employment"
-                            style="@style/AskvocateHomeChip"
-                            android:text="@string/employment" />
-                    </LinearLayout>
-                </HorizontalScrollView>
-
-                <!-- Dummy data disclosure -->
-                <TextView
-                    android:id="@+id/tv_dummy_note"
-                    android:layout_width="match_parent"
-                    android:layout_height="wrap_content"
-                    android:layout_marginTop="9dp"
-                    android:background="@drawable/bg_dummy_note"
-                    android:gravity="center"
-                    android:paddingHorizontal="10dp"
-                    android:paddingVertical="6dp"
-                    android:text="@string/dummy_data_note"
-                    android:textColor="@color/status_warm_text"
-                    android:textSize="11.5sp" />
-
-                <!-- Continue your case -->
-                <LinearLayout
-                    android:layout_width="match_parent"
-                    android:layout_height="wrap_content"
-                    android:layout_marginTop="22dp"
-                    android:gravity="center_vertical"
-                    android:orientation="horizontal">
-
-                    <TextView
-                        android:layout_width="0dp"
-                        android:layout_height="wrap_content"
-                        android:layout_weight="1"
-                        android:text="@string/continue_your_case"
-                        android:textAppearance="@style/TextAppearance.Askvocate.HomeHeader" />
-
-                    <TextView
-                        android:id="@+id/btn_view_all"
-                        android:layout_width="wrap_content"
-                        android:layout_height="wrap_content"
-                        android:background="?attr/selectableItemBackground"
-                        android:padding="4dp"
-                        android:text="@string/view_all"
-                        android:textAppearance="@style/TextAppearance.Askvocate.HomeLink" />
-                </LinearLayout>
-
-                <androidx.recyclerview.widget.RecyclerView
-                    android:id="@+id/rv_ongoing_cases"
-                    android:layout_width="match_parent"
-                    android:layout_height="132dp"
-                    android:layout_marginTop="6dp"
-                    android:clipToPadding="false"
-                    android:orientation="horizontal"
-                    android:overScrollMode="never"
-                    app:layoutManager="androidx.recyclerview.widget.LinearLayoutManager"
-                    tools:listitem="@layout/item_ongoing_case" />
-
-                <!-- Verified lawyers near you -->
-                <TextView
-                    android:layout_width="match_parent"
-                    android:layout_height="wrap_content"
-                    android:layout_marginTop="24dp"
-                    android:text="@string/verified_lawyers_near_you"
-                    android:textAppearance="@style/TextAppearance.Askvocate.HomeHeader" />
-
-                <com.google.android.material.card.MaterialCardView
-                    android:id="@+id/card_verified_lawyers"
-                    android:layout_width="match_parent"
-                    android:layout_height="wrap_content"
-                    android:layout_marginTop="10dp"
-                    android:clickable="true"
-                    android:focusable="true"
-                    android:foreground="?attr/selectableItemBackground"
-                    app:cardBackgroundColor="@color/surface_white"
-                    app:cardCornerRadius="18dp"
-                    app:cardElevation="0dp"
-                    app:strokeColor="@color/home_outline"
-                    app:strokeWidth="1dp">
-
-                    <LinearLayout
-                        android:layout_width="match_parent"
-                        android:layout_height="wrap_content"
-                        android:orientation="vertical">
-
-                        <ImageView
-                            android:layout_width="match_parent"
-                            android:layout_height="108dp"
-                            android:contentDescription="@string/home_map_cd"
-                            android:scaleType="centerCrop"
-                            android:src="@drawable/bg_map_preview" />
-
-                        <LinearLayout
-                            android:layout_width="match_parent"
-                            android:layout_height="wrap_content"
-                            android:gravity="center_vertical"
-                            android:orientation="horizontal"
-                            android:paddingStart="15dp"
-                            android:paddingTop="12dp"
-                            android:paddingEnd="12dp"
-                            android:paddingBottom="12dp">
-
-                            <LinearLayout
-                                android:layout_width="0dp"
-                                android:layout_height="wrap_content"
-                                android:layout_weight="1"
-                                android:orientation="vertical">
-
-                                <TextView
-                                    android:layout_width="wrap_content"
-                                    android:layout_height="wrap_content"
-                                    android:text="@string/verified_nearby_count"
-                                    android:textColor="@color/home_section_header"
-                                    android:textSize="15sp"
-                                    android:textStyle="bold" />
-
-                                <TextView
-                                    android:layout_width="wrap_content"
-                                    android:layout_height="wrap_content"
-                                    android:layout_marginTop="2dp"
-                                    android:text="@string/verified_nearby_sub"
-                                    android:textColor="@color/text_secondary"
-                                    android:textSize="12.5sp" />
-                            </LinearLayout>
-
-                            <ImageView
-                                android:layout_width="22dp"
-                                android:layout_height="22dp"
-                                android:contentDescription="@string/cd_chevron"
-                                android:src="@drawable/ic_chevron_right"
-                                app:tint="@color/text_tertiary" />
-                        </LinearLayout>
-                    </LinearLayout>
-                </com.google.android.material.card.MaterialCardView>
-
-                <!-- Top rated this week -->
-                <LinearLayout
-                    android:layout_width="match_parent"
-                    android:layout_height="wrap_content"
-                    android:layout_marginTop="24dp"
-                    android:gravity="center_vertical"
-                    android:orientation="horizontal">
-
-                    <TextView
-                        android:layout_width="0dp"
-                        android:layout_height="wrap_content"
-                        android:layout_weight="1"
-                        android:text="@string/top_rated_this_week"
-                        android:textAppearance="@style/TextAppearance.Askvocate.HomeHeader" />
-
-                    <TextView
-                        android:id="@+id/btn_see_all"
-                        android:layout_width="wrap_content"
-                        android:layout_height="wrap_content"
-                        android:background="?attr/selectableItemBackground"
-                        android:padding="4dp"
-                        android:text="@string/see_all"
-                        android:textAppearance="@style/TextAppearance.Askvocate.HomeLink" />
-                </LinearLayout>
-
-                <androidx.recyclerview.widget.RecyclerView
-                    android:id="@+id/rv_top_lawyers"
-                    android:layout_width="match_parent"
-                    android:layout_height="178dp"
-                    android:layout_marginTop="10dp"
-                    android:clipToPadding="false"
-                    android:orientation="horizontal"
-                    android:overScrollMode="never"
-                    app:layoutManager="androidx.recyclerview.widget.LinearLayoutManager"
-                    tools:listitem="@layout/item_top_rated_lawyer" />
-
-                <!-- ======= Lower section: Find your lawyer ======= -->
-                <TextView
-                    android:layout_width="wrap_content"
-                    android:layout_height="wrap_content"
-                    android:layout_marginTop="26dp"
-                    android:text="@string/find_your_lawyer"
-                    android:textColor="@color/home_blue"
-                    android:textSize="23sp"
-                    android:textStyle="bold"
-                    android:fontFamily="serif" />
-
-                <TextView
-                    android:layout_width="match_parent"
-                    android:layout_height="wrap_content"
-                    android:layout_marginTop="5dp"
-                    android:lineSpacingExtra="2dp"
-                    android:text="@string/find_your_lawyer_sub"
-                    android:textColor="@color/text_secondary"
-                    android:textSize="13sp" />
-
-                <!-- Describe your case card -->
-                <com.google.android.material.card.MaterialCardView
-                    android:layout_width="match_parent"
-                    android:layout_height="wrap_content"
-                    android:layout_marginTop="16dp"
-                    app:cardBackgroundColor="@color/surface_white"
-                    app:cardCornerRadius="16dp"
-                    app:cardElevation="0dp"
-                    app:strokeColor="@color/home_blue"
-                    app:strokeWidth="1.4dp">
-
-                    <LinearLayout
-                        android:layout_width="match_parent"
-                        android:layout_height="wrap_content"
-                        android:orientation="vertical"
-                        android:padding="14dp">
-
-                        <TextView
-                            android:layout_width="wrap_content"
-                            android:layout_height="wrap_content"
-                            android:fontFamily="serif"
-                            android:text="@string/describe_your_case"
-                            android:textColor="@color/navy_primary"
-                            android:textSize="17sp"
-                            android:textStyle="bold" />
-
-                        <TextView
-                            android:layout_width="match_parent"
-                            android:layout_height="wrap_content"
-                            android:layout_marginTop="6dp"
-                            android:lineSpacingExtra="2dp"
-                            android:text="@string/describe_your_case_sub"
-                            android:textColor="@color/text_secondary"
-                            android:textSize="12.5sp" />
-
-                        <LinearLayout
-                            android:layout_width="match_parent"
-                            android:layout_height="wrap_content"
-                            android:layout_marginTop="13dp"
-                            android:background="@drawable/bg_case_input"
-                            android:gravity="center_vertical"
-                            android:orientation="horizontal">
-
-                            <EditText
-                                android:id="@+id/et_case_description"
-                                android:layout_width="0dp"
-                                android:layout_height="wrap_content"
-                                android:layout_weight="1"
-                                android:background="@android:color/transparent"
-                                android:hint="@string/case_description_hint"
-                                android:inputType="textMultiLine"
-                                android:maxLines="2"
-                                android:minHeight="44dp"
-                                android:paddingVertical="10dp"
-                                android:textColor="@color/home_section_header"
-                                android:textColorHint="@color/text_tertiary"
-                                android:textSize="13.5sp" />
-
-                            <ImageView
-                                android:id="@+id/btn_send_desc"
-                                android:layout_width="42dp"
-                                android:layout_height="42dp"
-                                android:layout_marginStart="6dp"
-                                android:background="@drawable/bg_send_circle"
-                                android:contentDescription="@string/cd_send_message"
-                                android:padding="12dp"
-                                android:src="@drawable/ic_send"
-                                app:tint="@color/surface_white" />
-                        </LinearLayout>
-                    </LinearLayout>
-                </com.google.android.material.card.MaterialCardView>
-
-                <!-- Category -->
-                <TextView
-                    android:layout_width="wrap_content"
-                    android:layout_height="wrap_content"
-                    android:layout_marginTop="18dp"
-                    android:text="@string/category_label"
-                    android:textColor="@color/pill_unselected_text"
-                    android:textSize="14sp"
-                    android:textStyle="bold" />
-
-                <LinearLayout
-                    android:layout_width="match_parent"
-                    android:layout_height="wrap_content"
-                    android:layout_marginTop="10dp"
-                    android:orientation="horizontal">
-
-                    <TextView
-                        android:id="@+id/cat_family"
-                        style="@style/AskvocateHomeCategoryPill"
-                        android:layout_width="0dp"
-                        android:layout_height="wrap_content"
-                        android:layout_marginEnd="10dp"
-                        android:layout_weight="1"
-                        android:background="@drawable/bg_category_pill_selected"
-                        android:text="@string/cat_family_personal"
-                        android:textColor="@color/pill_selected_text"
-                        android:textStyle="bold" />
-
-                    <TextView
-                        android:id="@+id/cat_property"
-                        style="@style/AskvocateHomeCategoryPill"
-                        android:layout_width="0dp"
-                        android:layout_height="wrap_content"
-                        android:layout_weight="1"
-                        android:text="@string/cat_property_real_estate" />
-                </LinearLayout>
-
-                <LinearLayout
-                    android:layout_width="match_parent"
-                    android:layout_height="wrap_content"
-                    android:layout_marginTop="10dp"
-                    android:orientation="horizontal">
-
-                    <TextView
-                        android:id="@+id/cat_employment"
-                        style="@style/AskvocateHomeCategoryPill"
-                        android:layout_width="0dp"
-                        android:layout_height="wrap_content"
-                        android:layout_marginEnd="10dp"
-                        android:layout_weight="1"
-                        android:text="@string/cat_employment" />
-
-                    <TextView
-                        android:id="@+id/cat_civil"
-                        style="@style/AskvocateHomeCategoryPill"
-                        android:layout_width="0dp"
-                        android:layout_height="wrap_content"
-                        android:layout_weight="1"
-                        android:text="@string/cat_civil_consumer" />
-                </LinearLayout>
-
-                <!-- CTA -->
-                <TextView
-                    android:id="@+id/btn_find_matching"
-                    android:layout_width="match_parent"
-                    android:layout_height="52dp"
-                    android:layout_marginTop="22dp"
-                    android:layout_marginBottom="8dp"
-                    android:background="@drawable/bg_pill_button_orange"
-                    android:clickable="true"
-                    android:focusable="true"
-                    android:foreground="?attr/selectableItemBackground"
-                    android:gravity="center"
-                    android:text="@string/find_matching_lawyers"
-                    android:textColor="@color/text_on_accent"
-                    android:textSize="16sp"
+                    android:text="@string/view_all"
+                    android:textAppearance="@style/TextAppearance.Askvocate.Body"
+                    android:textColor="@color/amber_accent"
                     android:textStyle="bold" />
             </LinearLayout>
-        </androidx.core.widget.NestedScrollView>
-    </LinearLayout>
-</FrameLayout>
+
+            <androidx.recyclerview.widget.RecyclerView
+                android:id="@+id/rv_categories"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginBottom="@dimen/spacing_xl"
+                android:clipToPadding="false"
+                android:orientation="horizontal"
+                android:paddingHorizontal="@dimen/spacing_lg"
+                app:layoutManager="androidx.recyclerview.widget.LinearLayoutManager"
+                tools:listitem="@layout/item_category_chip" />
+
+            <!-- Top Rated Lawyers -->
+            <LinearLayout
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginHorizontal="@dimen/spacing_lg"
+                android:layout_marginBottom="@dimen/spacing_md"
+                android:gravity="center_vertical"
+                android:orientation="horizontal">
+
+                <TextView
+                    android:layout_width="0dp"
+                    android:layout_height="wrap_content"
+                    android:layout_weight="1"
+                    android:text="@string/top_rated_lawyers"
+                    android:textAppearance="@style/TextAppearance.Askvocate.Title"
+                    android:textColor="@color/text_primary" />
+
+                <TextView
+                    android:id="@+id/btn_see_all_lawyers"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:text="@string/see_all"
+                    android:textAppearance="@style/TextAppearance.Askvocate.Body"
+                    android:textColor="@color/amber_accent"
+                    android:textStyle="bold" />
+            </LinearLayout>
+
+            <androidx.recyclerview.widget.RecyclerView
+                android:id="@+id/rv_top_lawyers"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginBottom="@dimen/spacing_xl"
+                android:clipToPadding="false"
+                android:orientation="horizontal"
+                android:paddingHorizontal="@dimen/spacing_lg"
+                app:layoutManager="androidx.recyclerview.widget.LinearLayoutManager"
+                tools:listitem="@layout/item_lawyer_horizontal" />
+
+            <!-- AI Legal Assistant Promo -->
+            <com.google.android.material.card.MaterialCardView
+                style="@style/Widget.Askvocate.Card"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginHorizontal="@dimen/spacing_lg"
+                android:layout_marginBottom="@dimen/spacing_xl"
+                app:cardBackgroundColor="@color/transparent"
+                app:cardElevation="0dp">
+
+                <androidx.constraintlayout.widget.ConstraintLayout
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:background="@drawable/bg_ai_promo"
+                    android:padding="@dimen/spacing_xl">
+
+                    <ImageView
+                        android:id="@+id/iv_ai_icon"
+                        android:layout_width="48dp"
+                        android:layout_height="48dp"
+                        android:contentDescription="@null"
+                        android:src="@drawable/ic_psychology"
+                        app:layout_constraintStart_toStartOf="parent"
+                        app:layout_constraintTop_toTopOf="parent"
+                        app:tint="@color/white" />
+
+                    <TextView
+                        android:id="@+id/tv_ai_promo_title"
+                        android:layout_width="0dp"
+                        android:layout_height="wrap_content"
+                        android:layout_marginStart="@dimen/spacing_md"
+                        android:text="@string/have_legal_question"
+                        android:textAppearance="@style/TextAppearance.Askvocate.Title"
+                        android:textColor="@color/white"
+                        app:layout_constraintEnd_toEndOf="parent"
+                        app:layout_constraintStart_toEndOf="@id/iv_ai_icon"
+                        app:layout_constraintTop_toTopOf="@id/iv_ai_icon" />
+
+                    <TextView
+                        android:id="@+id/tv_ai_promo_desc"
+                        android:layout_width="0dp"
+                        android:layout_height="wrap_content"
+                        android:layout_marginTop="@dimen/spacing_xs"
+                        android:text="@string/ai_assistant_promo_desc"
+                        android:textAppearance="@style/TextAppearance.Askvocate.Caption"
+                        android:textColor="#E0E0E0"
+                        app:layout_constraintEnd_toEndOf="parent"
+                        app:layout_constraintStart_toStartOf="@id/tv_ai_promo_title"
+                        app:layout_constraintTop_toBottomOf="@id/tv_ai_promo_title" />
+
+                    <com.google.android.material.button.MaterialButton
+                        android:id="@+id/btn_start_ai_chat"
+                        style="@style/Widget.Askvocate.Button.Primary"
+                        android:layout_width="wrap_content"
+                        android:layout_height="wrap_content"
+                        android:layout_marginTop="@dimen/spacing_lg"
+                        android:text="@string/start_ai_chat"
+                        app:backgroundTint="@color/amber_accent"
+                        app:layout_constraintStart_toStartOf="@id/tv_ai_promo_title"
+                        app:layout_constraintTop_toBottomOf="@id/tv_ai_promo_desc" />
+
+                    <TextView
+                        android:layout_width="0dp"
+                        android:layout_height="wrap_content"
+                        android:layout_marginTop="@dimen/spacing_md"
+                        android:alpha="0.6"
+                        android:text="@string/ai_disclaimer"
+                        android:textAppearance="@style/TextAppearance.Askvocate.Caption"
+                        android:textColor="@color/white"
+                        android:textSize="11sp"
+                        app:layout_constraintEnd_toEndOf="parent"
+                        app:layout_constraintStart_toStartOf="parent"
+                        app:layout_constraintTop_toBottomOf="@id/btn_start_ai_chat" />
+
+                </androidx.constraintlayout.widget.ConstraintLayout>
+            </com.google.android.material.card.MaterialCardView>
+
+            <!-- Legal Insights -->
+            <TextView
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:layout_marginHorizontal="@dimen/spacing_lg"
+                android:layout_marginBottom="@dimen/spacing_md"
+                android:text="@string/legal_knowledge_hub"
+                android:textAppearance="@style/TextAppearance.Askvocate.Title"
+                android:textColor="@color/text_primary" />
+
+            <androidx.recyclerview.widget.RecyclerView
+                android:id="@+id/rv_knowledge_hub"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:clipToPadding="false"
+                android:orientation="horizontal"
+                android:paddingHorizontal="@dimen/spacing_lg"
+                app:layoutManager="androidx.recyclerview.widget.LinearLayoutManager"
+                tools:listitem="@layout/item_knowledge_card" />
+
+        </LinearLayout>
+    </androidx.core.widget.NestedScrollView>
+
+</androidx.coordinatorlayout.widget.CoordinatorLayout>
