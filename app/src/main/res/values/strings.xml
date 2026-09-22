@@ -218,4 +218,47 @@
     <string name="cd_verified">Verified professional</string>
     <string name="askvocate">ASKVOCATE</string>
     <string name="sign_up_with_google">Sign up with Google</string>
+
+    <!-- Client Profile Dashboard -->
+    <string name="my_account">My Account</string>
+    <string name="client_account">Client Account</string>
+    <string name="default_user_name">Sudip Kundu</string>
+    <string name="default_user_email">sudip.kundu@example.com</string>
+    <string name="default_user_phone">+91 98765 43210</string>
+    <string name="default_user_address">123 Legal Street, Justice Colony, New Delhi 110001</string>
+    <string name="default_language">English</string>
+    <string name="default_theme">System Default</string>
+    <string name="complete_profile">Complete your profile</string>
+    <string name="complete_profile_desc">Add your information to personalize your Askvocate experience.</string>
+    <string name="complete_profile_cta">Complete Profile</string>
+    <string name="quick_access">Quick Access</string>
+    <string name="saved_advocates">Saved Advocates</string>
+    <string name="saved_advocates_desc">Your saved profiles</string>
+    <string name="my_appointments_desc">View consultations</string>
+    <string name="my_documents_desc">Manage your files</string>
+    <string name="recent_activity">Recent Activity</string>
+    <string name="recent_activity_desc">View recent actions</string>
+    <string name="account_and_preferences">Account &amp; Preferences</string>
+    <string name="personal_info_desc">Manage your profile details</string>
+    <string name="notifications_desc">Manage alerts and reminders</string>
+    <string name="language_desc">Choose your preferred language</string>
+    <string name="appearance">Appearance</string>
+    <string name="appearance_desc">Theme and display preferences</string>
+    <string name="security_and_privacy">Security &amp; Privacy</string>
+    <string name="privacy_security_desc">Manage account security</string>
+    <string name="biometric_lock">Biometric App Lock</string>
+    <string name="biometric_lock_desc">Enable secure fingerprint / face unlock</string>
+    <string name="help_and_support">Help &amp; Support</string>
+    <string name="help_center_desc">Find answers to common questions</string>
+    <string name="contact_support">Contact Support</string>
+    <string name="contact_support_desc">Get help from Askvocate team</string>
+    <string name="report_problem">Report a Problem</string>
+    <string name="report_problem_desc">Tell us about an issue</string>
+    <string name="feedback">Feedback</string>
+    <string name="feedback_desc">Share your experience with us</string>
+    <string name="about_askvocate">About Askvocate</string>
+    <string name="app_version_format">Version %s</string>
+    <string name="terms_of_service">Terms of Service</string>
+    <string name="logout_confirm_title">Log out of Askvocate?</string>
+    <string name="logout_confirm_msg">You will need to sign in again to access your account.</string>
 </resources>
