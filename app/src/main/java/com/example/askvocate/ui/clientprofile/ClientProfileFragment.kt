@@ -73,7 +73,7 @@ class ClientProfileFragment : Fragment() {
 
         CoroutineScope(Dispatchers.IO).launch {
             try {
-                val url = URL("${ApiConfig.BASE_URL}/users/$endpoint/$userId")
+                val url = URL("${ApiConfig.BASE_URL}/api/users/$endpoint/$userId")
                 val conn = url.openConnection() as HttpURLConnection
                 conn.requestMethod = "GET"
                 conn.connectTimeout = 10_000

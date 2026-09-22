@@ -21,7 +21,7 @@ import java.util.Map;
  * Base path: /api/users
  */
 @RestController
-@RequestMapping("/api/users")
+    @RequestMapping("/api/users")
 public class UserController {
 
     private static final Logger log = LoggerFactory.getLogger(UserController.class);

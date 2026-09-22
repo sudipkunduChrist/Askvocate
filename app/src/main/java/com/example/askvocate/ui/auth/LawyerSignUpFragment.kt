@@ -29,6 +29,7 @@ import org.json.JSONObject
 import java.io.OutputStreamWriter
 import java.net.HttpURLConnection
 import java.net.URL
+import com.example.askvocate.network.ApiConfig
 
 /**
  * Signup screen exclusively for lawyers.
@@ -45,7 +46,7 @@ class LawyerSignUpFragment : Fragment() {
     /** true = Experienced, false = Fresher (default) */
     private var isExperienced: Boolean = false
 
-    private val BASE_URL = "${com.example.askvocate.network.ApiConfig.BASE_URL}/users"
+    private val BASE_URL = "${ApiConfig.BASE_URL}/api"
 
     override fun onCreateView(
         inflater: LayoutInflater,
@@ -195,7 +196,7 @@ class LawyerSignUpFragment : Fragment() {
         confirmPassword: String,
         onResult: (Boolean) -> Unit
     ) {
-        val endpoint = if (isExperienced) "/register/lawyer/experienced" else "/register/lawyer/fresher"
+        val endpoint = if (isExperienced) "/users/register/lawyer/experienced" else "/users/register/lawyer/fresher"
 
         CoroutineScope(Dispatchers.IO).launch {
             try {

@@ -148,7 +148,7 @@ class SignUpFragment : Fragment() {
     ) {
         CoroutineScope(Dispatchers.IO).launch {
             try {
-                val url = URL("$BASE_URL/users/register/client")
+                val url = URL("$BASE_URL/api/users/register/client")
                 val conn = url.openConnection() as HttpURLConnection
                 conn.requestMethod = "POST"
                 conn.setRequestProperty("Content-Type", "application/json; charset=utf-8")

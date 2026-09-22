@@ -155,7 +155,7 @@ object GoogleAuthHelper {
         onSuccess: () -> Unit
     ) {
         try {
-            val url = URL("${ApiConfig.BASE_URL}/users/auth/google")
+            val url = URL("${ApiConfig.BASE_URL}/api/users/auth/google")
             val conn = url.openConnection() as HttpURLConnection
             conn.requestMethod = "POST"
             conn.setRequestProperty("Content-Type", "application/json; charset=utf-8")

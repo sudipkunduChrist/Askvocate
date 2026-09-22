@@ -122,7 +122,7 @@ class SignInFragment : Fragment() {
     private fun login(emailOrPhone: String, password: String, onResult: (Boolean) -> Unit) {
         CoroutineScope(Dispatchers.IO).launch {
             try {
-                val url = URL("$BASE_URL/users/login")
+                val url = URL("$BASE_URL/api/users/login")
                 val conn = url.openConnection() as HttpURLConnection
                 conn.requestMethod = "POST"
                 conn.setRequestProperty("Content-Type", "application/json; charset=utf-8")
