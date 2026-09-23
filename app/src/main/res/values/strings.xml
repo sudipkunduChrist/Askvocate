@@ -277,10 +277,18 @@
     <string name="terms_of_service">Terms of Service</string>
     <string name="logout_confirm_title">Log out of Askvocate?</string>
     <string name="logout_confirm_msg">You will need to sign in again to access your account.</string>
+    <!-- Navigation & Case Tabs -->
     <string name="tab_cases">Cases</string>
     <string name="tab_messages">Messages</string>
     <string name="find_your_lawyer">Find your lawyer</string>
-    <string name="dummy_data_note">This is dummy data for demonstration purposes.</string>
+    <string name="dummy_data_note">Showing dummy data for preview — sample cases &amp; lawyers</string>
+    <string name="find_your_lawyer_sub">Tell us about your case and we\'ll match you with verified advocates nearby.</string>
+    <string name="describe_your_case">Describe your case</string>
+    <string name="describe_your_case_sub">Our AI assistant reads what you share and matches you with the right specialization, no legal jargon needed.</string>
+    <string name="case_description_hint">e.g. My landlord won\'t return my deposit...</string>
+    <string name="category_label">Category</string>
+    <string name="find_matching_lawyers">Find matching lawyers \u2192</string>
+    <string name="cd_chevron">Open</string>
     <plurals name="matching_lawyers_count">
         <item quantity="one">%1$d matching lawyer</item>
         <item quantity="other">%1$d matching lawyers</item>
