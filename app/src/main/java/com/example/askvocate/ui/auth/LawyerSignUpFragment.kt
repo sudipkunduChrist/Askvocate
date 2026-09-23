@@ -191,7 +191,7 @@ class LawyerSignUpFragment : Fragment() {
 
     private fun register(
         name: String,
-        emailOrPhone: String,
+        email: String,
         password: String,
         confirmPassword: String,
         onResult: (Boolean) -> Unit
@@ -210,7 +210,7 @@ class LawyerSignUpFragment : Fragment() {
 
                 val body = JSONObject().apply {
                     put("name",            name)
-                    put("emailOrPhone",    emailOrPhone)
+                    put("email",           email)
                     put("password",        password)
                     put("confirmPassword", confirmPassword)
                 }.toString()
@@ -234,7 +234,7 @@ class LawyerSignUpFragment : Fragment() {
                                 context = requireContext(),
                                 userId = userObj.optString("id", ""),
                                 name = userObj.optString("name", "User"),
-                                emailOrPhone = userObj.optString("emailOrPhone", ""),
+                                emailOrPhone = userObj.optString("email", ""),
                                 role = if (isExperienced) "LAWYER_EXPERIENCED" else "LAWYER_FRESHER"
                             )
                         }

@@ -31,8 +31,10 @@ public class ClientProfile {
 
     private String name;
 
-    @Indexed(unique = true)
-    private String emailOrPhone;
+    @Indexed(unique = true, sparse = true)
+    private String email;
+    private String phone;
+    private String address;
 
     private String passwordHash;
 

@@ -4,7 +4,7 @@
     xmlns:tools="http://schemas.android.com/tools"
     android:layout_width="match_parent"
     android:layout_height="match_parent"
-    android:background="@color/background_cream"
+    android:background="@color/white"
     android:fitsSystemWindows="true">
 
     <!-- Top App Bar -->
@@ -12,15 +12,18 @@
         android:id="@+id/app_bar"
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
-        android:background="@color/background_cream"
+        android:background="@color/white"
         app:elevation="0dp">
 
         <com.google.android.material.appbar.MaterialToolbar
             android:id="@+id/toolbar"
             android:layout_width="match_parent"
             android:layout_height="?attr/actionBarSize"
+            android:fitsSystemWindows="true"
             android:paddingHorizontal="@dimen/spacing_lg"
-            app:contentInsetStart="0dp">
+            app:contentInsetStart="0dp"
+            app:navigationIcon="@drawable/ic_menu"
+            app:navigationIconTint="@color/navy_primary">
 
             <androidx.constraintlayout.widget.ConstraintLayout
                 android:layout_width="match_parent"
@@ -102,9 +105,20 @@
                             android:id="@+id/iv_client_avatar"
                             android:layout_width="@dimen/avatar_xl"
                             android:layout_height="@dimen/avatar_xl"
-                            android:src="@drawable/pfp_male_1"
+                            android:visibility="gone"
                             app:civ_border_color="@color/navy_primary"
                             app:civ_border_width="2dp" />
+
+                        <TextView
+                            android:id="@+id/tv_avatar_initial"
+                            android:layout_width="@dimen/avatar_xl"
+                            android:layout_height="@dimen/avatar_xl"
+                            android:background="@drawable/bg_avatar_circle"
+                            android:gravity="center"
+                            android:textColor="@color/navy_primary"
+                            android:textSize="36sp"
+                            android:textStyle="bold"
+                            tools:text="S" />
 
                         <com.google.android.material.floatingactionbutton.FloatingActionButton
                             android:id="@+id/btn_edit_avatar"
@@ -164,22 +178,7 @@
                         app:layout_constraintStart_toStartOf="parent"
                         app:layout_constraintTop_toBottomOf="@id/tv_client_email" />
 
-                    <!-- Edit Profile Action Button -->
-                    <com.google.android.material.button.MaterialButton
-                        android:id="@+id/btn_edit_profile"
-                        style="@style/Widget.Askvocate.Button.Secondary"
-                        android:layout_width="wrap_content"
-                        android:layout_height="36dp"
-                        android:layout_marginTop="@dimen/spacing_md"
-                        android:paddingHorizontal="@dimen/spacing_lg"
-                        android:text="@string/edit_profile"
-                        android:textSize="13sp"
-                        app:cornerRadius="@dimen/radius_pill"
-                        app:icon="@drawable/ic_edit_pencil"
-                        app:iconSize="16dp"
-                        app:layout_constraintEnd_toEndOf="parent"
-                        app:layout_constraintStart_toStartOf="parent"
-                        app:layout_constraintTop_toBottomOf="@id/tv_account_badge" />
+
 
                 </androidx.constraintlayout.widget.ConstraintLayout>
             </com.google.android.material.card.MaterialCardView>

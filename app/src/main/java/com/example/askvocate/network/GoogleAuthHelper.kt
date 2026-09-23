@@ -187,8 +187,10 @@ object GoogleAuthHelper {
                             context = context,
                             userId = userObj.optString("id", ""),
                             name = userObj.optString("name", "User"),
-                            emailOrPhone = userObj.optString("emailOrPhone", ""),
-                            role = json.optString("role", "")
+                            emailOrPhone = userObj.optString("email", ""),
+                            role = json.optString("role", ""),
+                            authProvider = "GOOGLE",
+                            profileImageUrl = json.optString("profileImageUrl", "")
                         )
                     }
                     val message = json?.optString("message", "Signed in with Google") ?: "Signed in with Google"

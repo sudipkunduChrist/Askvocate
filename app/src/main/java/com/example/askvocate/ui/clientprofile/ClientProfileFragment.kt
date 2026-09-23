@@ -10,13 +10,18 @@ import android.view.ViewGroup
 import android.view.animation.DecelerateInterpolator
 import android.widget.EditText
 import android.widget.Toast
+import coil.load
 import androidx.appcompat.app.AppCompatDelegate
 import androidx.core.view.isVisible
 import androidx.fragment.app.Fragment
 import androidx.navigation.fragment.findNavController
+import androidx.lifecycle.lifecycleScope
 import com.example.askvocate.R
 import com.example.askvocate.databinding.FragmentClientProfileBinding
+import com.example.askvocate.network.GoogleAuthHelper
+import com.example.askvocate.util.SessionManager
 import com.google.android.material.dialog.MaterialAlertDialogBuilder
+import kotlinx.coroutines.launch
 
 class ClientProfileFragment : Fragment() {
 
@@ -56,12 +61,27 @@ class ClientProfileFragment : Fragment() {
         updateProfileCompletion()
     }
 
+    override fun onResume() {
+        super.onResume()
+        if (::prefs.isInitialized && _binding != null) {
+            loadUserData()
+            updateProfileCompletion()
+        }
+    }
+
     private fun loadUserData() {
-        val name = prefs.getString(KEY_NAME, "Sudip Sharma") ?: "Sudip Sharma"
-        val email = prefs.getString(KEY_EMAIL, "sudip.sharma@example.com") ?: "sudip.sharma@example.com"
-        val phone = prefs.getString(KEY_PHONE, "+91 98765 43210") ?: "+91 98765 43210"
-        val address = prefs.getString(KEY_ADDRESS, "123 Legal Street, Justice Colony, New Delhi 110001")
-            ?: "123 Legal Street, Justice Colony, New Delhi 110001"
+        val name = prefs.getString(KEY_NAME, null)
+            ?.takeIf { it.isNotBlank() }
+            ?: SessionManager.getUserName(requireContext()).takeIf { it.isNotBlank() }
+            ?: getString(R.string.not_set)
+        val email = prefs.getString(KEY_EMAIL, null)
+            ?.takeIf { it.isNotBlank() }
+            ?: SessionManager.getUserEmail(requireContext()).takeIf { it.isNotBlank() }
+            ?: getString(R.string.not_set)
+        val phone = prefs.getString(KEY_PHONE, null)?.takeIf { it.isNotBlank() }
+            ?: getString(R.string.not_set)
+        val address = prefs.getString(KEY_ADDRESS, null)?.takeIf { it.isNotBlank() }
+            ?: getString(R.string.not_set)
         val language = prefs.getString(KEY_LANGUAGE, "English") ?: "English"
         val theme = prefs.getString(KEY_THEME, "System Default") ?: "System Default"
         val isBiometricEnabled = prefs.getBoolean(KEY_BIOMETRIC, false)
@@ -70,9 +90,43 @@ class ClientProfileFragment : Fragment() {
         binding.tvClientEmail.text = email
         binding.tvClientPhone.text = phone
         binding.tvClientAddress.text = address
+        binding.tvAccountBadge.text = when (SessionManager.getUserRole(requireContext()).uppercase()) {
+            "LAWYER_FRESHER" -> getString(R.string.fresher_lawyer_account)
+            "LAWYER_EXPERIENCED" -> getString(R.string.experienced_lawyer_account)
+            "ADMIN" -> getString(R.string.admin_account)
+            else -> getString(R.string.client_account)
+        }
+        updateAvatar(name)
         binding.tvCurrentLanguage.text = language
         binding.tvCurrentTheme.text = theme
         binding.switchBiometricLock.isChecked = isBiometricEnabled
+    }
+
+    private fun updateAvatar(name: String) {
+        val initial = name.trim().firstOrNull()?.uppercaseChar()?.toString() ?: "?"
+        binding.tvAvatarInitial.text = initial
+
+        val isGoogleUser = SessionManager.getAuthProvider(requireContext())
+            .equals("GOOGLE", ignoreCase = true)
+        val profileImageUrl = SessionManager.getProfileImageUrl(requireContext())
+
+        if (isGoogleUser && profileImageUrl.isNotBlank()) {
+            binding.tvAvatarInitial.isVisible = false
+            binding.ivClientAvatar.isVisible = true
+            binding.ivClientAvatar.load(profileImageUrl) {
+                crossfade(true)
+                listener(
+                    onError = { _, _ ->
+                        binding.ivClientAvatar.isVisible = false
+                        binding.tvAvatarInitial.isVisible = true
+                    }
+                )
+            }
+        } else {
+            binding.ivClientAvatar.setImageDrawable(null)
+            binding.ivClientAvatar.isVisible = false
+            binding.tvAvatarInitial.isVisible = true
+        }
     }
 
     private fun updateProfileCompletion() {
@@ -112,14 +166,24 @@ class ClientProfileFragment : Fragment() {
     }
 
     private fun setupClickListeners() {
+        binding.toolbar.setNavigationOnClickListener {
+            (requireActivity() as? com.example.askvocate.MainActivity)?.openDrawer()
+        }
+
+        binding.btnProfileSettings.setOnClickListener {
+            Toast.makeText(requireContext(), "Notifications coming soon!", Toast.LENGTH_SHORT).show()
+        }
+
         // Edit Profile Trigger
-        val openEditDialog = View.OnClickListener { showEditProfileDialog() }
-        binding.btnEditProfile.setOnClickListener(openEditDialog)
         binding.btnEditAvatar.setOnClickListener {
             Toast.makeText(requireContext(), "Profile photo updated", Toast.LENGTH_SHORT).show()
         }
-        binding.rowPersonalInfo.setOnClickListener(openEditDialog)
-        binding.btnCompleteProfile.setOnClickListener(openEditDialog)
+        
+        val navigateToPersonalInfo = View.OnClickListener {
+            findNavController().navigate(R.id.action_client_profile_to_personal_info)
+        }
+        binding.rowPersonalInfo.setOnClickListener(navigateToPersonalInfo)
+        binding.btnCompleteProfile.setOnClickListener(navigateToPersonalInfo)
 
         // Settings / Notifications icon on top right
         binding.btnProfileSettings.setOnClickListener {
@@ -131,7 +195,7 @@ class ClientProfileFragment : Fragment() {
             findNavController().navigate(R.id.nav_appointments)
         }
         binding.actionSavedAdvocates.setOnClickListener {
-            findNavController().navigate(R.id.nav_find_lawyers)
+            findNavController().navigate(R.id.action_client_profile_to_saved_advocates)
         }
         binding.actionDocuments.setOnClickListener {
             showDocumentsDialog()
@@ -186,51 +250,7 @@ class ClientProfileFragment : Fragment() {
         }
     }
 
-    private fun showEditProfileDialog() {
-        val context = requireContext()
-        val dialogView = LayoutInflater.from(context).inflate(R.layout.dialog_edit_profile, null)
 
-        val etName = dialogView.findViewById<EditText>(R.id.et_edit_name)
-        val etEmail = dialogView.findViewById<EditText>(R.id.et_edit_email)
-        val etPhone = dialogView.findViewById<EditText>(R.id.et_edit_phone)
-        val etAddress = dialogView.findViewById<EditText>(R.id.et_edit_address)
-
-        etName.setText(binding.tvClientName.text)
-        etEmail.setText(binding.tvClientEmail.text)
-        etPhone.setText(binding.tvClientPhone.text)
-        etAddress.setText(binding.tvClientAddress.text)
-
-        MaterialAlertDialogBuilder(context)
-            .setTitle(R.string.edit_profile)
-            .setView(dialogView)
-            .setPositiveButton(R.string.save) { _, _ ->
-                val newName = etName.text.toString().trim()
-                val newEmail = etEmail.text.toString().trim()
-                val newPhone = etPhone.text.toString().trim()
-                val newAddress = etAddress.text.toString().trim()
-
-                if (newName.isNotEmpty()) {
-                    binding.tvClientName.text = newName
-                    binding.tvClientEmail.text = newEmail
-                    binding.tvClientPhone.text = newPhone
-                    binding.tvClientAddress.text = newAddress
-
-                    prefs.edit()
-                        .putString(KEY_NAME, newName)
-                        .putString(KEY_EMAIL, newEmail)
-                        .putString(KEY_PHONE, newPhone)
-                        .putString(KEY_ADDRESS, newAddress)
-                        .apply()
-
-                    updateProfileCompletion()
-                    Toast.makeText(context, "Profile updated successfully", Toast.LENGTH_SHORT).show()
-                } else {
-                    Toast.makeText(context, "Name cannot be empty", Toast.LENGTH_SHORT).show()
-                }
-            }
-            .setNegativeButton(R.string.cancel, null)
-            .show()
-    }
 
     private fun showNotificationsDialog() {
         val options = arrayOf("Appointment Reminders", "Chat Alerts", "Legal Updates", "Promotions")
@@ -259,6 +279,15 @@ class ClientProfileFragment : Fragment() {
                 val chosen = languages[which].split(" ")[0]
                 binding.tvCurrentLanguage.text = chosen
                 prefs.edit().putString(KEY_LANGUAGE, chosen).apply()
+                
+                val languageTag = when (which) {
+                    1 -> "hi"
+                    2 -> "bn"
+                    else -> "en"
+                }
+                val appLocale = androidx.core.os.LocaleListCompat.forLanguageTags(languageTag)
+                AppCompatDelegate.setApplicationLocales(appLocale)
+
                 Toast.makeText(requireContext(), "Language set to $chosen", Toast.LENGTH_SHORT).show()
                 dialog.dismiss()
             }
@@ -350,9 +379,17 @@ class ClientProfileFragment : Fragment() {
                 // Clear profile session prefs
                 prefs.edit().clear().apply()
                 
-                // Navigate to Sign In screen clearing backstack
+                // Clear global session state
+                SessionManager.setLoggedIn(requireContext(), false)
+                
+                // Clear Google Auth credential state
+                viewLifecycleOwner.lifecycleScope.launch {
+                    GoogleAuthHelper.clearCredentialState(requireContext())
+                }
+
+                // Return to the first role selection screen and clear authenticated history.
                 findNavController().navigate(
-                    R.id.nav_sign_in,
+                    R.id.nav_role_selection,
                     null,
                     androidx.navigation.NavOptions.Builder()
                         .setPopUpTo(R.id.nav_graph, true)

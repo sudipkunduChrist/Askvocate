@@ -4,10 +4,12 @@ import android.os.Bundle
 import android.view.LayoutInflater
 import android.view.View
 import android.view.ViewGroup
+import androidx.appcompat.widget.Toolbar
 import androidx.fragment.app.Fragment
 import androidx.fragment.app.viewModels
 import androidx.navigation.fragment.findNavController
 import androidx.recyclerview.widget.RecyclerView
+import com.example.askvocate.MainActivity
 import com.example.askvocate.R
 import com.example.askvocate.ui.adapters.ChatListAdapter
 import com.example.askvocate.util.AnimationUtils
@@ -22,6 +24,14 @@ class ChatListFragment : Fragment() {
 
     override fun onViewCreated(view: View, savedInstanceState: Bundle?) {
         super.onViewCreated(view, savedInstanceState)
+
+        val toolbar = view.findViewById<Toolbar>(R.id.toolbar)
+        toolbar.setNavigationOnClickListener {
+            (requireActivity() as? MainActivity)?.openDrawer()
+        }
+        view.findViewById<View>(R.id.btn_notifications).setOnClickListener {
+            android.widget.Toast.makeText(requireContext(), "Notifications coming soon!", android.widget.Toast.LENGTH_SHORT).show()
+        }
 
         val rvChatList = view.findViewById<RecyclerView>(R.id.rv_chat_list)
         val chatListAdapter = ChatListAdapter { chat ->

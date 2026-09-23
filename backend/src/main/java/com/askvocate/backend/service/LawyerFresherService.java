@@ -28,13 +28,14 @@ public class LawyerFresherService {
         if (!dto.getPassword().equals(dto.getConfirmPassword())) {
             throw new IllegalArgumentException("Passwords do not match");
         }
-        if (lawyerFresherProfileRepository.existsByEmailOrPhone(dto.getEmailOrPhone())) {
+        if (lawyerFresherProfileRepository.existsByEmail(dto.getEmail())) {
             throw new IllegalArgumentException("Account already exists with this email or phone");
         }
 
         LawyerFresherProfile profile = LawyerFresherProfile.builder()
                 .name(dto.getName())
-                .emailOrPhone(dto.getEmailOrPhone())
+                .email(dto.getEmail().trim().toLowerCase())
+                .phone(null)
                 .passwordHash(passwordEncoder.encode(dto.getPassword()))
                 .provider(dto.getProvider() != null ? dto.getProvider() : com.askvocate.backend.entity.AuthProvider.LOCAL)
                 .university(dto.getUniversity() != null ? dto.getUniversity() : "")
@@ -47,8 +48,8 @@ public class LawyerFresherService {
     }
 
     /** Fetch a fresher lawyer by their email or phone number. */
-    public Optional<LawyerFresherProfile> findByEmailOrPhone(String emailOrPhone) {
-        return lawyerFresherProfileRepository.findByEmailOrPhone(emailOrPhone);
+    public Optional<LawyerFresherProfile> findByEmail(String email) {
+        return lawyerFresherProfileRepository.findByEmail(email);
     }
 
     /** Fetch a fresher lawyer by their MongoDB ID. */
@@ -87,6 +88,24 @@ public class LawyerFresherService {
 
     /** Saves a fresher lawyer created via Google Sign-In (no local password). */
     public LawyerFresherProfile saveGoogleLawyerFresher(LawyerFresherProfile profile) {
+        return lawyerFresherProfileRepository.save(profile);
+    }
+
+    /**
+     * Updates an existing fresher lawyer profile.
+     */
+    public LawyerFresherProfile updateLawyerFresherProfile(String id, com.askvocate.backend.dto.ProfileUpdateRequest dto) {
+        LawyerFresherProfile profile = lawyerFresherProfileRepository.findById(id)
+                .orElseThrow(() -> new IllegalArgumentException("Lawyer not found"));
+
+        if (dto.getName() != null) profile.setName(dto.getName());
+        if (dto.getEmail() != null) profile.setEmail(dto.getEmail());
+        if (dto.getPhone() != null) profile.setPhone(dto.getPhone());
+        if (dto.getAddress() != null) profile.setAddress(dto.getAddress());
+        if (dto.getSpecialization() != null) profile.setSpecialization(dto.getSpecialization());
+        if (dto.getUniversity() != null) profile.setUniversity(dto.getUniversity());
+        if (dto.getGraduationYear() != null) profile.setGraduationYear(dto.getGraduationYear());
+
         return lawyerFresherProfileRepository.save(profile);
     }
 }

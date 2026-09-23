@@ -1,0 +1,226 @@
+<?xml version="1.0" encoding="utf-8"?>
+<androidx.coordinatorlayout.widget.CoordinatorLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:app="http://schemas.android.com/apk/res-auto"
+    xmlns:tools="http://schemas.android.com/tools"
+    android:layout_width="match_parent" android:layout_height="match_parent"
+    android:background="@color/white" android:fitsSystemWindows="true">
+
+    <com.google.android.material.appbar.AppBarLayout
+        android:layout_width="match_parent" android:layout_height="wrap_content"
+        android:background="@color/white" app:elevation="0dp">
+        <com.google.android.material.appbar.MaterialToolbar
+            android:id="@+id/toolbar" android:layout_width="match_parent"
+            android:layout_height="?attr/actionBarSize" android:paddingHorizontal="@dimen/spacing_sm"
+            app:contentInsetStartWithNavigation="0dp" app:navigationIcon="@drawable/ic_chevron_left"
+            app:title="Personal Information" app:titleTextAppearance="@style/TextAppearance.Askvocate.Title"
+            app:titleTextColor="@color/navy_primary" />
+    </com.google.android.material.appbar.AppBarLayout>
+
+    <androidx.core.widget.NestedScrollView
+        android:layout_width="match_parent" android:layout_height="match_parent"
+        android:clipToPadding="false" android:fillViewport="true" android:paddingBottom="100dp"
+        app:layout_behavior="@string/appbar_scrolling_view_behavior">
+        <LinearLayout
+            android:layout_width="match_parent" android:layout_height="wrap_content"
+            android:orientation="vertical" android:paddingHorizontal="@dimen/spacing_lg"
+            android:paddingTop="@dimen/spacing_md">
+
+            <com.google.android.material.card.MaterialCardView
+                style="@style/Widget.Askvocate.Card" android:layout_width="match_parent"
+                android:layout_height="wrap_content" android:layout_marginBottom="@dimen/spacing_xl"
+                app:cardBackgroundColor="@color/navy_primary" app:cardCornerRadius="@dimen/radius_lg">
+                <LinearLayout android:layout_width="match_parent" android:layout_height="wrap_content"
+                    android:gravity="center_vertical" android:orientation="horizontal" android:padding="@dimen/spacing_lg">
+                    <FrameLayout android:layout_width="56dp" android:layout_height="56dp" android:background="@drawable/bg_avatar_circle">
+                        <ImageView android:layout_width="28dp" android:layout_height="28dp"
+                            android:layout_gravity="center" android:contentDescription="@null"
+                            android:src="@drawable/ic_profile" app:tint="@color/navy_primary" />
+                    </FrameLayout>
+                    <LinearLayout android:layout_width="0dp" android:layout_height="wrap_content"
+                        android:layout_marginStart="@dimen/spacing_lg" android:layout_weight="1" android:orientation="vertical">
+                        <TextView android:layout_width="wrap_content" android:layout_height="wrap_content"
+                            android:text="Your personal details" android:textColor="@color/white"
+                            android:textSize="18sp" android:textStyle="bold" />
+                        <TextView android:layout_width="wrap_content" android:layout_height="wrap_content"
+                            android:layout_marginTop="@dimen/spacing_xs"
+                            android:text="Keep your contact information accurate and up to date."
+                            android:textColor="@color/amber_light" android:textSize="13sp" />
+                    </LinearLayout>
+                </LinearLayout>
+            </com.google.android.material.card.MaterialCardView>
+
+            <FrameLayout android:layout_width="match_parent" android:layout_height="wrap_content">
+                <LinearLayout android:id="@+id/layout_view_mode" android:layout_width="match_parent"
+                    android:layout_height="wrap_content" android:orientation="vertical">
+                    <TextView android:layout_width="wrap_content" android:layout_height="wrap_content"
+                        android:layout_marginStart="@dimen/spacing_xs" android:layout_marginBottom="@dimen/spacing_sm"
+                        android:text="BASIC DETAILS" android:textAppearance="@style/TextAppearance.Askvocate.Label"
+                        android:textColor="@color/navy_primary" android:textStyle="bold" />
+                    <com.google.android.material.card.MaterialCardView
+                        style="@style/Widget.Askvocate.Card.Outlined" android:layout_width="match_parent"
+                        android:layout_height="wrap_content" android:layout_marginBottom="@dimen/spacing_xl">
+                        <LinearLayout android:layout_width="match_parent" android:layout_height="wrap_content"
+                            android:orientation="vertical" android:padding="@dimen/spacing_lg">
+                            <TextView android:layout_width="wrap_content" android:layout_height="wrap_content"
+                                android:text="Full name" android:textAppearance="@style/TextAppearance.Askvocate.Caption"
+                                android:textColor="@color/text_tertiary" />
+                            <TextView android:id="@+id/tv_display_name" android:layout_width="match_parent"
+                                android:layout_height="wrap_content" android:layout_marginTop="@dimen/spacing_xs"
+                                android:textAppearance="@style/TextAppearance.Askvocate.BodyLarge"
+                                android:textColor="@color/text_primary" android:textStyle="bold" tools:text="Shivang Bajaj" />
+                            <View android:layout_width="match_parent" android:layout_height="1dp"
+                                android:layout_marginVertical="@dimen/spacing_lg" android:background="@color/divider" />
+                            <TextView android:layout_width="wrap_content" android:layout_height="wrap_content"
+                                android:text="Account role" android:textAppearance="@style/TextAppearance.Askvocate.Caption"
+                                android:textColor="@color/text_tertiary" />
+                            <TextView android:id="@+id/tv_display_role" android:layout_width="match_parent"
+                                android:layout_height="wrap_content" android:layout_marginTop="@dimen/spacing_xs"
+                                android:textAppearance="@style/TextAppearance.Askvocate.BodyLarge"
+                                android:textColor="@color/text_primary" tools:text="Experienced Lawyer" />
+                            <LinearLayout android:id="@+id/container_display_specialization"
+                                android:layout_width="match_parent" android:layout_height="wrap_content"
+                                android:orientation="vertical" android:visibility="gone">
+                                <View android:layout_width="match_parent" android:layout_height="1dp"
+                                    android:layout_marginVertical="@dimen/spacing_lg" android:background="@color/divider" />
+                                <TextView android:layout_width="wrap_content" android:layout_height="wrap_content"
+                                    android:text="Specialization" android:textAppearance="@style/TextAppearance.Askvocate.Caption"
+                                    android:textColor="@color/text_tertiary" />
+                                <TextView android:id="@+id/tv_display_specialization" android:layout_width="match_parent"
+                                    android:layout_height="wrap_content" android:layout_marginTop="@dimen/spacing_xs"
+                                    android:textAppearance="@style/TextAppearance.Askvocate.BodyLarge"
+                                    android:textColor="@color/text_primary" tools:text="Corporate Law" />
+                                <View android:layout_width="match_parent" android:layout_height="1dp" android:layout_marginVertical="@dimen/spacing_lg" android:background="@color/divider" />
+                                <TextView android:layout_width="wrap_content" android:layout_height="wrap_content" android:text="University" android:textAppearance="@style/TextAppearance.Askvocate.Caption" android:textColor="@color/text_tertiary" />
+                                <TextView android:id="@+id/tv_display_university" android:layout_width="match_parent" android:layout_height="wrap_content" android:layout_marginTop="@dimen/spacing_xs" android:textAppearance="@style/TextAppearance.Askvocate.BodyLarge" android:textColor="@color/text_primary" />
+                                <View android:layout_width="match_parent" android:layout_height="1dp" android:layout_marginVertical="@dimen/spacing_lg" android:background="@color/divider" />
+                                <TextView android:layout_width="wrap_content" android:layout_height="wrap_content" android:text="Graduation year" android:textAppearance="@style/TextAppearance.Askvocate.Caption" android:textColor="@color/text_tertiary" />
+                                <TextView android:id="@+id/tv_display_graduation_year" android:layout_width="match_parent" android:layout_height="wrap_content" android:layout_marginTop="@dimen/spacing_xs" android:textAppearance="@style/TextAppearance.Askvocate.BodyLarge" android:textColor="@color/text_primary" />
+                                <View android:layout_width="match_parent" android:layout_height="1dp" android:layout_marginVertical="@dimen/spacing_lg" android:background="@color/divider" />
+                                <TextView android:layout_width="wrap_content" android:layout_height="wrap_content" android:text="Verification status" android:textAppearance="@style/TextAppearance.Askvocate.Caption" android:textColor="@color/text_tertiary" />
+                                <TextView android:id="@+id/tv_display_verification_status" android:layout_width="match_parent" android:layout_height="wrap_content" android:layout_marginTop="@dimen/spacing_xs" android:textAppearance="@style/TextAppearance.Askvocate.BodyLarge" android:textColor="@color/navy_primary" android:textStyle="bold" />
+                            </LinearLayout>
+                            <LinearLayout android:id="@+id/container_display_experienced" android:layout_width="match_parent" android:layout_height="wrap_content" android:orientation="vertical" android:visibility="gone">
+                                <View android:layout_width="match_parent" android:layout_height="1dp" android:layout_marginVertical="@dimen/spacing_lg" android:background="@color/divider" />
+                                <TextView android:layout_width="wrap_content" android:layout_height="wrap_content" android:text="Bar Council ID" android:textAppearance="@style/TextAppearance.Askvocate.Caption" android:textColor="@color/text_tertiary" />
+                                <TextView android:id="@+id/tv_display_bar_council_id" android:layout_width="match_parent" android:layout_height="wrap_content" android:layout_marginTop="@dimen/spacing_xs" android:textAppearance="@style/TextAppearance.Askvocate.BodyLarge" android:textColor="@color/text_primary" />
+                                <View android:layout_width="match_parent" android:layout_height="1dp" android:layout_marginVertical="@dimen/spacing_lg" android:background="@color/divider" />
+                                <TextView android:layout_width="wrap_content" android:layout_height="wrap_content" android:text="Practice areas" android:textAppearance="@style/TextAppearance.Askvocate.Caption" android:textColor="@color/text_tertiary" />
+                                <TextView android:id="@+id/tv_display_practice_areas" android:layout_width="match_parent" android:layout_height="wrap_content" android:layout_marginTop="@dimen/spacing_xs" android:textAppearance="@style/TextAppearance.Askvocate.BodyLarge" android:textColor="@color/text_primary" />
+                                <View android:layout_width="match_parent" android:layout_height="1dp" android:layout_marginVertical="@dimen/spacing_lg" android:background="@color/divider" />
+                                <TextView android:layout_width="wrap_content" android:layout_height="wrap_content" android:text="Current firm" android:textAppearance="@style/TextAppearance.Askvocate.Caption" android:textColor="@color/text_tertiary" />
+                                <TextView android:id="@+id/tv_display_current_firm" android:layout_width="match_parent" android:layout_height="wrap_content" android:layout_marginTop="@dimen/spacing_xs" android:textAppearance="@style/TextAppearance.Askvocate.BodyLarge" android:textColor="@color/text_primary" />
+                            </LinearLayout>
+                        </LinearLayout>
+                    </com.google.android.material.card.MaterialCardView>
+
+                    <TextView android:layout_width="wrap_content" android:layout_height="wrap_content"
+                        android:layout_marginStart="@dimen/spacing_xs" android:layout_marginBottom="@dimen/spacing_sm"
+                        android:text="CONTACT DETAILS" android:textAppearance="@style/TextAppearance.Askvocate.Label"
+                        android:textColor="@color/navy_primary" android:textStyle="bold" />
+                    <com.google.android.material.card.MaterialCardView
+                        style="@style/Widget.Askvocate.Card.Outlined" android:layout_width="match_parent"
+                        android:layout_height="wrap_content" android:layout_marginBottom="@dimen/spacing_lg">
+                        <LinearLayout android:layout_width="match_parent" android:layout_height="wrap_content"
+                            android:orientation="vertical" android:padding="@dimen/spacing_lg">
+                            <TextView android:layout_width="wrap_content" android:layout_height="wrap_content"
+                                android:text="Email address" android:textAppearance="@style/TextAppearance.Askvocate.Caption"
+                                android:textColor="@color/text_tertiary" />
+                            <TextView android:id="@+id/tv_display_email" android:layout_width="match_parent"
+                                android:layout_height="wrap_content" android:layout_marginTop="@dimen/spacing_xs"
+                                android:textAppearance="@style/TextAppearance.Askvocate.BodyLarge" android:textColor="@color/text_primary"
+                                tools:text="shivang@example.com" />
+                            <View android:layout_width="match_parent" android:layout_height="1dp"
+                                android:layout_marginVertical="@dimen/spacing_lg" android:background="@color/divider" />
+                            <TextView android:layout_width="wrap_content" android:layout_height="wrap_content"
+                                android:text="Phone number" android:textAppearance="@style/TextAppearance.Askvocate.Caption"
+                                android:textColor="@color/text_tertiary" />
+                            <TextView android:id="@+id/tv_display_phone" android:layout_width="match_parent"
+                                android:layout_height="wrap_content" android:layout_marginTop="@dimen/spacing_xs"
+                                android:textAppearance="@style/TextAppearance.Askvocate.BodyLarge" android:textColor="@color/text_primary"
+                                tools:text="+91 9876543210" />
+                            <View android:layout_width="match_parent" android:layout_height="1dp"
+                                android:layout_marginVertical="@dimen/spacing_lg" android:background="@color/divider" />
+                            <TextView android:layout_width="wrap_content" android:layout_height="wrap_content"
+                                android:text="Address" android:textAppearance="@style/TextAppearance.Askvocate.Caption"
+                                android:textColor="@color/text_tertiary" />
+                            <TextView android:id="@+id/tv_display_address" android:layout_width="match_parent"
+                                android:layout_height="wrap_content" android:layout_marginTop="@dimen/spacing_xs"
+                                android:textAppearance="@style/TextAppearance.Askvocate.BodyLarge" android:textColor="@color/text_primary"
+                                tools:text="123 Legal Street, New Delhi" />
+                        </LinearLayout>
+                    </com.google.android.material.card.MaterialCardView>
+                    <com.google.android.material.button.MaterialButton
+                        android:id="@+id/btn_edit_profile" style="@style/Widget.Askvocate.Button.Primary"
+                        android:layout_width="match_parent" android:layout_height="56dp"
+                        android:text="Edit personal information" app:icon="@drawable/ic_edit_pencil"
+                        app:iconGravity="textStart" />
+                </LinearLayout>
+
+                <LinearLayout android:id="@+id/layout_edit_mode" android:layout_width="match_parent"
+                    android:layout_height="wrap_content" android:orientation="vertical" android:visibility="gone">
+                    <TextView android:layout_width="wrap_content" android:layout_height="wrap_content"
+                        android:layout_marginStart="@dimen/spacing_xs" android:layout_marginBottom="@dimen/spacing_sm"
+                        android:text="EDIT DETAILS" android:textAppearance="@style/TextAppearance.Askvocate.Label"
+                        android:textColor="@color/navy_primary" android:textStyle="bold" />
+                    <com.google.android.material.card.MaterialCardView
+                        style="@style/Widget.Askvocate.Card.Outlined" android:layout_width="match_parent"
+                        android:layout_height="wrap_content" android:layout_marginBottom="@dimen/spacing_lg">
+                        <LinearLayout android:layout_width="match_parent" android:layout_height="wrap_content"
+                            android:orientation="vertical" android:padding="@dimen/spacing_lg">
+                            <com.google.android.material.textfield.TextInputLayout style="@style/Widget.Askvocate.TextInputLayout"
+                                android:layout_width="match_parent" android:layout_height="wrap_content"
+                                android:layout_marginBottom="@dimen/spacing_md" android:hint="Full name">
+                                <com.google.android.material.textfield.TextInputEditText android:id="@+id/et_name"
+                                    android:layout_width="match_parent" android:layout_height="wrap_content" android:inputType="textPersonName" />
+                            </com.google.android.material.textfield.TextInputLayout>
+                            <com.google.android.material.textfield.TextInputLayout style="@style/Widget.Askvocate.TextInputLayout"
+                                android:layout_width="match_parent" android:layout_height="wrap_content"
+                                android:layout_marginBottom="@dimen/spacing_md" android:hint="Email address">
+                                <com.google.android.material.textfield.TextInputEditText android:id="@+id/et_email"
+                                    android:layout_width="match_parent" android:layout_height="wrap_content" android:inputType="textEmailAddress" />
+                            </com.google.android.material.textfield.TextInputLayout>
+                            <com.google.android.material.textfield.TextInputLayout style="@style/Widget.Askvocate.TextInputLayout"
+                                android:layout_width="match_parent" android:layout_height="wrap_content"
+                                android:layout_marginBottom="@dimen/spacing_md" android:hint="Phone number">
+                                <com.google.android.material.textfield.TextInputEditText android:id="@+id/et_phone"
+                                    android:layout_width="match_parent" android:layout_height="wrap_content" android:inputType="phone" />
+                            </com.google.android.material.textfield.TextInputLayout>
+                            <com.google.android.material.textfield.TextInputLayout style="@style/Widget.Askvocate.TextInputLayout"
+                                android:layout_width="match_parent" android:layout_height="wrap_content"
+                                android:layout_marginBottom="@dimen/spacing_md" android:hint="Address">
+                                <com.google.android.material.textfield.TextInputEditText android:id="@+id/et_address"
+                                    android:layout_width="match_parent" android:layout_height="wrap_content"
+                                    android:inputType="textPostalAddress" android:minLines="2" />
+                            </com.google.android.material.textfield.TextInputLayout>
+                            <com.google.android.material.textfield.TextInputLayout android:id="@+id/til_specialization"
+                                style="@style/Widget.Askvocate.TextInputLayout" android:layout_width="match_parent"
+                                android:layout_height="wrap_content" android:hint="Specialization" android:visibility="gone">
+                                <com.google.android.material.textfield.TextInputEditText android:id="@+id/et_specialization"
+                                    android:layout_width="match_parent" android:layout_height="wrap_content" android:inputType="text" />
+                            </com.google.android.material.textfield.TextInputLayout>
+                            <LinearLayout android:id="@+id/container_edit_lawyer_details" android:layout_width="match_parent" android:layout_height="wrap_content" android:orientation="vertical" android:visibility="gone">
+                                <com.google.android.material.textfield.TextInputLayout style="@style/Widget.Askvocate.TextInputLayout" android:layout_width="match_parent" android:layout_height="wrap_content" android:layout_marginTop="@dimen/spacing_md" android:layout_marginBottom="@dimen/spacing_md" android:hint="University"><com.google.android.material.textfield.TextInputEditText android:id="@+id/et_university" android:layout_width="match_parent" android:layout_height="wrap_content" android:inputType="textCapWords" /></com.google.android.material.textfield.TextInputLayout>
+                                <com.google.android.material.textfield.TextInputLayout style="@style/Widget.Askvocate.TextInputLayout" android:layout_width="match_parent" android:layout_height="wrap_content" android:hint="Graduation year"><com.google.android.material.textfield.TextInputEditText android:id="@+id/et_graduation_year" android:layout_width="match_parent" android:layout_height="wrap_content" android:inputType="number" /></com.google.android.material.textfield.TextInputLayout>
+                            </LinearLayout>
+                            <LinearLayout android:id="@+id/container_edit_experienced" android:layout_width="match_parent" android:layout_height="wrap_content" android:orientation="vertical" android:visibility="gone">
+                                <com.google.android.material.textfield.TextInputLayout style="@style/Widget.Askvocate.TextInputLayout" android:layout_width="match_parent" android:layout_height="wrap_content" android:layout_marginTop="@dimen/spacing_md" android:layout_marginBottom="@dimen/spacing_md" android:hint="Bar Council ID"><com.google.android.material.textfield.TextInputEditText android:id="@+id/et_bar_council_id" android:layout_width="match_parent" android:layout_height="wrap_content" android:inputType="text" /></com.google.android.material.textfield.TextInputLayout>
+                                <com.google.android.material.textfield.TextInputLayout style="@style/Widget.Askvocate.TextInputLayout" android:layout_width="match_parent" android:layout_height="wrap_content" android:layout_marginBottom="@dimen/spacing_md" android:hint="Practice areas (comma separated)"><com.google.android.material.textfield.TextInputEditText android:id="@+id/et_practice_areas" android:layout_width="match_parent" android:layout_height="wrap_content" android:inputType="textCapSentences" /></com.google.android.material.textfield.TextInputLayout>
+                                <com.google.android.material.textfield.TextInputLayout style="@style/Widget.Askvocate.TextInputLayout" android:layout_width="match_parent" android:layout_height="wrap_content" android:hint="Current firm"><com.google.android.material.textfield.TextInputEditText android:id="@+id/et_current_firm" android:layout_width="match_parent" android:layout_height="wrap_content" android:inputType="textCapWords" /></com.google.android.material.textfield.TextInputLayout>
+                            </LinearLayout>
+                        </LinearLayout>
+                    </com.google.android.material.card.MaterialCardView>
+                    <LinearLayout android:layout_width="match_parent" android:layout_height="wrap_content" android:orientation="horizontal">
+                        <com.google.android.material.button.MaterialButton android:id="@+id/btn_cancel_edit"
+                            style="@style/Widget.Askvocate.Button.Secondary" android:layout_width="0dp"
+                            android:layout_height="56dp" android:layout_marginEnd="@dimen/spacing_sm"
+                            android:layout_weight="1" android:text="Cancel" />
+                        <com.google.android.material.button.MaterialButton android:id="@+id/btn_save_profile"
+                            style="@style/Widget.Askvocate.Button.Primary" android:layout_width="0dp"
+                            android:layout_height="56dp" android:layout_marginStart="@dimen/spacing_sm"
+                            android:layout_weight="1" android:text="Save changes" />
+                    </LinearLayout>
+                </LinearLayout>
+            </FrameLayout>
+        </LinearLayout>
+    </androidx.core.widget.NestedScrollView>
+</androidx.coordinatorlayout.widget.CoordinatorLayout>

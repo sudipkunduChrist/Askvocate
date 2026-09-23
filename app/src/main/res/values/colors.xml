@@ -11,7 +11,7 @@
     <color name="amber_dark">#FFC57A0B</color>
 
     <!-- Background Colors -->
-    <color name="background_cream">#FFF8F6F2</color>
+    <color name="background_cream">#FFFFFFFF</color>
     <color name="surface_white">#FFFFFFFF</color>
     <color name="border_light">#FFE7E2D6</color>
     <color name="divider">#FFEDE9E0</color>
@@ -73,7 +73,7 @@
     <color name="splash_text">#FF1D2021</color>
     <color name="splash_text_variant">#661D2021</color>
     <!-- Justitia Premium Design System (from code.html) -->
-    <color name="justitia_bg">#f6faff</color>
+    <color name="justitia_bg">#FFFFFFFF</color>
     <color name="justitia_on_background">#171c20</color>
     <color name="justitia_primary">#002961</color>
     <color name="justitia_primary_container">#063e8a</color>
@@ -82,23 +82,23 @@
     <color name="justitia_on_surface_variant">#434751</color>
     <color name="justitia_slate_text">#0F172A</color>
     <color name="justitia_teal_success">#0D9488</color>
-    <color name="justitia_surface_elevated">#F8FAFC</color>
+    <color name="justitia_surface_elevated">#FFFFFFFF</color>
     <color name="justitia_border">#E2E8F0</color>
     <color name="justitia_shadow_glow">#26063E8A</color>
     <color name="justitia_secondary_shadow">#875200</color>
 
     <!-- Mappings -->
-    <color name="journey_background">@color/justitia_bg</color>
+    <color name="journey_background">@color/white</color>
     <color name="journey_text_headline">@color/justitia_slate_text</color>
     <color name="journey_text_body">@color/justitia_on_surface_variant</color>
-    <color name="journey_card_bg">@color/justitia_surface_elevated</color>
+    <color name="journey_card_bg">@color/white</color>
     <color name="journey_timeline_line">@color/justitia_secondary_container</color>
 
     <!-- Home screen redesign (matched to product mockups) -->
     <color name="home_blue">#FF063E8A</color>
     <color name="home_section_header">#FF2B2B2B</color>
     <color name="home_outline">#FFE3E3E3</color>
-    <color name="home_input_bg">#FFF4F4F4</color>
+    <color name="home_input_bg">#FFFFFFFF</color>
     <color name="pill_selected_bg">#FFF8EEDC</color>
     <color name="pill_selected_text">#FFA7834D</color>
     <color name="pill_unselected_text">#FF454545</color>

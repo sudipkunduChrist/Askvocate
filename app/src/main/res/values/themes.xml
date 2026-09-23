@@ -13,10 +13,10 @@
         <item name="colorSecondaryContainer">@color/amber_light</item>
 
         <!-- Background & Surface -->
-        <item name="android:colorBackground">@color/background_cream</item>
+        <item name="android:colorBackground">@color/white</item>
         <item name="colorSurface">@color/surface_white</item>
         <item name="colorOnSurface">@color/text_primary</item>
-        <item name="colorSurfaceVariant">@color/background_cream</item>
+        <item name="colorSurfaceVariant">@color/white</item>
 
         <!-- Error -->
         <item name="colorError">@color/error_red</item>
@@ -27,7 +27,7 @@
         <item name="android:windowLightStatusBar">false</item>
 
         <!-- Window -->
-        <item name="android:windowBackground">@color/background_cream</item>
+        <item name="android:windowBackground">@color/white</item>
 
         <!-- Default ripple -->
         <item name="colorControlHighlight">@color/ripple_light</item>

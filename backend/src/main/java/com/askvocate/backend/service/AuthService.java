@@ -42,8 +42,9 @@ public class AuthService {
 
     /**
      * Verifies a Google ID token (from Android Credential Manager) and signs the user in.
-     * If the email exists, signs into the existing role (or rejects if targetRole conflicts).
-     * If new user, creates the profile matching targetRole ("CLIENT", "LAWYER_FRESHER", "LAWYER_EXPERIENCED").
+     * When targetRole is supplied, account lookup and uniqueness are scoped to that role.
+     * This allows the same Google identity to own separate fresher and experienced profiles.
+     * Without targetRole, the legacy sign-in flow searches all role collections.
      */
     public Map<String, Object> loginWithGoogle(String idTokenString, String targetRole) {
         GoogleIdToken.Payload payload = verifyGoogleIdToken(idTokenString);
@@ -57,47 +58,77 @@ public class AuthService {
             name = email.substring(0, email.indexOf('@'));
         }
 
-        // Check if account already exists across any role collection
-        Optional<ClientProfile> clientOpt = clientService.findByEmailOrPhone(email);
-        Optional<LawyerFresherProfile> fresherOpt = lawyerFresherService.findByEmailOrPhone(email);
-        Optional<LawyerExperiencedProfile> expOpt = lawyerExperiencedService.findByEmailOrPhone(email);
+        String requestedRole = targetRole == null ? "" : targetRole.trim().toUpperCase();
+        if (!requestedRole.isEmpty()
+                && !requestedRole.equals("CLIENT")
+                && !requestedRole.equals("LAWYER_FRESHER")
+                && !requestedRole.equals("LAWYER_EXPERIENCED")) {
+            throw new IllegalArgumentException("Unsupported account role");
+        }
 
         String existingRole = null;
         Object existingUser = null;
 
-        if (clientOpt.isPresent()) {
-            existingRole = "CLIENT";
-            existingUser = clientOpt.get();
-        } else if (fresherOpt.isPresent()) {
-            existingRole = "LAWYER_FRESHER";
-            existingUser = fresherOpt.get();
-        } else if (expOpt.isPresent()) {
-            existingRole = "LAWYER_EXPERIENCED";
-            existingUser = expOpt.get();
+        if (!requestedRole.isEmpty()) {
+            // Sign-up from a role-specific screen must only inspect that role's collection.
+            // An account in another collection is a separate profile, not a conflict.
+            if (requestedRole.equals("CLIENT")) {
+                existingUser = clientService.findByEmail(email).orElse(null);
+            } else if (requestedRole.equals("LAWYER_FRESHER")) {
+                existingUser = lawyerFresherService.findByEmail(email).orElse(null);
+            } else {
+                existingUser = lawyerExperiencedService.findByEmail(email).orElse(null);
+            }
+            if (existingUser != null) {
+                existingRole = requestedRole;
+            }
+        } else {
+            // Generic Google sign-in has no selected role, so retain the existing search order.
+            Optional<ClientProfile> clientOpt = clientService.findByEmail(email);
+            Optional<LawyerFresherProfile> fresherOpt = lawyerFresherService.findByEmail(email);
+            Optional<LawyerExperiencedProfile> expOpt = lawyerExperiencedService.findByEmail(email);
+
+            if (clientOpt.isPresent()) {
+                existingRole = "CLIENT";
+                existingUser = clientOpt.get();
+            } else if (fresherOpt.isPresent()) {
+                existingRole = "LAWYER_FRESHER";
+                existingUser = fresherOpt.get();
+            } else if (expOpt.isPresent()) {
+                existingRole = "LAWYER_EXPERIENCED";
+                existingUser = expOpt.get();
+            }
         }
 
         if (existingRole != null) {
-            // If explicit targetRole was provided during sign-up and conflicts with existing account, reject
-            if (targetRole != null && !targetRole.isBlank() && !targetRole.equalsIgnoreCase(existingRole)) {
-                String roleName = existingRole.replace("_", " ").toLowerCase();
-                throw new IllegalArgumentException("An account with this email already exists as a " + roleName + ". Please sign in instead.");
+            // Migrate legacy documents that stored the address under emailOrPhone.
+            if (existingUser instanceof ClientProfile client && client.getEmail() == null) {
+                client.setEmail(email);
+                existingUser = clientService.saveGoogleClient(client);
+            } else if (existingUser instanceof LawyerFresherProfile fresher && fresher.getEmail() == null) {
+                fresher.setEmail(email);
+                existingUser = lawyerFresherService.saveGoogleLawyerFresher(fresher);
+            } else if (existingUser instanceof LawyerExperiencedProfile experienced && experienced.getEmail() == null) {
+                experienced.setEmail(email);
+                existingUser = lawyerExperiencedService.saveGoogleLawyerExperienced(experienced);
             }
-
             Map<String, Object> result = new HashMap<>();
             result.put("role", existingRole);
             result.put("user", existingUser);
             result.put("isNewUser", false);
+            result.put("profileImageUrl", payload.get("picture"));
             return result;
         }
 
         // New User -> Create profile matching targetRole (default: CLIENT)
-        String finalRole = (targetRole != null && !targetRole.isBlank()) ? targetRole.toUpperCase() : "CLIENT";
+        String finalRole = requestedRole.isEmpty() ? "CLIENT" : requestedRole;
         Object newUserProfile;
 
         if ("LAWYER_FRESHER".equals(finalRole)) {
             LawyerFresherProfile profile = LawyerFresherProfile.builder()
                     .name(name)
-                    .emailOrPhone(email)
+                    .email(email)
+                    .phone(null)
                     .passwordHash(null)
                     .provider(com.askvocate.backend.entity.AuthProvider.GOOGLE)
                     .createdAt(java.time.Instant.now().toString())
@@ -106,7 +137,8 @@ public class AuthService {
         } else if ("LAWYER_EXPERIENCED".equals(finalRole)) {
             LawyerExperiencedProfile profile = LawyerExperiencedProfile.builder()
                     .name(name)
-                    .emailOrPhone(email)
+                    .email(email)
+                    .phone(null)
                     .passwordHash(null)
                     .provider(com.askvocate.backend.entity.AuthProvider.GOOGLE)
                     .createdAt(java.time.Instant.now().toString())
@@ -115,7 +147,8 @@ public class AuthService {
         } else {
             ClientProfile profile = ClientProfile.builder()
                     .name(name)
-                    .emailOrPhone(email)
+                    .email(email)
+                    .phone(null)
                     .passwordHash(null)
                     .provider(com.askvocate.backend.entity.AuthProvider.GOOGLE)
                     .createdAt(java.time.Instant.now().toString())
@@ -128,6 +161,7 @@ public class AuthService {
         result.put("role", finalRole);
         result.put("user", newUserProfile);
         result.put("isNewUser", true);
+        result.put("profileImageUrl", payload.get("picture"));
         return result;
     }
 
@@ -156,13 +190,17 @@ public class AuthService {
      * Returns user profile + role if credentials match.
      */
     public Map<String, Object> login(LoginRequest dto) {
-        String input = dto.getEmailOrPhone();
+        String input = dto.getEmail().trim().toLowerCase();
         String password = dto.getPassword();
 
         // 1. Check Client
-        Optional<ClientProfile> clientOpt = clientService.findByEmailOrPhone(input);
+        Optional<ClientProfile> clientOpt = clientService.findByEmail(input);
         if (clientOpt.isPresent()) {
             ClientProfile client = clientOpt.get();
+            if (client.getEmail() == null) {
+                client.setEmail(input);
+                clientService.saveGoogleClient(client);
+            }
             if (client.getProvider() == com.askvocate.backend.entity.AuthProvider.GOOGLE) {
                 // Federated account — no local password to check
                 throw new IllegalArgumentException("This account uses Google Sign-In. Tap 'Sign in with Google' instead.");
@@ -176,9 +214,13 @@ public class AuthService {
         }
 
         // 2. Check Lawyer Fresher
-        Optional<LawyerFresherProfile> fresherOpt = lawyerFresherService.findByEmailOrPhone(input);
+        Optional<LawyerFresherProfile> fresherOpt = lawyerFresherService.findByEmail(input);
         if (fresherOpt.isPresent()) {
             LawyerFresherProfile fresher = fresherOpt.get();
+            if (fresher.getEmail() == null) {
+                fresher.setEmail(input);
+                lawyerFresherService.saveGoogleLawyerFresher(fresher);
+            }
             if (fresher.getProvider() == com.askvocate.backend.entity.AuthProvider.GOOGLE) {
                 throw new IllegalArgumentException("This account uses Google Sign-In. Tap 'Sign in with Google' instead.");
             }
@@ -191,9 +233,13 @@ public class AuthService {
         }
 
         // 3. Check Lawyer Experienced
-        Optional<LawyerExperiencedProfile> expOpt = lawyerExperiencedService.findByEmailOrPhone(input);
+        Optional<LawyerExperiencedProfile> expOpt = lawyerExperiencedService.findByEmail(input);
         if (expOpt.isPresent()) {
             LawyerExperiencedProfile exp = expOpt.get();
+            if (exp.getEmail() == null) {
+                exp.setEmail(input);
+                lawyerExperiencedService.saveGoogleLawyerExperienced(exp);
+            }
             if (exp.getProvider() == com.askvocate.backend.entity.AuthProvider.GOOGLE) {
                 throw new IllegalArgumentException("This account uses Google Sign-In. Tap 'Sign in with Google' instead.");
             }

@@ -7,8 +7,11 @@ import android.view.ViewGroup
 import androidx.fragment.app.Fragment
 import androidx.navigation.NavOptions
 import androidx.navigation.fragment.findNavController
+import androidx.lifecycle.lifecycleScope
 import com.example.askvocate.R
+import com.example.askvocate.network.GoogleAuthHelper
 import com.example.askvocate.util.SessionManager
+import kotlinx.coroutines.launch
 
 class SettingsFragment : Fragment() {
 
@@ -25,6 +28,10 @@ class SettingsFragment : Fragment() {
 
         view.findViewById<View>(R.id.btn_logout).setOnClickListener {
             SessionManager.setLoggedIn(requireContext(), false)
+
+            viewLifecycleOwner.lifecycleScope.launch {
+                GoogleAuthHelper.clearCredentialState(requireContext())
+            }
 
             val options = NavOptions.Builder()
                 .setPopUpTo(R.id.nav_home, inclusive = true)

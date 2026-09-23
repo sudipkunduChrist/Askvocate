@@ -28,13 +28,14 @@ public class LawyerExperiencedService {
         if (!dto.getPassword().equals(dto.getConfirmPassword())) {
             throw new IllegalArgumentException("Passwords do not match");
         }
-        if (lawyerExperiencedProfileRepository.existsByEmailOrPhone(dto.getEmailOrPhone())) {
+        if (lawyerExperiencedProfileRepository.existsByEmail(dto.getEmail())) {
             throw new IllegalArgumentException("Account already exists with this email or phone");
         }
 
         LawyerExperiencedProfile profile = LawyerExperiencedProfile.builder()
                 .name(dto.getName())
-                .emailOrPhone(dto.getEmailOrPhone())
+                .email(dto.getEmail().trim().toLowerCase())
+                .phone(null)
                 .passwordHash(passwordEncoder.encode(dto.getPassword()))
                 .provider(dto.getProvider() != null ? dto.getProvider() : com.askvocate.backend.entity.AuthProvider.LOCAL)
                 .university(dto.getUniversity() != null ? dto.getUniversity() : "")
@@ -50,8 +51,8 @@ public class LawyerExperiencedService {
     }
 
     /** Fetch an experienced lawyer by their email or phone number. */
-    public Optional<LawyerExperiencedProfile> findByEmailOrPhone(String emailOrPhone) {
-        return lawyerExperiencedProfileRepository.findByEmailOrPhone(emailOrPhone);
+    public Optional<LawyerExperiencedProfile> findByEmail(String email) {
+        return lawyerExperiencedProfileRepository.findByEmail(email);
     }
 
     /** Fetch an experienced lawyer by their MongoDB ID. */
@@ -90,6 +91,27 @@ public class LawyerExperiencedService {
 
     /** Saves an experienced lawyer created via Google Sign-In (no local password). */
     public LawyerExperiencedProfile saveGoogleLawyerExperienced(LawyerExperiencedProfile profile) {
+        return lawyerExperiencedProfileRepository.save(profile);
+    }
+
+    /**
+     * Updates an existing experienced lawyer profile.
+     */
+    public LawyerExperiencedProfile updateLawyerExperiencedProfile(String id, com.askvocate.backend.dto.ProfileUpdateRequest dto) {
+        LawyerExperiencedProfile profile = lawyerExperiencedProfileRepository.findById(id)
+                .orElseThrow(() -> new IllegalArgumentException("Lawyer not found"));
+
+        if (dto.getName() != null) profile.setName(dto.getName());
+        if (dto.getEmail() != null) profile.setEmail(dto.getEmail());
+        if (dto.getPhone() != null) profile.setPhone(dto.getPhone());
+        if (dto.getAddress() != null) profile.setAddress(dto.getAddress());
+        if (dto.getSpecialization() != null) profile.setSpecialization(dto.getSpecialization());
+        if (dto.getUniversity() != null) profile.setUniversity(dto.getUniversity());
+        if (dto.getGraduationYear() != null) profile.setGraduationYear(dto.getGraduationYear());
+        if (dto.getBarCouncilId() != null) profile.setBarCouncilId(dto.getBarCouncilId());
+        if (dto.getPracticeAreas() != null) profile.setPracticeAreas(dto.getPracticeAreas());
+        if (dto.getCurrentFirm() != null) profile.setCurrentFirm(dto.getCurrentFirm());
+
         return lawyerExperiencedProfileRepository.save(profile);
     }
 }

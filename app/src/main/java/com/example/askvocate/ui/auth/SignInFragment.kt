@@ -119,7 +119,7 @@ class SignInFragment : Fragment() {
         }
     }
 
-    private fun login(emailOrPhone: String, password: String, onResult: (Boolean) -> Unit) {
+    private fun login(email: String, password: String, onResult: (Boolean) -> Unit) {
         CoroutineScope(Dispatchers.IO).launch {
             try {
                 val url = URL("$BASE_URL/api/users/login")
@@ -131,7 +131,7 @@ class SignInFragment : Fragment() {
                 conn.readTimeout = 10_000
 
                 val body = JSONObject().apply {
-                    put("emailOrPhone", emailOrPhone)
+                    put("email", email)
                     put("password", password)
                 }.toString()
 
@@ -154,7 +154,7 @@ class SignInFragment : Fragment() {
                                 context = requireContext(),
                                 userId = userObj.optString("id", ""),
                                 name = userObj.optString("name", "User"),
-                                emailOrPhone = userObj.optString("emailOrPhone", ""),
+                                emailOrPhone = userObj.optString("email", ""),
                                 role = json.optString("role", "")
                             )
                         }

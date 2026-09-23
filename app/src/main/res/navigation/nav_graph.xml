@@ -222,7 +222,42 @@
         android:id="@+id/nav_client_profile"
         android:name="com.example.askvocate.ui.clientprofile.ClientProfileFragment"
         android:label="@string/nav_profile"
-        tools:layout="@layout/fragment_client_profile" />
+        tools:layout="@layout/fragment_client_profile">
+        <action
+            android:id="@+id/action_client_profile_to_personal_info"
+            app:destination="@id/nav_personal_info"
+            app:enterAnim="@anim/slide_in_right"
+            app:exitAnim="@anim/slide_out_left"
+            app:popEnterAnim="@anim/slide_in_left"
+            app:popExitAnim="@anim/slide_out_right" />
+        <action
+            android:id="@+id/action_client_profile_to_saved_advocates"
+            app:destination="@id/nav_saved_advocates"
+            app:enterAnim="@anim/slide_in_right"
+            app:exitAnim="@anim/slide_out_left"
+            app:popEnterAnim="@anim/slide_in_left"
+            app:popExitAnim="@anim/slide_out_right" />
+    </fragment>
+
+    <fragment
+        android:id="@+id/nav_saved_advocates"
+        android:name="com.example.askvocate.ui.savedadvocates.SavedAdvocatesFragment"
+        android:label="@string/saved_advocates_title"
+        tools:layout="@layout/fragment_saved_advocates">
+        <action
+            android:id="@+id/action_saved_advocates_to_lawyer_profile"
+            app:destination="@id/nav_lawyer_profile"
+            app:enterAnim="@anim/slide_in_right"
+            app:exitAnim="@anim/slide_out_left"
+            app:popEnterAnim="@anim/slide_in_left"
+            app:popExitAnim="@anim/slide_out_right" />
+    </fragment>
+
+    <fragment
+        android:id="@+id/nav_personal_info"
+        android:name="com.example.askvocate.ui.personalinfo.PersonalInfoFragment"
+        android:label="Personal Information"
+        tools:layout="@layout/fragment_personal_info" />
 
     <fragment
         android:id="@+id/nav_map"

@@ -104,6 +104,7 @@
 
                 <!-- Center slot (floating ask button lives here) -->
                 <LinearLayout
+                    android:id="@+id/center_nav_slot"
                     android:layout_width="0dp"
                     android:layout_height="match_parent"
                     android:layout_weight="1"

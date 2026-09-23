@@ -39,5 +39,9 @@ object ApiConfig {
     // ═══════════════════════════════════════════════════════════════
     const val BASE_URL = "http://localhost:8080"
 
+    // USB device: adb reverse tcp:8000 tcp:8000
+    // Android emulator: use http://10.0.2.2:8000 instead.
+    const val AI_BASE_URL = "http://localhost:8000"
+
 //    const val BASE_URL = "http://10.0.2.2:8080" --> uncomment this and comment other urls if on emulator
 }

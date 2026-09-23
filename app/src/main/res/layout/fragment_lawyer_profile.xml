@@ -4,7 +4,7 @@
     xmlns:tools="http://schemas.android.com/tools"
     android:layout_width="match_parent"
     android:layout_height="match_parent"
-    android:background="@color/background_cream">
+    android:background="@color/white">
 
     <com.google.android.material.appbar.AppBarLayout
         android:id="@+id/appbar"
@@ -91,6 +91,27 @@
             android:layout_height="wrap_content"
             android:orientation="vertical"
             android:padding="@dimen/spacing_lg">
+
+            <ProgressBar
+                android:id="@+id/progress_profile"
+                android:layout_width="36dp"
+                android:layout_height="36dp"
+                android:layout_gravity="center_horizontal"
+                android:layout_marginBottom="@dimen/spacing_lg"
+                android:indeterminateTint="@color/amber_accent"
+                android:visibility="gone" />
+
+            <TextView
+                android:id="@+id/tv_profile_error"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginBottom="@dimen/spacing_lg"
+                android:background="@drawable/bg_ai_trust_strip"
+                android:padding="@dimen/spacing_md"
+                android:textColor="@color/error_red"
+                android:visibility="gone"
+                tools:text="Unable to load advocate details"
+                tools:visibility="visible" />
 
             <!-- Stats Row -->
             <LinearLayout
@@ -194,8 +215,40 @@
                 android:textColor="@color/text_secondary"
                 tools:text="Anjali Sharma is a senior corporate lawyer with over 10 years of experience helping startups and enterprises..." />
 
+            <TextView
+                android:id="@+id/tv_dataset_details_title"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginBottom="@dimen/spacing_sm"
+                android:text="Professional details"
+                android:textAppearance="@style/TextAppearance.Askvocate.Title"
+                android:visibility="gone" />
+
+            <com.google.android.material.card.MaterialCardView
+                android:id="@+id/card_dataset_details"
+                style="@style/Widget.Askvocate.Card"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginBottom="@dimen/spacing_xl"
+                android:visibility="gone"
+                app:cardBackgroundColor="@color/white"
+                app:cardCornerRadius="@dimen/radius_lg"
+                app:cardElevation="1dp"
+                app:strokeColor="@color/divider"
+                app:strokeWidth="1dp">
+
+                <LinearLayout
+                    android:id="@+id/dataset_details_container"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:orientation="vertical"
+                    android:paddingHorizontal="@dimen/spacing_lg"
+                    android:paddingVertical="@dimen/spacing_sm" />
+            </com.google.android.material.card.MaterialCardView>
+
             <!-- Reviews Section -->
             <TextView
+                android:id="@+id/tv_reviews_title"
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
                 android:layout_marginBottom="@dimen/spacing_sm"

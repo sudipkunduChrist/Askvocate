@@ -42,9 +42,9 @@ public class UserController {
 
     @PostMapping("/login")
     public ResponseEntity<?> login(@Valid @RequestBody com.askvocate.backend.dto.LoginRequest dto) {
-        log.info("--> Endpoint Hit: POST /api/users/login | Identifier: {}", dto.getEmailOrPhone());
+        log.info("--> Endpoint Hit: POST /api/users/login | Email: {}", dto.getEmail());
         var data = authService.login(dto);
-        log.info("<-- Login Successful | Identifier: {} | Role: {}", dto.getEmailOrPhone(), data.get("role"));
+        log.info("<-- Login Successful | Email: {} | Role: {}", dto.getEmail(), data.get("role"));
         return ResponseEntity.ok(Map.of(
                 "success", true,
                 "message", "Login successful",
@@ -67,13 +67,14 @@ public class UserController {
             var data = authService.loginWithGoogle(dto.getIdToken(), dto.getTargetRole());
             log.info("<-- Google auth successful | Role: {} | isNewUser: {}",
                     data.get("role"), data.get("isNewUser"));
-            return ResponseEntity.ok(Map.of(
-                    "success", true,
-                    "message", data.get("isNewUser").equals(true)
-                            ? "Account created with Google" : "Login successful",
-                    "role", data.get("role"),
-                    "user", data.get("user")
-            ));
+            Map<String, Object> response = new java.util.HashMap<>();
+            response.put("success", true);
+            response.put("message", data.get("isNewUser").equals(true)
+                    ? "Account created with Google" : "Login successful");
+            response.put("role", data.get("role"));
+            response.put("user", data.get("user"));
+            response.put("profileImageUrl", data.get("profileImageUrl"));
+            return ResponseEntity.ok(response);
         } catch (IllegalArgumentException e) {
             log.warn("<-- Google auth rejected: {}", e.getMessage());
             return ResponseEntity.status(HttpStatus.UNAUTHORIZED).body(Map.of(
@@ -93,9 +94,9 @@ public class UserController {
 
     @PostMapping("/register/client")
     public ResponseEntity<?> registerClient(@Valid @RequestBody ClientSignUp dto) {
-        log.info("--> Endpoint Hit: POST /api/users/register/client | Email: {}", dto.getEmailOrPhone());
+        log.info("--> Endpoint Hit: POST /api/users/register/client | Email: {}", dto.getEmail());
         var profile = clientService.register(dto);
-        log.info("<-- Client Successfully Stored in MongoDB | ID: {} | Email: {}", profile.getId(), profile.getEmailOrPhone());
+        log.info("<-- Client Successfully Stored in MongoDB | ID: {} | Email: {}", profile.getId(), profile.getEmail());
         return ResponseEntity.ok(Map.of(
                 "success", true,
                 "message", "Client registered successfully",
@@ -105,9 +106,9 @@ public class UserController {
 
     @PostMapping("/register/lawyer/fresher")
     public ResponseEntity<?> registerLawyerFresher(@Valid @RequestBody LawyerFresherSignup dto) {
-        log.info("--> Endpoint Hit: POST /api/users/register/lawyer/fresher | Email: {}", dto.getEmailOrPhone());
+        log.info("--> Endpoint Hit: POST /api/users/register/lawyer/fresher | Email: {}", dto.getEmail());
         var profile = lawyerFresherService.register(dto);
-        log.info("<-- Lawyer Fresher Successfully Stored in MongoDB | ID: {} | Email: {}", profile.getId(), profile.getEmailOrPhone());
+        log.info("<-- Lawyer Fresher Successfully Stored in MongoDB | ID: {} | Email: {}", profile.getId(), profile.getEmail());
         return ResponseEntity.ok(Map.of(
                 "success", true,
                 "message", "Fresher lawyer registered successfully.",
@@ -117,9 +118,9 @@ public class UserController {
 
     @PostMapping("/register/lawyer/experienced")
     public ResponseEntity<?> registerLawyerExperienced(@Valid @RequestBody LawyerExperiencedSignup dto) {
-        log.info("--> Endpoint Hit: POST /api/users/register/lawyer/experienced | Email: {}", dto.getEmailOrPhone());
+        log.info("--> Endpoint Hit: POST /api/users/register/lawyer/experienced | Email: {}", dto.getEmail());
         var profile = lawyerExperiencedService.register(dto);
-        log.info("<-- Lawyer Experienced Successfully Stored in MongoDB | ID: {} | Email: {}", profile.getId(), profile.getEmailOrPhone());
+        log.info("<-- Lawyer Experienced Successfully Stored in MongoDB | ID: {} | Email: {}", profile.getId(), profile.getEmail());
         return ResponseEntity.ok(Map.of(
                 "success", true,
                 "message", "Experienced lawyer registered successfully.",
@@ -143,6 +144,17 @@ public class UserController {
                 )));
     }
 
+    /** PUT /api/users/client/{id} */
+    @PutMapping("/client/{id}")
+    public ResponseEntity<?> updateClientProfile(@PathVariable String id, @RequestBody com.askvocate.backend.dto.ProfileUpdateRequest dto) {
+        try {
+            var profile = clientService.updateClientProfile(id, dto);
+            return ResponseEntity.ok(Map.of("success", true, "message", "Profile updated successfully", "user", profile));
+        } catch (IllegalArgumentException e) {
+            return ResponseEntity.status(HttpStatus.NOT_FOUND).body(Map.of("success", false, "error", e.getMessage()));
+        }
+    }
+
     /** GET /api/users/lawyer/fresher/{id} */
     @GetMapping("/lawyer/fresher/{id}")
     public ResponseEntity<?> getLawyerFresherById(@PathVariable String id) {
@@ -157,6 +169,17 @@ public class UserController {
                 )));
     }
 
+    /** PUT /api/users/lawyer/fresher/{id} */
+    @PutMapping("/lawyer/fresher/{id}")
+    public ResponseEntity<?> updateLawyerFresherProfile(@PathVariable String id, @RequestBody com.askvocate.backend.dto.ProfileUpdateRequest dto) {
+        try {
+            var profile = lawyerFresherService.updateLawyerFresherProfile(id, dto);
+            return ResponseEntity.ok(Map.of("success", true, "message", "Profile updated successfully", "user", profile));
+        } catch (IllegalArgumentException e) {
+            return ResponseEntity.status(HttpStatus.NOT_FOUND).body(Map.of("success", false, "error", e.getMessage()));
+        }
+    }
+
     /** GET /api/users/lawyer/experienced/{id} */
     @GetMapping("/lawyer/experienced/{id}")
     public ResponseEntity<?> getLawyerExperiencedById(@PathVariable String id) {
@@ -169,5 +192,15 @@ public class UserController {
                         "success", false,
                         "error", "Experienced lawyer not found"
                 )));
+    }
+    /** PUT /api/users/lawyer/experienced/{id} */
+    @PutMapping("/lawyer/experienced/{id}")
+    public ResponseEntity<?> updateLawyerExperiencedProfile(@PathVariable String id, @RequestBody com.askvocate.backend.dto.ProfileUpdateRequest dto) {
+        try {
+            var profile = lawyerExperiencedService.updateLawyerExperiencedProfile(id, dto);
+            return ResponseEntity.ok(Map.of("success", true, "message", "Profile updated successfully", "user", profile));
+        } catch (IllegalArgumentException e) {
+            return ResponseEntity.status(HttpStatus.NOT_FOUND).body(Map.of("success", false, "error", e.getMessage()));
+        }
     }
 }

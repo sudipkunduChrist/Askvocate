@@ -10,9 +10,9 @@ import java.util.Optional;
 @Repository
 public interface LawyerFresherProfileRepository extends MongoRepository<LawyerFresherProfile, String> {
 
-    @Query("{ 'emailOrPhone': ?0 }")
-    Optional<LawyerFresherProfile> findByEmailOrPhone(String emailOrPhone);
+    @Query("{ '$or': [ { 'email': ?0 }, { 'emailOrPhone': ?0 } ] }")
+    Optional<LawyerFresherProfile> findByEmail(String email);
 
-    @Query(value = "{ 'emailOrPhone': ?0 }", exists = true)
-    boolean existsByEmailOrPhone(String emailOrPhone);
+    @Query(value = "{ '$or': [ { 'email': ?0 }, { 'emailOrPhone': ?0 } ] }", exists = true)
+    boolean existsByEmail(String email);
 }

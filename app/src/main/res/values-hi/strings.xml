@@ -1,0 +1,31 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <!-- App Name -->
+    <string name="app_name">Askvocate</string>
+
+    <!-- Navigation -->
+    <string name="nav_home">होम</string>
+    <string name="nav_find_lawyers">वकील खोजें</string>
+    <string name="nav_chat">चैट</string>
+    <string name="nav_profile">प्रोफाइल</string>
+    <string name="nav_map">नक्शा</string>
+    <string name="nav_appointments">मेरे अपॉइंटमेंट</string>
+    <string name="nav_settings">सेटिंग्स</string>
+    <string name="nav_logout">लॉग आउट</string>
+
+    <!-- Client Profile Dashboard -->
+    <string name="my_account">मेरा खाता</string>
+    <string name="client_account">क्लाइंट खाता</string>
+    <string name="personal_info">व्यक्तिगत जानकारी</string>
+    <string name="language">भाषा</string>
+    <string name="account_and_preferences">खाता और प्राथमिकताएं</string>
+    <string name="notifications">सूचनाएं</string>
+    <string name="appearance">दिखावट</string>
+
+    <!-- Personal Info -->
+    <string name="full_name">पूरा नाम</string>
+    <string name="email">ईमेल</string>
+    <string name="phone">फ़ोन</string>
+    <string name="address">पता</string>
+    <string name="save">सहेजें</string>
+</resources>

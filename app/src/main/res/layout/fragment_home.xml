@@ -4,13 +4,13 @@
     xmlns:tools="http://schemas.android.com/tools"
     android:layout_width="match_parent"
     android:layout_height="match_parent"
-    android:background="@color/background_cream">
+    android:background="@color/white">
 
     <com.google.android.material.appbar.AppBarLayout
         android:id="@+id/app_bar"
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
-        android:background="@color/background_cream"
+        android:background="@color/white"
         android:fitsSystemWindows="true"
         app:elevation="0dp">
 
@@ -18,24 +18,16 @@
             android:id="@+id/toolbar"
             android:layout_width="match_parent"
             android:layout_height="?attr/actionBarSize"
+            android:background="@color/white"
             app:contentInsetStart="0dp"
-            app:layout_scrollFlags="scroll|enterAlways|snap">
+            app:layout_scrollFlags="scroll|enterAlways|snap"
+            app:navigationIcon="@drawable/ic_menu"
+            app:navigationIconTint="@color/navy_primary">
 
             <androidx.constraintlayout.widget.ConstraintLayout
                 android:layout_width="match_parent"
                 android:layout_height="match_parent"
                 android:paddingHorizontal="@dimen/spacing_lg">
-
-                <ImageView
-                    android:id="@+id/iv_logo"
-                    android:layout_width="100dp"
-                    android:layout_height="50dp"
-                    android:contentDescription="@string/app_name"
-                    android:scaleType="fitCenter"
-                    android:src="@drawable/app_logo"
-                    app:layout_constraintBottom_toBottomOf="parent"
-                    app:layout_constraintStart_toStartOf="parent"
-                    app:layout_constraintTop_toTopOf="parent" />
 
                 <FrameLayout
                     android:id="@+id/btn_notifications"
@@ -137,18 +129,6 @@
                         app:layout_constraintStart_toStartOf="parent"
                         app:layout_constraintTop_toBottomOf="@id/tv_hero_subtitle" />
 
-                    <com.google.android.material.button.MaterialButton
-                        android:id="@+id/btn_ask_ai_hero"
-                        style="@style/Widget.Askvocate.Button.Text"
-                        android:layout_width="wrap_content"
-                        android:layout_height="wrap_content"
-                        android:layout_marginStart="@dimen/spacing_md"
-                        android:text="@string/ask_ai"
-                        android:textColor="@color/white"
-                        app:layout_constraintBottom_toBottomOf="@id/btn_find_lawyer_hero"
-                        app:layout_constraintStart_toEndOf="@id/btn_find_lawyer_hero"
-                        app:layout_constraintTop_toTopOf="@id/btn_find_lawyer_hero" />
-
                 </androidx.constraintlayout.widget.ConstraintLayout>
             </com.google.android.material.card.MaterialCardView>
 
@@ -201,11 +181,12 @@
 
             <!-- Quick Actions -->
             <GridLayout
+                android:id="@+id/quick_actions_grid"
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
                 android:layout_marginHorizontal="@dimen/spacing_lg"
                 android:layout_marginBottom="@dimen/spacing_xxl"
-                android:columnCount="4">
+                android:columnCount="3">
 
                 <!-- Action 1: Advocates -->
                 <LinearLayout
@@ -232,35 +213,6 @@
                         android:layout_height="wrap_content"
                         android:layout_marginTop="@dimen/spacing_xs"
                         android:text="@string/action_advocates"
-                        android:textAppearance="@style/TextAppearance.Askvocate.Caption"
-                        android:textColor="@color/text_primary" />
-                </LinearLayout>
-
-                <!-- Action 2: AI Assistant -->
-                <LinearLayout
-                    android:id="@+id/action_ask_ai"
-                    android:layout_width="0dp"
-                    android:layout_height="90dp"
-                    android:layout_columnWeight="1"
-                    android:background="@drawable/bg_quick_action"
-                    android:clickable="true"
-                    android:focusable="true"
-                    android:gravity="center"
-                    android:orientation="vertical"
-                    android:padding="@dimen/spacing_md">
-
-                    <ImageView
-                        android:layout_width="32dp"
-                        android:layout_height="32dp"
-                        android:contentDescription="@null"
-                        android:src="@drawable/ic_psychology"
-                        app:tint="@color/navy_primary" />
-
-                    <TextView
-                        android:layout_width="wrap_content"
-                        android:layout_height="wrap_content"
-                        android:layout_marginTop="@dimen/spacing_xs"
-                        android:text="@string/ask_ai"
                         android:textAppearance="@style/TextAppearance.Askvocate.Caption"
                         android:textColor="@color/text_primary" />
                 </LinearLayout>
@@ -357,6 +309,7 @@
             </LinearLayout>
 
             <LinearLayout
+                android:id="@+id/legal_categories_header"
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
                 android:layout_marginHorizontal="@dimen/spacing_lg"
@@ -395,6 +348,7 @@
 
             <!-- Top Rated Lawyers -->
             <LinearLayout
+                android:id="@+id/top_lawyers_header"
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
                 android:layout_marginHorizontal="@dimen/spacing_lg"
@@ -430,83 +384,6 @@
                 android:paddingHorizontal="@dimen/spacing_lg"
                 app:layoutManager="androidx.recyclerview.widget.LinearLayoutManager"
                 tools:listitem="@layout/item_lawyer_horizontal" />
-
-            <!-- AI Legal Assistant Promo -->
-            <com.google.android.material.card.MaterialCardView
-                style="@style/Widget.Askvocate.Card"
-                android:layout_width="match_parent"
-                android:layout_height="wrap_content"
-                android:layout_marginHorizontal="@dimen/spacing_lg"
-                android:layout_marginBottom="@dimen/spacing_xl"
-                app:cardBackgroundColor="@color/transparent"
-                app:cardElevation="0dp">
-
-                <androidx.constraintlayout.widget.ConstraintLayout
-                    android:layout_width="match_parent"
-                    android:layout_height="wrap_content"
-                    android:background="@drawable/bg_ai_promo"
-                    android:padding="@dimen/spacing_xl">
-
-                    <ImageView
-                        android:id="@+id/iv_ai_icon"
-                        android:layout_width="48dp"
-                        android:layout_height="48dp"
-                        android:contentDescription="@null"
-                        android:src="@drawable/ic_psychology"
-                        app:layout_constraintStart_toStartOf="parent"
-                        app:layout_constraintTop_toTopOf="parent"
-                        app:tint="@color/white" />
-
-                    <TextView
-                        android:id="@+id/tv_ai_promo_title"
-                        android:layout_width="0dp"
-                        android:layout_height="wrap_content"
-                        android:layout_marginStart="@dimen/spacing_md"
-                        android:text="@string/have_legal_question"
-                        android:textAppearance="@style/TextAppearance.Askvocate.Title"
-                        android:textColor="@color/white"
-                        app:layout_constraintEnd_toEndOf="parent"
-                        app:layout_constraintStart_toEndOf="@id/iv_ai_icon"
-                        app:layout_constraintTop_toTopOf="@id/iv_ai_icon" />
-
-                    <TextView
-                        android:id="@+id/tv_ai_promo_desc"
-                        android:layout_width="0dp"
-                        android:layout_height="wrap_content"
-                        android:layout_marginTop="@dimen/spacing_xs"
-                        android:text="@string/ai_assistant_promo_desc"
-                        android:textAppearance="@style/TextAppearance.Askvocate.Caption"
-                        android:textColor="#E0E0E0"
-                        app:layout_constraintEnd_toEndOf="parent"
-                        app:layout_constraintStart_toStartOf="@id/tv_ai_promo_title"
-                        app:layout_constraintTop_toBottomOf="@id/tv_ai_promo_title" />
-
-                    <com.google.android.material.button.MaterialButton
-                        android:id="@+id/btn_start_ai_chat"
-                        style="@style/Widget.Askvocate.Button.Primary"
-                        android:layout_width="wrap_content"
-                        android:layout_height="wrap_content"
-                        android:layout_marginTop="@dimen/spacing_lg"
-                        android:text="@string/start_ai_chat"
-                        app:backgroundTint="@color/amber_accent"
-                        app:layout_constraintStart_toStartOf="@id/tv_ai_promo_title"
-                        app:layout_constraintTop_toBottomOf="@id/tv_ai_promo_desc" />
-
-                    <TextView
-                        android:layout_width="0dp"
-                        android:layout_height="wrap_content"
-                        android:layout_marginTop="@dimen/spacing_md"
-                        android:alpha="0.6"
-                        android:text="@string/ai_disclaimer"
-                        android:textAppearance="@style/TextAppearance.Askvocate.Caption"
-                        android:textColor="@color/white"
-                        android:textSize="11sp"
-                        app:layout_constraintEnd_toEndOf="parent"
-                        app:layout_constraintStart_toStartOf="parent"
-                        app:layout_constraintTop_toBottomOf="@id/btn_start_ai_chat" />
-
-                </androidx.constraintlayout.widget.ConstraintLayout>
-            </com.google.android.material.card.MaterialCardView>
 
             <!-- Legal Insights -->
             <TextView

@@ -23,12 +23,15 @@ import androidx.navigation.NavOptions
 import androidx.navigation.fragment.NavHostFragment
 import androidx.navigation.ui.setupWithNavController
 import com.google.android.material.navigation.NavigationView
+import androidx.lifecycle.lifecycleScope
+import kotlinx.coroutines.launch
 
 class MainActivity : AppCompatActivity() {
 
     private lateinit var navController: NavController
 
     private lateinit var drawerLayout: DrawerLayout
+    private var isCheckingSession = false
 
     override fun onCreate(savedInstanceState: Bundle?) {
         enableEdgeToEdge(
@@ -42,6 +45,7 @@ class MainActivity : AppCompatActivity() {
         val bottomNavContainer: View = findViewById(R.id.bottom_nav_container)
         val navView: NavigationView = findViewById(R.id.nav_view)
         val fabAsk: View = findViewById(R.id.fab_center_ask)
+        val centerNavSlot: View = findViewById(R.id.center_nav_slot)
 
         val navHostFragment = supportFragmentManager
             .findFragmentById(R.id.nav_host_fragment) as NavHostFragment
@@ -54,7 +58,7 @@ class MainActivity : AppCompatActivity() {
             insets
         }
 
-        // ---- Custom bottom tabs: Home | Cases | (ask) | Messages | Profile ----
+        // ---- Custom bottom tabs: Home | Cases | (ask center) | Messages | Profile ----
         val tabDestinations = mapOf(
             R.id.tab_home to R.id.nav_home,
             R.id.tab_cases to R.id.nav_appointments,
@@ -75,9 +79,11 @@ class MainActivity : AppCompatActivity() {
 
         // Drawer navigation.
         navView.setupWithNavController(navController)
+        drawerLayout.setDrawerLockMode(DrawerLayout.LOCK_MODE_LOCKED_CLOSED)
 
         // Show/hide chrome depending on the current screen.
         navController.addOnDestinationChangedListener { _, destination, _ ->
+            // Bottom navigation bar is accessible on all app pages, hiding only during full-screen auth/onboarding flows.
             val showBar = when (destination.id) {
                 R.id.nav_splash,
                 R.id.nav_role_selection,
@@ -85,27 +91,11 @@ class MainActivity : AppCompatActivity() {
                 R.id.nav_get_started,
                 R.id.nav_sign_in,
                 R.id.nav_sign_up,
-                R.id.nav_lawyer_sign_up,
-                R.id.nav_lawyer_profile,
-                R.id.nav_chat_detail,
-                R.id.nav_privacy_policy -> false
+                R.id.nav_lawyer_sign_up -> false
                 else -> true
-            }
-            val lockDrawer = when (destination.id) {
-                R.id.nav_splash,
-                R.id.nav_role_selection,
-                R.id.nav_onboarding,
-                R.id.nav_get_started,
-                R.id.nav_sign_in,
-                R.id.nav_sign_up,
-                R.id.nav_lawyer_sign_up,
-                R.id.nav_privacy_policy -> true
-                else -> false
             }
             val barWasShown = bottomNavContainer.visibility == View.VISIBLE
             if (showBar && !barWasShown) {
-                // Fade the bar in together with the destination's fragment so
-                // the nav bar and page content appear at the same time.
                 bottomNavContainer.visibility = View.VISIBLE
                 bottomNavContainer.alpha = 0f
                 bottomNavContainer.animate()
@@ -116,24 +106,51 @@ class MainActivity : AppCompatActivity() {
             } else if (!showBar) {
                 bottomNavContainer.visibility = View.GONE
             }
-            drawerLayout.setDrawerLockMode(
-                if (lockDrawer) DrawerLayout.LOCK_MODE_LOCKED_CLOSED else DrawerLayout.LOCK_MODE_UNLOCKED
-            )
+            drawerLayout.setDrawerLockMode(DrawerLayout.LOCK_MODE_LOCKED_CLOSED)
             updateTabStates(destination.id)
         }
     }
 
-    /** Opens the navigation drawer (used by the home screen's grid icon). */
+    override fun onStart() {
+        super.onStart()
+        if (!::navController.isInitialized || !com.example.askvocate.util.SessionManager.isLoggedIn(this)) return
+
+        val destination = navController.currentDestination?.id
+        val authDestinations = setOf(
+            R.id.nav_splash, R.id.nav_role_selection, R.id.nav_onboarding,
+            R.id.nav_get_started, R.id.nav_sign_in, R.id.nav_sign_up, R.id.nav_lawyer_sign_up
+        )
+        if (destination in authDestinations || isCheckingSession) return
+
+        isCheckingSession = true
+        lifecycleScope.launch {
+            val result = com.example.askvocate.util.SessionManager.validateWithServer(this@MainActivity)
+            isCheckingSession = false
+            if (result == com.example.askvocate.util.SessionManager.ValidationResult.INVALID) {
+                com.example.askvocate.util.SessionManager.setLoggedIn(this@MainActivity, false)
+                navController.navigate(
+                    R.id.nav_role_selection,
+                    null,
+                    NavOptions.Builder().setPopUpTo(R.id.nav_graph, true).build()
+                )
+            }
+        }
+    }
+
+    /** Opens the navigation drawer from the top-left hamburger icon. */
     fun openDrawer() {
-        drawerLayout.openDrawer(GravityCompat.START)
+        if (drawerLayout.isDrawerOpen(GravityCompat.START)) {
+            drawerLayout.closeDrawer(GravityCompat.START)
+        } else {
+            drawerLayout.openDrawer(GravityCompat.START)
+        }
     }
 
     private fun selectTab(destId: Int) {
         if (navController.currentDestination?.id == destId) return
         val options = NavOptions.Builder()
-            .setPopUpTo(R.id.nav_home, inclusive = false, saveState = true)
+            .setPopUpTo(R.id.nav_home, inclusive = (destId == R.id.nav_home), saveState = false)
             .setLaunchSingleTop(true)
-            .setRestoreState(true)
             .build()
         navController.navigate(destId, null, options)
     }
@@ -142,15 +159,19 @@ class MainActivity : AppCompatActivity() {
         val selectedColor = ContextCompat.getColor(this, R.color.home_blue)
         val unselectedColor = ContextCompat.getColor(this, R.color.text_tertiary)
 
+        val isProfileTabActive = currentDestId == R.id.nav_client_profile || currentDestId == R.id.nav_personal_info
+        val isHomeTabActive = currentDestId == R.id.nav_home
+        val isCasesTabActive = currentDestId == R.id.nav_appointments
+        val isMessagesTabActive = currentDestId == R.id.nav_chat_list
+
         val tabs = listOf(
-            Triple(R.id.icon_home, R.id.label_home, R.id.nav_home),
-            Triple(R.id.icon_cases, R.id.label_cases, R.id.nav_appointments),
-            Triple(R.id.icon_messages, R.id.label_messages, R.id.nav_chat_list),
-            Triple(R.id.icon_profile, R.id.label_profile, R.id.nav_client_profile)
+            Triple(R.id.icon_home, R.id.label_home, isHomeTabActive),
+            Triple(R.id.icon_cases, R.id.label_cases, isCasesTabActive),
+            Triple(R.id.icon_messages, R.id.label_messages, isMessagesTabActive),
+            Triple(R.id.icon_profile, R.id.label_profile, isProfileTabActive)
         )
 
-        tabs.forEach { (iconId, labelId, destId) ->
-            val selected = currentDestId == destId
+        tabs.forEach { (iconId, labelId, selected) ->
             val icon = findViewById<ImageView>(iconId)
             val label = findViewById<TextView>(labelId)
             icon.imageTintList = ColorStateList.valueOf(if (selected) selectedColor else unselectedColor)
@@ -164,7 +185,6 @@ class MainActivity : AppCompatActivity() {
         if (drawerLayout.isDrawerOpen(GravityCompat.START)) {
             drawerLayout.closeDrawer(GravityCompat.START)
         } else if (navController.currentDestination?.id == R.id.nav_home) {
-            // Home is the signed-in root (splash was already removed), so back exits the app.
             finish()
         } else {
             super.onBackPressed()

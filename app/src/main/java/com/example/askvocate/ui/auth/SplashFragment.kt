@@ -5,8 +5,6 @@ import android.animation.AnimatorSet
 import android.animation.ObjectAnimator
 import android.animation.ValueAnimator
 import android.os.Bundle
-import android.os.Handler
-import android.os.Looper
 import android.view.LayoutInflater
 import android.view.View
 import android.view.ViewGroup
@@ -17,6 +15,10 @@ import androidx.navigation.fragment.NavHostFragment
 import com.example.askvocate.R
 import com.example.askvocate.databinding.FragmentSplashBinding
 import com.example.askvocate.util.SessionManager
+import androidx.lifecycle.lifecycleScope
+import kotlinx.coroutines.async
+import kotlinx.coroutines.delay
+import kotlinx.coroutines.launch
 
 class SplashFragment : Fragment() {
 
@@ -39,13 +41,20 @@ class SplashFragment : Fragment() {
 
         startAnimations()
 
-        // 4 second delay to allow animations to play before navigating.
-        // The account is always signed in by default, so the app boots straight
-        // into Home unless the user logged out from the profile page.
-        Handler(Looper.getMainLooper()).postDelayed({
+        // Validate the cached identity against the database while the splash
+        // animation runs. A deleted database record immediately invalidates it.
+        viewLifecycleOwner.lifecycleScope.launch {
+            val validation = async { SessionManager.validateWithServer(requireContext()) }
+            delay(4000)
             if (isAdded && _binding != null) {
-                val navController = NavHostFragment.findNavController(this)
-                if (SessionManager.isLoggedIn(requireContext())) {
+                val navController = NavHostFragment.findNavController(this@SplashFragment)
+                val sessionResult = validation.await()
+                if (sessionResult == SessionManager.ValidationResult.INVALID) {
+                    SessionManager.setLoggedIn(requireContext(), false)
+                }
+
+                if (SessionManager.isLoggedIn(requireContext()) &&
+                    sessionResult != SessionManager.ValidationResult.INVALID) {
                     val options = NavOptions.Builder()
                         .setPopUpTo(R.id.nav_splash, inclusive = true)
                         .setEnterAnim(R.anim.fade_in)
@@ -56,7 +65,7 @@ class SplashFragment : Fragment() {
                     navController.navigate(R.id.action_splash_to_role_selection)
                 }
             }
-        }, 4000)
+        }
     }
 
     private fun startAnimations() {

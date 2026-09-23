@@ -11,6 +11,7 @@ import androidx.core.view.isVisible
 import androidx.fragment.app.Fragment
 import androidx.fragment.app.viewModels
 import androidx.navigation.fragment.findNavController
+import com.example.askvocate.MainActivity
 import com.example.askvocate.R
 import com.example.askvocate.databinding.FragmentHomeBinding
 import com.example.askvocate.ui.adapters.AppointmentAdapter
@@ -47,12 +48,33 @@ class HomeFragment : Fragment() {
         setupAppointments()
         setupKnowledgeHub()
         setupHeroSection()
+        configureRoleSpecificUi()
 
         observeViewModel()
     }
 
+    private fun configureRoleSpecificUi() {
+        val isClient = SessionManager.getUserRole(requireContext())
+            .equals("CLIENT", ignoreCase = true)
+
+        binding.btnFindLawyerHero.isVisible = isClient
+        binding.searchContainer.isVisible = isClient
+        binding.actionFindLawyer.isVisible = isClient
+        binding.legalCategoriesHeader.isVisible = isClient
+        binding.rvCategories.isVisible = isClient
+        binding.topLawyersHeader.isVisible = isClient
+        binding.rvTopLawyers.isVisible = isClient
+        binding.quickActionsGrid.columnCount = if (isClient) 3 else 2
+        if (!isClient) {
+            binding.tvHeroSubtitle.setText(R.string.lawyer_hero_subtitle)
+        }
+    }
+
     private fun setupToolbar() {
-        
+        binding.toolbar.setNavigationOnClickListener {
+            (requireActivity() as? MainActivity)?.openDrawer()
+        }
+
         binding.btnNotifications.setOnClickListener {
             // Navigate to notifications if available
             Toast.makeText(requireContext(), "Notifications coming soon!", Toast.LENGTH_SHORT).show()
@@ -71,10 +93,6 @@ class HomeFragment : Fragment() {
 
         binding.btnFindLawyerHero.setOnClickListener {
             findNavController().navigate(R.id.nav_find_lawyers)
-        }
-        binding.btnAskAiHero.setOnClickListener {
-            // Navigate to AI Assistant
-            findNavController().navigate(R.id.nav_chat_list)
         }
     }
 
@@ -100,9 +118,6 @@ class HomeFragment : Fragment() {
     private fun setupQuickActions() {
         binding.actionFindLawyer.setOnClickListener {
             findNavController().navigate(R.id.nav_find_lawyers)
-        }
-        binding.actionAskAi.setOnClickListener {
-            findNavController().navigate(R.id.nav_chat_list)
         }
         binding.actionAppointments.setOnClickListener {
             findNavController().navigate(R.id.nav_appointments)
