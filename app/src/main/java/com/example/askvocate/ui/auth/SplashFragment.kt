@@ -10,7 +10,6 @@ import android.view.View
 import android.view.ViewGroup
 import android.view.animation.DecelerateInterpolator
 import androidx.fragment.app.Fragment
-import androidx.navigation.NavOptions
 import androidx.navigation.fragment.NavHostFragment
 import com.example.askvocate.R
 import com.example.askvocate.databinding.FragmentSplashBinding
@@ -55,12 +54,7 @@ class SplashFragment : Fragment() {
 
                 if (SessionManager.isLoggedIn(requireContext()) &&
                     sessionResult != SessionManager.ValidationResult.INVALID) {
-                    val options = NavOptions.Builder()
-                        .setPopUpTo(R.id.nav_splash, inclusive = true)
-                        .setEnterAnim(R.anim.fade_in)
-                        .setExitAnim(R.anim.fade_out)
-                        .build()
-                    navController.navigate(R.id.nav_home, null, options)
+                    navController.navigate(R.id.action_splash_to_home)
                 } else {
                     navController.navigate(R.id.action_splash_to_role_selection)
                 }

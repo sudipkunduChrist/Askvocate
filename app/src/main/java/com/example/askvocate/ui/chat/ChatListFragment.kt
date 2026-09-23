@@ -13,6 +13,7 @@ import com.example.askvocate.MainActivity
 import com.example.askvocate.R
 import com.example.askvocate.ui.adapters.ChatListAdapter
 import com.example.askvocate.util.AnimationUtils
+import com.example.askvocate.util.applyStatusBarInset
 
 class ChatListFragment : Fragment() {
 
@@ -24,6 +25,8 @@ class ChatListFragment : Fragment() {
 
     override fun onViewCreated(view: View, savedInstanceState: Bundle?) {
         super.onViewCreated(view, savedInstanceState)
+
+        view.findViewById<View>(R.id.app_bar).applyStatusBarInset()
 
         val toolbar = view.findViewById<Toolbar>(R.id.toolbar)
         toolbar.setNavigationOnClickListener {

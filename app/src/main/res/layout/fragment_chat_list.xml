@@ -7,6 +7,7 @@
     android:background="@color/surface_white">
 
     <com.google.android.material.appbar.AppBarLayout
+        android:id="@+id/app_bar"
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
         android:background="@color/surface_white"
@@ -16,8 +17,6 @@
             android:id="@+id/toolbar"
             android:layout_width="match_parent"
             android:layout_height="?attr/actionBarSize"
-            android:fitsSystemWindows="true"
-            app:layout_scrollFlags="scroll|enterAlways|snap"
             app:navigationIcon="@drawable/ic_menu"
             app:navigationIconTint="@color/navy_primary"
             app:title="@string/messages"
@@ -43,7 +42,7 @@
         android:layout_height="match_parent"
         android:clipToPadding="false"
         android:fillViewport="true"
-        android:paddingBottom="96dp"
+        android:paddingBottom="0dp"
         app:layout_behavior="@string/appbar_scrolling_view_behavior">
 
         <LinearLayout
@@ -72,7 +71,9 @@
                     android:layout_height="wrap_content"
                     android:hint="@string/search_conversations"
                     android:inputType="text"
-                    android:paddingVertical="@dimen/spacing_md" />
+                    android:paddingVertical="@dimen/spacing_md"
+                    android:textColor="@color/text_primary"
+                    android:textColorHint="@color/text_tertiary" />
             </com.google.android.material.textfield.TextInputLayout>
 
             <androidx.recyclerview.widget.RecyclerView

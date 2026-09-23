@@ -11,6 +11,7 @@ import com.example.askvocate.MainActivity
 import com.example.askvocate.R
 import com.example.askvocate.data.model.dummyOngoingCases
 import com.example.askvocate.ui.adapters.OngoingCaseAdapter
+import com.example.askvocate.util.applyStatusBarInset
 
 class AppointmentsFragment : Fragment() {
 
@@ -24,6 +25,8 @@ class AppointmentsFragment : Fragment() {
 
     override fun onViewCreated(view: View, savedInstanceState: Bundle?) {
         super.onViewCreated(view, savedInstanceState)
+
+        view.findViewById<View>(R.id.app_bar).applyStatusBarInset()
 
         view.findViewById<Toolbar>(R.id.toolbar).setNavigationOnClickListener {
             (requireActivity() as? MainActivity)?.openDrawer()

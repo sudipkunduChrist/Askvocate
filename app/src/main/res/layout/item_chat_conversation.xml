@@ -15,6 +15,7 @@
         android:id="@+id/iv_avatar"
         android:layout_width="56dp"
         android:layout_height="56dp"
+        android:scaleType="centerCrop"
         tools:src="@drawable/ic_profile" />
 
     <LinearLayout

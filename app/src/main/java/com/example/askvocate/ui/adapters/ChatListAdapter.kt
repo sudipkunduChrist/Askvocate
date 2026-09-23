@@ -3,6 +3,7 @@ package com.example.askvocate.ui.adapters
 import android.view.LayoutInflater
 import android.view.View
 import android.view.ViewGroup
+import android.widget.ImageView
 import android.widget.TextView
 import androidx.recyclerview.widget.DiffUtil
 import androidx.recyclerview.widget.ListAdapter
@@ -24,12 +25,20 @@ class ChatListAdapter(
     }
 
     inner class ChatViewHolder(itemView: View) : RecyclerView.ViewHolder(itemView) {
+        private val ivAvatar: ImageView = itemView.findViewById(R.id.iv_avatar)
         private val tvName: TextView = itemView.findViewById(R.id.tv_name)
         private val tvLastMessage: TextView = itemView.findViewById(R.id.tv_last_message)
         private val tvTime: TextView = itemView.findViewById(R.id.tv_time)
         private val tvUnreadCount: TextView = itemView.findViewById(R.id.tv_unread_count)
 
         fun bind(chat: ChatConversation) {
+            val avatar = when {
+                chat.lawyerName.contains("Anjali", ignoreCase = true) -> R.drawable.pfp_female_1
+                chat.lawyerName.contains("Rajesh", ignoreCase = true) -> R.drawable.pfp_male_1
+                chat.lawyerName.contains("Priya", ignoreCase = true) -> R.drawable.pfp_female_2
+                else -> R.drawable.ic_profile
+            }
+            ivAvatar.setImageResource(avatar)
             tvName.text = chat.lawyerName
             tvLastMessage.text = chat.lastMessage
             tvTime.text = chat.timestamp

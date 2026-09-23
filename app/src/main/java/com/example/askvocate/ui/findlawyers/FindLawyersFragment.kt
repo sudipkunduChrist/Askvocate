@@ -11,10 +11,7 @@ import android.widget.LinearLayout
 import android.widget.TextView
 import androidx.appcompat.widget.Toolbar
 import androidx.core.content.getSystemService
-import androidx.core.view.ViewCompat
-import androidx.core.view.WindowInsetsCompat
 import androidx.core.view.isVisible
-import androidx.core.view.updatePadding
 import androidx.fragment.app.Fragment
 import androidx.fragment.app.viewModels
 import androidx.navigation.NavOptions
@@ -26,6 +23,7 @@ import com.example.askvocate.ui.adapters.LawyerAdapter
 import com.example.askvocate.util.AnimationUtils
 import com.example.askvocate.util.SessionManager
 import com.example.askvocate.util.ToastType
+import com.example.askvocate.util.applyStatusBarInset
 import com.example.askvocate.util.showCustomToast
 import com.google.android.material.button.MaterialButton
 import com.google.android.material.floatingactionbutton.FloatingActionButton
@@ -49,13 +47,7 @@ class FindLawyersFragment : Fragment() {
             return
         }
 
-        val appBar = view.findViewById<View>(R.id.find_lawyers_app_bar)
-        ViewCompat.setOnApplyWindowInsetsListener(appBar) { bar, insets ->
-            val statusBarTop = insets.getInsets(WindowInsetsCompat.Type.statusBars()).top
-            bar.updatePadding(top = statusBarTop)
-            insets
-        }
-        ViewCompat.requestApplyInsets(appBar)
+        view.findViewById<View>(R.id.find_lawyers_app_bar).applyStatusBarInset()
 
         view.findViewById<Toolbar>(R.id.toolbar).setNavigationOnClickListener {
             (requireActivity() as? MainActivity)?.openDrawer()

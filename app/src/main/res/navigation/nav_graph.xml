@@ -17,6 +17,13 @@
             app:exitAnim="@anim/fade_out"
             app:popUpTo="@id/nav_splash"
             app:popUpToInclusive="true" />
+        <action
+            android:id="@+id/action_splash_to_home"
+            app:destination="@id/nav_home"
+            app:enterAnim="@anim/splash_fade_in"
+            app:exitAnim="@anim/splash_fade_out"
+            app:popUpTo="@id/nav_splash"
+            app:popUpToInclusive="true" />
     </fragment>
 
     <fragment

@@ -156,7 +156,7 @@
     </style>
 
     <style name="ShapeAppearance.Askvocate.FAB" parent="ShapeAppearance.Material3.Corner.Full">
-        <item name="cornerSize">@dimen/radius_lg</item>
+        <item name="cornerSize">50%</item>
     </style>
 
     <!-- ==================== NAVIGATION VIEW ==================== -->

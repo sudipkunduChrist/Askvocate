@@ -47,6 +47,15 @@ class MainActivity : AppCompatActivity() {
         val fabAsk: View = findViewById(R.id.fab_center_ask)
         val centerNavSlot: View = findViewById(R.id.center_nav_slot)
 
+        fun updateRoleNavigation() {
+            val isClient = com.example.askvocate.util.SessionManager
+                .getUserRole(this)
+                .equals("CLIENT", ignoreCase = true)
+            fabAsk.visibility = if (isClient) View.VISIBLE else View.GONE
+            centerNavSlot.visibility = if (isClient) View.VISIBLE else View.GONE
+            navView.menu.findItem(R.id.nav_find_lawyers)?.isVisible = isClient
+        }
+
         val navHostFragment = supportFragmentManager
             .findFragmentById(R.id.nav_host_fragment) as NavHostFragment
         navController = navHostFragment.navController
@@ -83,6 +92,7 @@ class MainActivity : AppCompatActivity() {
 
         // Show/hide chrome depending on the current screen.
         navController.addOnDestinationChangedListener { _, destination, _ ->
+            updateRoleNavigation()
             // Bottom navigation bar is accessible on all app pages, hiding only during full-screen auth/onboarding flows.
             val showBar = when (destination.id) {
                 R.id.nav_splash,
@@ -100,7 +110,7 @@ class MainActivity : AppCompatActivity() {
                 bottomNavContainer.alpha = 0f
                 bottomNavContainer.animate()
                     .alpha(1f)
-                    .setDuration(300)
+                    .setDuration(600)
                     .setInterpolator(DecelerateInterpolator())
                     .start()
             } else if (!showBar) {
@@ -109,6 +119,7 @@ class MainActivity : AppCompatActivity() {
             drawerLayout.setDrawerLockMode(DrawerLayout.LOCK_MODE_LOCKED_CLOSED)
             updateTabStates(destination.id)
         }
+        updateRoleNavigation()
     }
 
     override fun onStart() {

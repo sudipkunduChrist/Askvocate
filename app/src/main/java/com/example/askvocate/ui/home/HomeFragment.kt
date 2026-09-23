@@ -66,6 +66,7 @@ class HomeFragment : Fragment() {
         binding.rvTopLawyers.isVisible = isClient
         binding.quickActionsGrid.columnCount = if (isClient) 3 else 2
         if (!isClient) {
+            binding.quickActionsGrid.removeView(binding.actionFindLawyer)
             binding.tvHeroSubtitle.setText(R.string.lawyer_hero_subtitle)
         }
     }
