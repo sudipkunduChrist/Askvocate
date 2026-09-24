@@ -27,6 +27,8 @@ import com.example.askvocate.util.applyStatusBarInset
 import com.example.askvocate.util.showCustomToast
 import com.google.android.material.button.MaterialButton
 import com.google.android.material.floatingactionbutton.FloatingActionButton
+import com.google.android.material.textfield.TextInputEditText
+import com.google.android.material.textfield.TextInputLayout
 
 class FindLawyersFragment : Fragment() {
 
@@ -60,6 +62,11 @@ class FindLawyersFragment : Fragment() {
         val submitIcon = view.findViewById<FloatingActionButton>(R.id.btn_submit_case)
         val submitButton = view.findViewById<MaterialButton>(R.id.btn_find_matching_lawyers)
         val loading = view.findViewById<LinearLayout>(R.id.loading_container)
+        val clarification = view.findViewById<View>(R.id.clarification_container)
+        val clarificationQuestion = view.findViewById<TextView>(R.id.tv_clarification_question)
+        val clarificationAnswerLayout = view.findViewById<TextInputLayout>(R.id.til_clarification_answer)
+        val clarificationAnswer = view.findViewById<TextInputEditText>(R.id.et_clarification_answer)
+        val clarificationSubmit = view.findViewById<MaterialButton>(R.id.btn_submit_clarification)
         val results = view.findViewById<LinearLayout>(R.id.results_container)
         val error = view.findViewById<TextView>(R.id.tv_error)
         val domain = view.findViewById<TextView>(R.id.tv_detected_domain)
@@ -82,6 +89,23 @@ class FindLawyersFragment : Fragment() {
 
         submitIcon.setOnClickListener { submit() }
         submitButton.setOnClickListener { submit() }
+        clarificationSubmit.setOnClickListener {
+            val answer = clarificationAnswer.text?.toString().orEmpty()
+            if (answer.trim().length < 2) {
+                clarificationAnswerLayout.error = "Please answer this question to continue"
+                return@setOnClickListener
+            }
+            clarificationAnswerLayout.error = null
+            requireContext().getSystemService<InputMethodManager>()
+                ?.hideSoftInputFromWindow(clarificationAnswer.windowToken, 0)
+            viewModel.submitClarification(answer)
+        }
+        clarificationAnswer.setOnEditorActionListener { _, actionId, _ ->
+            if (actionId == EditorInfo.IME_ACTION_SEND) {
+                clarificationSubmit.performClick()
+                true
+            } else false
+        }
         caseDescription.setOnEditorActionListener { _, actionId, _ ->
             if (actionId == EditorInfo.IME_ACTION_SEND) {
                 submit()
@@ -91,6 +115,7 @@ class FindLawyersFragment : Fragment() {
 
         viewModel.uiState.observe(viewLifecycleOwner) { state ->
             loading.isVisible = state is FindLawyersViewModel.UiState.Loading
+            clarification.isVisible = state is FindLawyersViewModel.UiState.Clarification
             results.isVisible = state is FindLawyersViewModel.UiState.Success
             error.isVisible = state is FindLawyersViewModel.UiState.Error
             val isLoading = state is FindLawyersViewModel.UiState.Loading
@@ -131,6 +156,12 @@ class FindLawyersFragment : Fragment() {
                 is FindLawyersViewModel.UiState.Error -> {
                     error.text = state.message
                     requireContext().showCustomToast(state.message, ToastType.ERROR)
+                }
+                is FindLawyersViewModel.UiState.Clarification -> {
+                    clarificationQuestion.text = state.question
+                    clarificationAnswerLayout.error = null
+                    clarificationAnswer.text?.clear()
+                    clarificationAnswer.requestFocus()
                 }
                 else -> Unit
             }

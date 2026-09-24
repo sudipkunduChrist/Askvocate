@@ -19,6 +19,7 @@ class FindLawyersViewModel : ViewModel() {
         data object Idle : UiState()
         data object Loading : UiState()
         data class Success(val detectedDomain: String, val lawyers: List<Lawyer>) : UiState()
+        data class Clarification(val question: String, val originalQuery: String) : UiState()
         data class Error(val message: String) : UiState()
     }
 
@@ -36,6 +37,29 @@ class FindLawyersViewModel : ViewModel() {
         viewModelScope.launch {
             _uiState.value = try {
                 withContext(Dispatchers.IO) { requestRecommendations(query) }
+            } catch (error: Exception) {
+                UiState.Error(formatUserFriendlyError(error.message ?: error.toString()))
+            }
+        }
+    }
+
+    fun submitClarification(answerText: String) {
+        val clarification = _uiState.value as? UiState.Clarification ?: return
+        val answer = answerText.trim()
+        if (answer.length < 2) {
+            _uiState.value = UiState.Error("Please answer the clarification question before continuing.")
+            return
+        }
+
+        val expandedQuery = buildString {
+            append(clarification.originalQuery)
+            append("\nClarification: ")
+            append(answer)
+        }
+        _uiState.value = UiState.Loading
+        viewModelScope.launch {
+            _uiState.value = try {
+                withContext(Dispatchers.IO) { requestRecommendations(expandedQuery) }
             } catch (error: Exception) {
                 UiState.Error(formatUserFriendlyError(error.message ?: error.toString()))
             }
@@ -71,7 +95,7 @@ class FindLawyersViewModel : ViewModel() {
         }
     }
 
-    private fun requestRecommendations(query: String): UiState.Success {
+    private fun requestRecommendations(query: String): UiState {
         val connection = (URL("${ApiConfig.AI_BASE_URL}/recommend").openConnection() as HttpURLConnection).apply {
             requestMethod = "POST"
             connectTimeout = 15_000
@@ -94,6 +118,13 @@ class FindLawyersViewModel : ViewModel() {
                 val detail = json?.optString("detail")?.takeIf { it.isNotBlank() }
                 val rawMessage = detail ?: "Matching failed (HTTP $statusCode)."
                 throw IllegalStateException(formatUserFriendlyError(rawMessage))
+            }
+
+            if (json?.optBoolean("needs_clarification", false) == true) {
+                val question = json.optString("clarification_question")
+                    .takeIf { it.isNotBlank() }
+                    ?: "Please add a little more context so we can identify the right legal issue."
+                return UiState.Clarification(question, query)
             }
 
             val recommendations = json?.optJSONArray("recommended_lawyers")

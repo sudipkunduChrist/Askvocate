@@ -1,0 +1,4 @@
+query_id,language,expected_status,expected_domain,query_text
+R001,English,matched,Banking & Finance,"the bank recovery agent seized my financed bike without prior notice after I missed an EMI"
+R002,English,matched,Criminal Law,"police seized and impounded my bike but did not give me a seizure memo"
+R003,English,needs_context,,"bike seized without prior consent"

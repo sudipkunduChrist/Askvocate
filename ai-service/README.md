@@ -1,6 +1,8 @@
 # Askvocate AI service
 
-The Android app calls this service directly at `POST /recommend`. The multilingual local model is the primary classifier. Low-confidence queries fall back to Gemini, then Groq; lawyer filtering and reranking always stay local.
+The Android app calls this service directly at `POST /recommend`. The multilingual local model is the primary classifier. Only high-confidence, well-separated local results are accepted directly. Other queries fall back to Gemini, then Groq; lawyer filtering and reranking always stay local.
+
+The LLM may return `needs_context` when a missing fact could change the legal domain, or `out_of_taxonomy` when no supported domain fits. In either case the API returns `needs_clarification: true`, a `clarification_question`, and no lawyer recommendations so the app does not save a misleading match.
 
 ## Required local assets
 

@@ -22,11 +22,12 @@ DOMAIN_CACHE = DATA_DIR / "domain_embeddings_v3.pkl"
 LAWYER_CACHE = DATA_DIR / "lawyer_embeddings.pkl"
 MODEL_NAME = "sentence-transformers/paraphrase-multilingual-MiniLM-L12-v2"
 CACHE_VERSION = 2
+LLM_CONFIDENCE_THRESHOLD = 0.65
 
 LANGUAGE_THRESHOLDS = {
-    "english": {"confidence": 0.55, "margin": 0.05},
-    "hinglish": {"confidence": 0.50, "margin": 0.05},
-    "hindi": {"confidence": 0.42, "margin": 0.03},
+    "english": {"confidence": 0.75, "margin": 0.10},
+    "hinglish": {"confidence": 0.70, "margin": 0.08},
+    "hindi": {"confidence": 0.62, "margin": 0.06},
 }
 
 DOMAIN_TAXONOMY = {
@@ -65,12 +66,12 @@ DOMAIN_HINTS = {
     "Employment & Labour": "job salary fired termination gratuity provident fund labour नौकरी वेतन",
     "Cybercrime & IT": "online fraud otp upi hacked phishing cyber crime ऑनलाइन फ्रॉड साइबर",
     "Divorce & Matrimonial": "divorce alimony dowry marriage spouse talaq तलाक दहेज",
-    "Criminal Law": "fir bail arrest assault violence police theft murder जमानत गिरफ्तारी पुलिस",
+    "Criminal Law": "fir bail arrest assault violence police theft murder vehicle impounded confiscated police seizure जमानत गिरफ्तारी पुलिस",
     "Family & Succession": "inheritance will probate partition ancestral family विरासत उत्तराधिकार",
     "Motor Accident Claims": "road car bike accident hit run compensation mact दुर्घटना मुआवजा",
     "Medical Negligence": "doctor hospital wrong treatment surgery negligence डॉक्टर अस्पताल",
-    "Consumer Protection": "defective product warranty refund consumer service complaint उपभोक्ता रिफंड",
-    "Banking & Finance": "bank loan cheque bounce debt sarfaesi account बैंक लोन चेक",
+    "Consumer Protection": "defective product warranty refund consumer service complaint unfair recovery practice unauthorized repossession उपभोक्ता रिफंड",
+    "Banking & Finance": "bank loan vehicle loan emi cheque bounce debt sarfaesi account hypothecation repossession recovery agent financier बैंक लोन चेक",
     "Tax & GST": "income tax gst assessment audit refund आयकर जीएसटी टैक्स",
 }
 
@@ -80,6 +81,28 @@ SPECIAL_ROUTES = {
     "मारपीट": "Criminal Law", "498a": "Criminal Law", "dowry": "Criminal Law",
     "दहेज": "Criminal Law", "stridhan": "Family & Succession", "स्त्रीधन": "Family & Succession",
 }
+
+
+def _is_ambiguous_vehicle_seizure(query: str) -> bool:
+    lowered = query.lower()
+    vehicle_terms = ("bike", "motorcycle", "scooter", "car", "vehicle", "गाड़ी", "बाइक")
+    seizure_terms = ("seiz", "reposses", "impound", "confiscat", "taken", "ले गए", "जब्त")
+    actor_terms = (
+        "police", "traffic police", "government", "authority", "bank", "lender", "finance",
+        "financier", "recovery agent", "repo agent", "private person", "friend", "relative",
+        "पुलिस", "बैंक", "फाइनेंस", "रिकवरी एजेंट",
+    )
+    return (
+        any(term in lowered for term in vehicle_terms)
+        and any(term in lowered for term in seizure_terms)
+        and not any(term in lowered for term in actor_terms)
+    )
+
+
+def _clarification_question(query: str) -> str:
+    if _is_ambiguous_vehicle_seizure(query):
+        return "Who seized the vehicle: the police, a bank or recovery agent, or another private person—and was it financed?"
+    return "Please add who acted, why it happened, and what outcome you want so we can identify the right legal domain."
 
 
 def _clean(value: Any, default: Any = None) -> Any:
@@ -245,13 +268,55 @@ class RecommendationEngine:
         local_intent = self._classify(normalized_query, query_vector)
         language_key = processed["detected_language"].lower()
         threshold = LANGUAGE_THRESHOLDS.get(language_key, LANGUAGE_THRESHOLDS["english"])
+        context_sensitive = _is_ambiguous_vehicle_seizure(normalized_query)
         local_confident = local_intent["source"] == "special_route" or (
             local_intent["confidence"] >= threshold["confidence"]
             and local_intent["margin"] >= threshold["margin"]
             and not local_intent["ambiguous"]
+            and not context_sensitive
         )
 
         llm_intent = None if local_confident else classify_with_llm(normalized_query, self.domains)
+        llm_status = llm_intent.get("status", "matched") if llm_intent else None
+        if (llm_intent and llm_status == "matched"
+                and float(llm_intent.get("confidence", 0.0)) < LLM_CONFIDENCE_THRESHOLD):
+            llm_status = "needs_context"
+        if llm_intent and llm_status != "matched":
+            return {
+                "query": query,
+                "detected_domain": "Needs clarification",
+                "confidence": round(float(llm_intent.get("confidence", 0.0)), 4),
+                "margin": local_intent["margin"],
+                "ambiguous": True,
+                "top3_domains": local_intent["top3_domains"],
+                "language": processed["detected_language"],
+                "intent_source": llm_intent["source"],
+                "route_used": llm_status,
+                "classification_reason": llm_intent.get("reason", ""),
+                "needs_clarification": True,
+                "clarification_question": llm_intent.get("clarification_question") or _clarification_question(query),
+                "threshold_used": threshold,
+                "recommended_lawyers": [],
+                "total_lawyers": 0,
+            }
+        if not llm_intent and not local_confident:
+            return {
+                "query": query,
+                "detected_domain": "Needs clarification",
+                "confidence": local_intent["confidence"],
+                "margin": local_intent["margin"],
+                "ambiguous": True,
+                "top3_domains": local_intent["top3_domains"],
+                "language": processed["detected_language"],
+                "intent_source": local_intent["source"],
+                "route_used": "local_unsure",
+                "classification_reason": "External classifiers were unavailable or could not confidently classify the query.",
+                "needs_clarification": True,
+                "clarification_question": _clarification_question(query),
+                "threshold_used": threshold,
+                "recommended_lawyers": [],
+                "total_lawyers": 0,
+            }
         if llm_intent:
             domain = llm_intent["primary_domain"]
             confidence = llm_intent["confidence"]
@@ -316,6 +381,7 @@ class RecommendationEngine:
             "route_used": route_used,
             "classification_reason": reason,
             "needs_clarification": route_used == "local_unsure",
+            "clarification_question": _clarification_question(query) if route_used == "local_unsure" else "",
             "threshold_used": threshold,
             "recommended_lawyers": output,
             "total_lawyers": len(output),
