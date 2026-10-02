@@ -42,6 +42,17 @@
     <string name="have_legal_question">Have a legal question?</string>
     <string name="ai_assistant_promo_desc">Get preliminary information and understand which type of legal professional may be relevant to your concern.</string>
     <string name="start_ai_chat">Start a Conversation</string>
+    <string name="legal_assistant_notice">General legal information only—not a substitute for advice from a qualified advocate. If anyone is in immediate danger, contact local emergency services.</string>
+    <string name="describe_legal_problem">Describe what happened…</string>
+    <string name="find_matching_advocates">Find matching lawyers</string>
+    <string name="assistant_matching_loading">Finding matching lawyers…</string>
+    <string name="assistant_matching_retry">Retry finding lawyers</string>
+    <string name="assistant_matching_continue">Continue matching</string>
+    <string name="assistant_matching_answer">Your answer</string>
+    <string name="assistant_matching_answer_required">Please answer this question to continue</string>
+    <string name="assistant_matching_empty">No matching lawyers found. Share more details about your case to try again.</string>
+    <string name="legal_guide_short">ASKVOCATE LEGAL GUIDE</string>
+    <string name="retry_assistant_reply">Retry response</string>
     <string name="legal_knowledge_hub">Legal Insights</string>
     <string name="ai_disclaimer">AI responses are informational and are not a substitute for advice from a qualified legal professional.</string>
     <string name="view_all">View All</string>

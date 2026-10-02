@@ -4,6 +4,8 @@ import json
 import logging
 import os
 import re
+import urllib.error
+import urllib.request
 from functools import lru_cache
 from pathlib import Path
 from typing import Any
@@ -20,11 +22,13 @@ except ImportError:
 
 
 GEMINI_MODELS = (
-    os.getenv("GEMINI_MODEL", "gemini-3.8-flash"),
-    "gemini-3.6-flash",
-    "gemini-3.5-flash",
+    os.getenv("GEMINI_MODEL", "gemini-3.5-flash-lite"),
+    "gemini-3.1-flash-lite",
+    "gemini-3.8-flash",
 )
 GROQ_MODEL = os.getenv("GROQ_MODEL", "openai/gpt-oss-120b")
+NVIDIA_MODEL = os.getenv("NVIDIA_MODEL", "nvidia/nemotron-3-super-120b-a12b")
+NVIDIA_API_URL = "https://integrate.api.nvidia.com/v1/chat/completions"
 
 
 def _valid_key(name: str) -> bool:
@@ -34,6 +38,7 @@ def _valid_key(name: str) -> bool:
 
 def provider_configuration() -> dict[str, bool]:
     return {
+        "nvidia_configured": _valid_key("NVIDIA_API_KEY"),
         "gemini_configured": _valid_key("GEMINI_API_KEY"),
         "groq_configured": _valid_key("GROQ_API_KEY"),
     }
@@ -142,6 +147,7 @@ def _classify_with_gemini(query: str, domains: list[str]) -> dict[str, Any] | No
 
     prompt = _prompt(query, domains)
     attempted: set[str] = set()
+    failures: list[str] = []
     for model in GEMINI_MODELS:
         if not model or model in attempted:
             continue
@@ -150,15 +156,52 @@ def _classify_with_gemini(query: str, domains: list[str]) -> dict[str, Any] | No
             response = client.models.generate_content(
                 model=model,
                 contents=prompt,
-                config={"response_mime_type": "application/json", "temperature": 0.0},
+                config={"response_mime_type": "application/json"},
             )
             result = _parse_json(response.text or "", set(domains))
             result["source"] = f"gemini:{model}"
             return result
         except Exception as error:
-            logger.warning("Gemini classification failed for %s: %s", model, type(error).__name__)
+            failures.append(f"{model}:{type(error).__name__}")
             continue
+    if failures:
+        logger.warning("Gemini classification unavailable (%s)", ", ".join(failures))
     return None
+
+
+def _classify_with_nvidia(query: str, domains: list[str]) -> dict[str, Any] | None:
+    if not _valid_key("NVIDIA_API_KEY"):
+        return None
+
+    payload = json.dumps({
+        "model": NVIDIA_MODEL,
+        "messages": [{"role": "user", "content": _prompt(query, domains)}],
+        "temperature": 0.2,
+        "max_tokens": 900,
+        "reasoning_effort": "none",
+        "stream": False,
+    }).encode("utf-8")
+    request = urllib.request.Request(
+        NVIDIA_API_URL,
+        data=payload,
+        method="POST",
+        headers={
+            "Authorization": f"Bearer {os.environ['NVIDIA_API_KEY']}",
+            "Content-Type": "application/json",
+            "Accept": "application/json",
+        },
+    )
+    try:
+        with urllib.request.urlopen(request, timeout=15) as response:
+            body = json.loads(response.read().decode("utf-8"))
+        message = body["choices"][0]["message"]
+        content = message.get("content") or message.get("reasoning_content") or ""
+        result = _parse_json(str(content), set(domains))
+        result["source"] = f"nvidia:{NVIDIA_MODEL}"
+        return result
+    except (urllib.error.URLError, KeyError, IndexError, TypeError, ValueError, json.JSONDecodeError) as error:
+        logger.warning("NVIDIA classification unavailable: %s", type(error).__name__)
+        return None
 
 
 def _classify_with_groq(query: str, domains: list[str]) -> dict[str, Any] | None:
@@ -186,6 +229,10 @@ def _classify_with_groq(query: str, domains: list[str]) -> dict[str, Any] | None
 
 
 def classify_with_llm(query: str, domains: list[str]) -> dict[str, Any] | None:
-    """Gemini is the first fallback; Groq is used only when Gemini is unavailable or fails."""
+    """Try the configured free providers in order, keeping local matching as the primary route."""
     redacted_query = _redact_sensitive_text(query)
-    return _classify_with_gemini(redacted_query, domains) or _classify_with_groq(redacted_query, domains)
+    return (
+        _classify_with_nvidia(redacted_query, domains)
+        or _classify_with_gemini(redacted_query, domains)
+        or _classify_with_groq(redacted_query, domains)
+    )

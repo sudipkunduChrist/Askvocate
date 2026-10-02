@@ -195,6 +195,25 @@
             app:exitAnim="@anim/slide_out_left"
             app:popEnterAnim="@anim/slide_in_left"
             app:popExitAnim="@anim/slide_out_right" />
+        <action
+            android:id="@+id/action_home_to_legal_assistant"
+            app:destination="@id/nav_legal_assistant"
+            app:enterAnim="@anim/slide_in_right"
+            app:exitAnim="@anim/slide_out_left"
+            app:popEnterAnim="@anim/slide_in_left"
+            app:popExitAnim="@anim/slide_out_right" />
+    </fragment>
+
+    <fragment
+        android:id="@+id/nav_legal_assistant"
+        android:name="com.example.askvocate.ui.legalassistant.LegalAssistantFragment"
+        android:label="@string/ask_ai"
+        tools:layout="@layout/fragment_legal_assistant">
+        <action
+            android:id="@+id/action_legal_assistant_to_lawyer_profile"
+            app:destination="@id/nav_lawyer_profile"
+            app:enterAnim="@anim/slide_in_right"
+            app:exitAnim="@anim/slide_out_left" />
     </fragment>
 
     <fragment
@@ -202,6 +221,10 @@
         android:name="com.example.askvocate.ui.findlawyers.FindLawyersFragment"
         android:label="@string/nav_find_lawyers"
         tools:layout="@layout/fragment_find_lawyers">
+        <argument
+            android:name="searchQuery"
+            app:argType="string"
+            android:defaultValue="" />
         <action
             android:id="@+id/action_find_lawyers_to_lawyer_profile"
             app:destination="@id/nav_lawyer_profile"

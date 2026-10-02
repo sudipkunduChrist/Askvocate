@@ -48,6 +48,7 @@ class HomeFragment : Fragment() {
         setupAppointments()
         setupKnowledgeHub()
         setupHeroSection()
+        setupLegalAssistant()
         configureRoleSpecificUi()
 
         observeViewModel()
@@ -64,6 +65,7 @@ class HomeFragment : Fragment() {
         binding.rvCategories.isVisible = isClient
         binding.topLawyersHeader.isVisible = isClient
         binding.rvTopLawyers.isVisible = isClient
+        binding.assistantCard.isVisible = isClient
         binding.quickActionsGrid.columnCount = if (isClient) 3 else 2
         if (!isClient) {
             binding.quickActionsGrid.removeView(binding.actionFindLawyer)
@@ -94,6 +96,12 @@ class HomeFragment : Fragment() {
 
         binding.btnFindLawyerHero.setOnClickListener {
             findNavController().navigate(R.id.nav_find_lawyers)
+        }
+    }
+
+    private fun setupLegalAssistant() {
+        binding.assistantCard.setOnClickListener {
+            findNavController().navigate(R.id.action_home_to_legal_assistant)
         }
     }
 

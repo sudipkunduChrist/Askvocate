@@ -321,7 +321,12 @@ class RecommendationEngine:
             domain = llm_intent["primary_domain"]
             confidence = llm_intent["confidence"]
             source = llm_intent["source"]
-            route_used = "gemini_fallback" if source.startswith("gemini:") else "groq_fallback"
+            if source.startswith("nvidia:"):
+                route_used = "nvidia_fallback"
+            elif source.startswith("gemini:"):
+                route_used = "gemini_fallback"
+            else:
+                route_used = "groq_fallback"
             reason = llm_intent.get("reason", "")
         else:
             domain = local_intent["primary_domain"]

@@ -101,7 +101,8 @@ class MainActivity : AppCompatActivity() {
                 R.id.nav_get_started,
                 R.id.nav_sign_in,
                 R.id.nav_sign_up,
-                R.id.nav_lawyer_sign_up -> false
+                R.id.nav_lawyer_sign_up,
+                R.id.nav_legal_assistant -> false
                 else -> true
             }
             val barWasShown = bottomNavContainer.visibility == View.VISIBLE
