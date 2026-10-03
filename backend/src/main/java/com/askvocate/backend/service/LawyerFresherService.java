@@ -41,6 +41,7 @@ public class LawyerFresherService {
                 .university(dto.getUniversity() != null ? dto.getUniversity() : "")
                 .graduationYear(dto.getGraduationYear() != null ? dto.getGraduationYear() : 0)
                 .specialization(dto.getSpecialization() != null ? dto.getSpecialization() : "")
+                .barCouncilId(dto.getBarCouncilId() != null ? dto.getBarCouncilId() : "")
                 .createdAt(java.time.Instant.now().toString())
                 .build();   // verificationStatus defaults to PENDING via @Builder.Default
 
@@ -105,6 +106,7 @@ public class LawyerFresherService {
         if (dto.getSpecialization() != null) profile.setSpecialization(dto.getSpecialization());
         if (dto.getUniversity() != null) profile.setUniversity(dto.getUniversity());
         if (dto.getGraduationYear() != null) profile.setGraduationYear(dto.getGraduationYear());
+        if (dto.getBarCouncilId() != null) profile.setBarCouncilId(dto.getBarCouncilId());
 
         return lawyerFresherProfileRepository.save(profile);
     }

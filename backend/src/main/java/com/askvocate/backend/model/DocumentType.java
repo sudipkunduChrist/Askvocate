@@ -6,5 +6,8 @@ package com.askvocate.backend.model;
 public enum DocumentType {
     AADHAAR,
     PAN,
+    BAR_COUNCIL_ID,
+    BAR_CERTIFICATE,
+    CERTIFICATE_OF_PRACTICE,
     DRIVING_LICENSE
 }
