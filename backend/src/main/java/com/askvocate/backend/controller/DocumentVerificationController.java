@@ -9,7 +9,6 @@ import com.askvocate.backend.service.DocumentVerificationService;
 import jakarta.validation.Valid;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-import org.springframework.http.HttpStatus;
 import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
@@ -66,14 +65,7 @@ public class DocumentVerificationController {
         DocumentVerificationResponse response =
                 verificationService.verifyDocument(userId, type, front, back);
 
-        HttpStatus status = switch (response.getVerificationStatus()) {
-            case VERIFIED -> HttpStatus.OK;
-            case FAILED -> HttpStatus.UNPROCESSABLE_ENTITY;
-            case PENDING -> HttpStatus.ACCEPTED;
-            case REJECTED -> HttpStatus.FORBIDDEN;
-        };
-
-        return ResponseEntity.status(status).body(response);
+        return ResponseEntity.ok(response);
     }
 
     /**
@@ -136,12 +128,7 @@ public class DocumentVerificationController {
             @RequestHeader(value = "X-User-Id", required = false) String headerUserId,
             @PathVariable String documentId) {
 
-        String userId = null;
-        try {
-            userId = resolveUserId(jwt, null, headerUserId);
-        } catch (Exception ignored) {
-            // Allow querying without strict ownership if public/admin
-        }
+        String userId = resolveUserId(jwt, null, headerUserId);
 
         DocumentVerificationResponse response = verificationService.getDocumentById(userId, documentId);
         if (response == null) {

@@ -4,6 +4,7 @@ import com.askvocate.backend.dto.BarCouncilVerificationRequest;
 import com.askvocate.backend.dto.DocumentVerificationResponse;
 import com.askvocate.backend.dto.LawyerVerificationSummaryResponse;
 import com.askvocate.backend.entity.Verification_Status;
+import com.askvocate.backend.entity.Role;
 import com.askvocate.backend.exception.DocumentVerificationException;
 import com.askvocate.backend.model.*;
 import com.askvocate.backend.repository.ClientProfileRepository;
@@ -67,32 +68,46 @@ public class DocumentVerificationService {
                                                         MultipartFile backImage) {
         // 1. Validate inputs
         validateRequest(userId, documentType, frontImage, backImage);
+        rejectCompletedLawyerVerification(userId);
 
         String folder = "askvocate/documents/" + userId + "/" + documentType.name();
         List<CloudinaryRef> cloudinaryRefs = new ArrayList<>();
         OcrExtractionService.ExtractionResult extractionResult;
+        String failureFile = null;
+        String currentFile = safeFileName(frontImage);
 
         try {
             // 2. Upload front image with OCR
             log.info("Uploading front image for userId={}, documentType={}", userId, documentType);
-            CloudinaryService.UploadResult frontResult = uploadWithFallback(frontImage, folder, "front");
+            CloudinaryService.UploadResult frontResult = uploadWithOcr(frontImage, folder, "front");
             cloudinaryRefs.add(frontResult.cloudinaryRef());
 
             // 3. Extract OCR from front
             OcrExtractionService.ExtractionResult frontExtraction =
                     ocrExtractionService.extract(frontResult.rawOcrData(), documentType, "front");
+            if (!frontExtraction.success()) failureFile = currentFile;
 
             // 4. Upload and extract back image if provided
             if (backImage != null && !backImage.isEmpty()) {
+                currentFile = safeFileName(backImage);
                 log.info("Uploading back image for userId={}, documentType={}", userId, documentType);
-                CloudinaryService.UploadResult backResult = uploadWithFallback(backImage, folder, "back");
+                CloudinaryService.UploadResult backResult = uploadWithOcr(backImage, folder, "back");
                 cloudinaryRefs.add(backResult.cloudinaryRef());
 
                 OcrExtractionService.ExtractionResult backExtraction =
                         ocrExtractionService.extract(backResult.rawOcrData(), documentType, "back");
+                if (!backExtraction.success() && failureFile == null) failureFile = currentFile;
 
                 // Merge front + back results
                 extractionResult = ocrExtractionService.mergeResults(frontExtraction, backExtraction);
+                if (documentType == DocumentType.AADHAAR && extractionResult.success()
+                        && frontExtraction.aadhaarNumber() != null
+                        && backExtraction.aadhaarNumber() != null
+                        && !frontExtraction.aadhaarNumber().equals(backExtraction.aadhaarNumber())) {
+                    extractionResult = new OcrExtractionService.ExtractionResult(false, Map.of(), null, 0.0,
+                            "Aadhaar numbers on front and back do not match.");
+                    failureFile = currentFile;
+                }
             } else {
                 extractionResult = frontExtraction;
             }
@@ -104,7 +119,8 @@ public class DocumentVerificationService {
             } catch (Exception cleanupException) {
                 log.warn("Failed to clean up Cloudinary assets after verification failure", cleanupException);
             }
-            throw new DocumentVerificationException("Document verification failed: " + e.getMessage(), e);
+            throw new DocumentVerificationException("Document upload or OCR processing failed. Please try again.",
+                    e, currentFile);
         }
 
         // 5. Determine verification status
@@ -127,16 +143,20 @@ public class DocumentVerificationService {
         userDocument.setUserId(userId);
         userDocument.setDocumentType(documentType);
         userDocument.setVerificationStatus(status);
-        userDocument.setExtractedData(extractionResult.extractedFields());
-        userDocument.setMaskedDocumentNumber(extractionResult.maskedDocumentNumber());
+        userDocument.setExtractedData(extractionResult.success() ? extractionResult.extractedFields() : Map.of());
+        userDocument.setMaskedDocumentNumber(extractionResult.success() ? extractionResult.maskedDocumentNumber() : null);
+        userDocument.setAadhaarNumber(extractionResult.success() && documentType == DocumentType.AADHAAR
+                ? extractionResult.aadhaarNumber() : null);
         userDocument.setCloudinaryReferences(cloudinaryRefs);
         userDocument.setOcrConfidence(extractionResult.confidence());
         userDocument.setUpdatedAt(Instant.now());
 
         if (!extractionResult.success()) {
             userDocument.setFailureReason(extractionResult.error());
+            userDocument.setFailureFile(failureFile);
         } else {
             userDocument.setFailureReason(null);
+            userDocument.setFailureFile(null);
         }
 
         UserDocument saved = documentRepository.save(userDocument);
@@ -146,7 +166,11 @@ public class DocumentVerificationService {
         // 7. Update Lawyer Profile credentials and verification status if applicable
         LawyerUpdateResult lawyerUpdate = applyDocumentVerificationToLawyer(userId, saved);
 
-        return toResponse(saved, lawyerUpdate);
+        DocumentVerificationResponse response = toResponse(saved, lawyerUpdate);
+        if (status == VerificationStatus.VERIFIED && documentType == DocumentType.AADHAAR) {
+            response.setAadhaarNumber(saved.getAadhaarNumber());
+        }
+        return response;
     }
 
     /**
@@ -156,6 +180,8 @@ public class DocumentVerificationService {
      */
     public DocumentVerificationResponse verifyBarCouncilDirect(BarCouncilVerificationRequest request) {
         String userId = request.getUserId();
+        validateExistingLawyer(userId);
+        rejectCompletedLawyerVerification(userId);
         String rawNumber = request.getBarCouncilNumber();
 
         var validationResult = barCouncilValidationService.validate(rawNumber);
@@ -202,6 +228,7 @@ public class DocumentVerificationService {
      * checklist of verified documents, and next steps.
      */
     public LawyerVerificationSummaryResponse getLawyerVerificationSummary(String userId) {
+        validateExistingLawyer(userId);
         // Find lawyer
         Optional<LawyerExperiencedProfile> expOpt = findExperiencedLawyer(userId);
         Optional<LawyerFresherProfile> fresherOpt = findFresherLawyer(userId);
@@ -245,7 +272,7 @@ public class DocumentVerificationService {
                         || d.getDocumentType() == DocumentType.BAR_CERTIFICATE
                         || d.getDocumentType() == DocumentType.CERTIFICATE_OF_PRACTICE)
                         && d.getVerificationStatus() == VerificationStatus.VERIFIED
-        ) || (barCouncilId != null && !barCouncilId.isBlank());
+        );
 
         boolean aadhaarVerified = documents.stream().anyMatch(d ->
                 d.getDocumentType() == DocumentType.AADHAAR
@@ -266,6 +293,7 @@ public class DocumentVerificationService {
             case 1 -> 33;
             default -> 0;
         };
+        if (verifiedCount < 3) overallStatus = Verification_Status.PENDING;
 
         List<String> missing = new ArrayList<>();
         if (!barCouncilVerified) missing.add("Bar Council ID / Certificate");
@@ -304,6 +332,7 @@ public class DocumentVerificationService {
      * Returns all verification documents for a user.
      */
     public List<DocumentVerificationResponse> getUserDocuments(String userId) {
+        validateExistingLawyer(userId);
         return documentRepository.findByUserId(userId)
                 .stream()
                 .map(this::toResponse)
@@ -314,6 +343,7 @@ public class DocumentVerificationService {
      * Returns a specific verification document by ID, checking user ownership if userId is non-empty.
      */
     public DocumentVerificationResponse getDocumentById(String userId, String documentId) {
+        validateExistingLawyer(userId);
         UserDocument doc = documentRepository.findById(documentId)
                 .orElseThrow(() -> new DocumentVerificationException("Document not found."));
 
@@ -386,28 +416,7 @@ public class DocumentVerificationService {
                 : doc.getDocumentType() + " verified successfully (" + percentage + "% complete). Missing: " + String.join(", ", remainingDocs) + " to achieve 100% document verification process complete.";
 
         if (expOpt.isEmpty() && fresherOpt.isEmpty()) {
-            // Auto-create & store new lawyer profile from verified document
-            String lawyerName = (extractedName != null && !extractedName.isBlank()) ? extractedName : "Adv. Promila";
-            String email = (userId != null && userId.contains("@"))
-                    ? userId
-                    : (lawyerName.toLowerCase().replaceAll("[^a-z0-9]", "") + "@askvocate.com");
-            String address = doc.getExtractedData() != null ? doc.getExtractedData().getOrDefault("address", "") : "";
-
-            LawyerExperiencedProfile newLawyer = new LawyerExperiencedProfile();
-            newLawyer.setName(lawyerName);
-            newLawyer.setEmail(email);
-            newLawyer.setAddress(address);
-            if (isBarCouncilDoc && enrollmentNum != null && !enrollmentNum.isBlank()) {
-                newLawyer.setBarCouncilId(enrollmentNum);
-            }
-            newLawyer.setVerificationStatus(isFullyVerified ? Verification_Status.VERIFIED : Verification_Status.PENDING);
-            newLawyer.setVerifiedAt(isFullyVerified ? System.currentTimeMillis() : null);
-            LawyerExperiencedProfile savedLawyer = lawyerExperiencedProfileRepository.save(newLawyer);
-
-            log.info("Auto-registered new lawyer in MongoDB: id={}, name={}, email={}, status={}",
-                    savedLawyer.getId(), savedLawyer.getName(), savedLawyer.getEmail(), newLawyer.getVerificationStatus());
-
-            return new LawyerUpdateResult(true, newLawyer.getVerificationStatus(), true, progressMsg);
+            throw new DocumentVerificationException("Invalid userID or lawyer role.");
         }
 
         if (expOpt.isPresent()) {
@@ -430,7 +439,10 @@ public class DocumentVerificationService {
 
                 return new LawyerUpdateResult(true, exp.getVerificationStatus(), nameMatch, progressMsg);
             } else {
-                return new LawyerUpdateResult(true, exp.getVerificationStatus(), nameMatch,
+                exp.setVerificationStatus(Verification_Status.PENDING);
+                exp.setVerifiedAt(null);
+                lawyerExperiencedProfileRepository.save(exp);
+                return new LawyerUpdateResult(true, Verification_Status.PENDING, nameMatch,
                         "Document verification failed: " + doc.getFailureReason());
             }
         } else {
@@ -453,46 +465,36 @@ public class DocumentVerificationService {
 
                 return new LawyerUpdateResult(true, fresher.getVerificationStatus(), nameMatch, progressMsg);
             } else {
-                return new LawyerUpdateResult(true, fresher.getVerificationStatus(), nameMatch,
+                fresher.setVerificationStatus(Verification_Status.PENDING);
+                fresher.setVerifiedAt(null);
+                lawyerFresherProfileRepository.save(fresher);
+                return new LawyerUpdateResult(true, Verification_Status.PENDING, nameMatch,
                         "Document verification failed: " + doc.getFailureReason());
             }
         }
     }
 
     private Optional<LawyerExperiencedProfile> findExperiencedLawyer(String userId) {
-        Optional<LawyerExperiencedProfile> opt = lawyerExperiencedProfileRepository.findById(userId);
-        if (opt.isPresent()) return opt;
-        return lawyerExperiencedProfileRepository.findByEmail(userId);
+        return lawyerExperiencedProfileRepository.findById(userId)
+                .filter(profile -> profile.getRole() == Role.LAWYER_EXPERIENCED);
     }
 
     private Optional<LawyerFresherProfile> findFresherLawyer(String userId) {
-        Optional<LawyerFresherProfile> opt = lawyerFresherProfileRepository.findById(userId);
-        if (opt.isPresent()) return opt;
-        return lawyerFresherProfileRepository.findByEmail(userId);
+        return lawyerFresherProfileRepository.findById(userId)
+                .filter(profile -> profile.getRole() == Role.LAWYER_FRESHER);
     }
 
-    // ── Cloudinary Upload with Fallback ──────────────────────────────────
-
-    private CloudinaryService.UploadResult uploadWithFallback(MultipartFile file, String folder, String tag)
+    // OCR is required for verification. A failed upload cannot create local identity data.
+    private CloudinaryService.UploadResult uploadWithOcr(MultipartFile file, String folder, String tag)
             throws Exception {
-        try {
-            return cloudinaryService.uploadWithOcr(file, folder, tag);
-        } catch (Exception e) {
-            log.warn("Cloudinary upload with OCR failed ({}), attempting standard upload or fallback metadata", e.getMessage());
-            try {
-                String secureUrl = cloudinaryService.uploadFile(file, folder);
-                CloudinaryRef ref = new CloudinaryRef();
-                ref.setSecureUrl(secureUrl);
-                ref.setPublicId(cloudinaryService.extractPublicId(secureUrl));
-                return new CloudinaryService.UploadResult(ref, Map.of());
-            } catch (Exception uploadEx) {
-                log.warn("Cloudinary upload failed entirely ({}), creating local verification reference", uploadEx.getMessage());
-                CloudinaryRef mockRef = new CloudinaryRef();
-                mockRef.setPublicId("local_" + UUID.randomUUID());
-                mockRef.setSecureUrl("local://askvocate/documents/" + file.getOriginalFilename());
-                return new CloudinaryService.UploadResult(mockRef, Map.of());
-            }
-        }
+        return cloudinaryService.uploadWithOcr(file, folder, tag);
+    }
+
+    private String safeFileName(MultipartFile file) {
+        if (file == null || file.getOriginalFilename() == null) return null;
+        String name = file.getOriginalFilename().replace('\\', '/');
+        name = name.substring(name.lastIndexOf('/') + 1);
+        return name.replaceAll("[\\r\\n\\x00-\\x1f]", "");
     }
 
     private void cleanupCloudinaryAssets(List<CloudinaryRef> refs) {
@@ -509,11 +511,70 @@ public class DocumentVerificationService {
 
     // ── Validation ──────────────────────────────────────────────────────
 
+    private void validateExistingLawyer(String userId) {
+        if (userId == null || userId.isBlank()) {
+            throw new DocumentVerificationException("Invalid userID.");
+        }
+        String roleError = "Document verification is only available for LAWYER_FRESHER and LAWYER_EXPERIENCED roles.";
+        if (clientProfileRepository.existsById(userId)) {
+            throw new DocumentVerificationException(roleError);
+        }
+        Optional<LawyerExperiencedProfile> experienced = lawyerExperiencedProfileRepository.findById(userId);
+        Optional<LawyerFresherProfile> fresher = lawyerFresherProfileRepository.findById(userId);
+        if (experienced.isEmpty() && fresher.isEmpty()) {
+            throw new DocumentVerificationException("Invalid userID.");
+        }
+        if (experienced.filter(profile -> profile.getRole() == Role.LAWYER_EXPERIENCED).isEmpty()
+                && fresher.filter(profile -> profile.getRole() == Role.LAWYER_FRESHER).isEmpty()) {
+            throw new DocumentVerificationException(roleError);
+        }
+    }
+
+    private void rejectCompletedLawyerVerification(String userId) {
+        Optional<LawyerExperiencedProfile> experienced = findExperiencedLawyer(userId);
+        Optional<LawyerFresherProfile> fresher = findFresherLawyer(userId);
+        boolean markedVerified = experienced.map(p -> p.getVerificationStatus() == Verification_Status.VERIFIED)
+                .orElse(false) || fresher.map(p -> p.getVerificationStatus() == Verification_Status.VERIFIED).orElse(false);
+        if (!markedVerified) return;
+
+        List<UserDocument> documents = documentRepository.findByUserId(userId);
+        if (hasAllRequiredDocuments(documents)) {
+            throw new DocumentVerificationException("Lawyer verification is already complete; re-verification is not required.");
+        }
+
+        // Repair profiles previously marked VERIFIED before all documents were complete.
+        experienced.ifPresent(profile -> {
+            profile.setVerificationStatus(Verification_Status.PENDING);
+            profile.setVerifiedAt(null);
+            lawyerExperiencedProfileRepository.save(profile);
+        });
+        fresher.ifPresent(profile -> {
+            profile.setVerificationStatus(Verification_Status.PENDING);
+            profile.setVerifiedAt(null);
+            lawyerFresherProfileRepository.save(profile);
+        });
+    }
+
+    private boolean hasAllRequiredDocuments(List<UserDocument> documents) {
+        boolean bar = documents.stream().anyMatch(d ->
+                (d.getDocumentType() == DocumentType.BAR_COUNCIL_ID
+                        || d.getDocumentType() == DocumentType.BAR_CERTIFICATE
+                        || d.getDocumentType() == DocumentType.CERTIFICATE_OF_PRACTICE)
+                        && d.getVerificationStatus() == VerificationStatus.VERIFIED);
+        boolean aadhaar = documents.stream().anyMatch(d -> d.getDocumentType() == DocumentType.AADHAAR
+                && d.getVerificationStatus() == VerificationStatus.VERIFIED);
+        boolean pan = documents.stream().anyMatch(d -> d.getDocumentType() == DocumentType.PAN
+                && d.getVerificationStatus() == VerificationStatus.VERIFIED);
+        return bar && aadhaar && pan;
+    }
+
+    public boolean areAllMandatoryDocumentsVerified(String userId) {
+        return hasAllRequiredDocuments(documentRepository.findByUserId(userId));
+    }
+
     private void validateRequest(String userId, DocumentType documentType,
                                   MultipartFile frontImage, MultipartFile backImage) {
-        if (userId == null || userId.isBlank()) {
-            throw new DocumentVerificationException("User identifier is required.");
-        }
+        validateExistingLawyer(userId);
 
         if (documentType == null) {
             throw new DocumentVerificationException(
@@ -521,12 +582,14 @@ public class DocumentVerificationService {
         }
 
         if (frontImage == null || frontImage.isEmpty()) {
-            throw new DocumentVerificationException("Front image of the document is required.");
+            throw new DocumentVerificationException("Front image of the document is required.",
+                    null, safeFileName(frontImage));
         }
 
         if (documentType == DocumentType.AADHAAR && (backImage == null || backImage.isEmpty())) {
             throw new DocumentVerificationException(
-                    "Both front and back images are required for Aadhaar card verification.");
+                    "Both front and back images are required for Aadhaar card verification.",
+                    null, safeFileName(backImage));
         }
     }
 
@@ -543,7 +606,7 @@ public class DocumentVerificationService {
         Boolean nameMatched = lawyerUpdate != null ? lawyerUpdate.nameMatched() : null;
         String message = lawyerUpdate != null ? lawyerUpdate.message() : null;
 
-        return DocumentVerificationResponse.from(
+        DocumentVerificationResponse response = DocumentVerificationResponse.from(
                 doc.getId(),
                 doc.getDocumentType(),
                 doc.getVerificationStatus(),
@@ -556,5 +619,7 @@ public class DocumentVerificationService {
                 nameMatched,
                 message
         );
+        response.setFile(doc.getFailureFile());
+        return response;
     }
 }

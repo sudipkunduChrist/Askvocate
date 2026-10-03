@@ -17,6 +17,9 @@ public class LawyerExperiencedService {
     @Autowired
     private LawyerExperiencedProfileRepository lawyerExperiencedProfileRepository;
 
+    @Autowired
+    private DocumentVerificationService documentVerificationService;
+
     private final BCryptPasswordEncoder passwordEncoder = new BCryptPasswordEncoder();
 
     /**
@@ -72,6 +75,13 @@ public class LawyerExperiencedService {
     public LawyerExperiencedProfile approve(String id) {
         LawyerExperiencedProfile profile = lawyerExperiencedProfileRepository.findById(id)
                 .orElseThrow(() -> new IllegalArgumentException("Lawyer experienced profile not found: " + id));
+
+        if (!documentVerificationService.areAllMandatoryDocumentsVerified(id)) {
+            profile.setVerificationStatus(Verification_Status.PENDING);
+            profile.setVerifiedAt(null);
+            lawyerExperiencedProfileRepository.save(profile);
+            throw new IllegalArgumentException("Aadhaar, PAN, and a Bar Council document must all be verified before approval.");
+        }
 
         profile.setVerificationStatus(Verification_Status.VERIFIED);
         profile.setVerifiedAt(System.currentTimeMillis());

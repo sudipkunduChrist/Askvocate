@@ -11,7 +11,7 @@ import java.util.Map;
  * 
  * <p><b>Privacy guarantees:</b>
  * <ul>
- *   <li>Full document numbers are <b>never</b> included — only the masked variant.</li>
+ *   <li>Full Aadhaar number is included only in the immediate successful upload response.</li>
  *   <li>Raw OCR text is <b>never</b> included.</li>
  *   <li>Internal Cloudinary public IDs are <b>never</b> exposed.</li>
  * </ul>
@@ -22,9 +22,11 @@ public class DocumentVerificationResponse {
     private DocumentType documentType;
     private VerificationStatus verificationStatus;
     private String maskedDocumentNumber;
+    private String aadhaarNumber;
     private Map<String, String> extractedFields;
     private Double ocrConfidence;
     private String failureReason;
+    private String file;
     private Instant submittedAt;
 
     // Additional Lawyer Verification context
@@ -116,6 +118,14 @@ public class DocumentVerificationResponse {
         this.maskedDocumentNumber = maskedDocumentNumber;
     }
 
+    public String getAadhaarNumber() {
+        return aadhaarNumber;
+    }
+
+    public void setAadhaarNumber(String aadhaarNumber) {
+        this.aadhaarNumber = aadhaarNumber;
+    }
+
     public Map<String, String> getExtractedFields() {
         return extractedFields;
     }
@@ -138,6 +148,14 @@ public class DocumentVerificationResponse {
 
     public void setFailureReason(String failureReason) {
         this.failureReason = failureReason;
+    }
+
+    public String getFile() {
+        return file;
+    }
+
+    public void setFile(String file) {
+        this.file = file;
     }
 
     public Instant getSubmittedAt() {

@@ -39,6 +39,7 @@ public class BarCouncilValidationService {
             "(?i)\\b([A-Z]{1,4}\\s*[/\\-.]\\s*\\d{1,7}\\s*[/\\-.]\\s*(?:19|20)?\\d{2})\\b"
     );
 
+    private static final Map<String, String> STATE_BAR_COUNCILS = new LinkedHashMap<>();
     // State code to official State Name mapping
     private static final Map<String, String> STATE_NAMES = new LinkedHashMap<>();
     // State Name to list of valid State Bar Council codes

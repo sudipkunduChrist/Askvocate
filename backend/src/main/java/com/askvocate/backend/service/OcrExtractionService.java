@@ -35,13 +35,28 @@ public class OcrExtractionService {
 
     // ── Aadhaar patterns ────────────────────────────────────────────────
     private static final Pattern AADHAAR_NUMBER_PATTERN =
-            Pattern.compile("\\b(\\d{4}\\s?\\d{4}\\s?\\d{4})\\b");
+            Pattern.compile("\\b([2-9]\\d{3}(?:[\\s-]{0,2}\\d{4}){2})\\b");
+    private static final Pattern AADHAAR_MARKER_PATTERN = Pattern.compile(
+            "(?i)\\b(?:aadha{1,2}r|uidai|unique identification authority|government of india)\\b|आधार|भारत सरकार");
+    private static final Pattern AADHAAR_DOB_PATTERN = Pattern.compile(
+            "(?im)\\b(?:DOB|Date\\s*of\\s*Birth|जन्म\\s*तिथि)\\s*[:/-]?\\s*(\\d{1,2}[/.-]\\d{1,2}[/.-]\\d{4})\\b");
+    private static final Pattern AADHAAR_YOB_PATTERN = Pattern.compile(
+            "(?im)\\b(?:YOB|Year\\s*of\\s*Birth|जन्म\\s*वर्ष)\\s*[:/-]?\\s*((?:19|20)\\d{2})\\b");
+    private static final Pattern PINCODE_PATTERN = Pattern.compile("\\b([1-9]\\d{5})\\b");
+    private static final Pattern AADHAAR_ENGLISH_ADDRESS_LABEL =
+            Pattern.compile("(?i)^[ \\t]*Address[ \\t]*[:：/-]?[ \\t]*(.*)$");
+    private static final Pattern AADHAAR_HINDI_ADDRESS_LABEL =
+            Pattern.compile("^[ \\t]*पता[ \\t]*[:：/-]?[ \\t]*(.*)$");
+    private static final Pattern AADHAAR_ADDRESS_STOP = Pattern.compile(
+            "(?i)^[ \\t]*(?:Address|पता|VID|DOB|YOB|Name|Gender|UIDAI|Aadhaar|Unique Identification Authority|www\\.|help@).*|^[2-9]\\d{3}[ \\t-]?\\d{4}[ \\t-]?\\d{4}$");
     private static final Pattern DOB_PATTERN =
             Pattern.compile("\\b(\\d{2}[/\\-.]\\d{2}[/\\-.]\\d{4})\\b");
     private static final Pattern GENDER_PATTERN =
             Pattern.compile("\\b(MALE|FEMALE|TRANSGENDER|पुरुष|महिला)\\b", Pattern.CASE_INSENSITIVE);
     private static final Pattern NAME_AFTER_LABEL_PATTERN =
             Pattern.compile("(?:Name|नाम)\\s*[:/]?\\s*(.+)", Pattern.CASE_INSENSITIVE);
+    private static final Pattern AADHAAR_NAME_LABEL_PATTERN =
+            Pattern.compile("(?im)^(?:Name|नाम)[ \\t]*[:/-]?[ \\t]*(.+)$");
 
     // ── PAN patterns ────────────────────────────────────────────────────
     private static final Pattern PAN_NUMBER_PATTERN =
@@ -100,64 +115,19 @@ public class OcrExtractionService {
         double confidence = extractConfidenceFromOcrResponse(rawOcrData);
 
         if (ocrText == null || ocrText.isBlank()) {
-            log.warn("Cloudinary OCR produced no text. Providing side-specific fallback for {} ({})", documentType, side);
-            return createDevFallbackResult(documentType, side);
+            log.warn("Cloudinary OCR produced no text for {} ({})", documentType, side);
+            return new ExtractionResult(false, Map.of(), null, 0.0,
+                    "No readable OCR text was returned. Upload a clear document image.");
         }
 
         log.info("OCR extraction starting for documentType={}, side={}, textLength={}, confidence={}",
                 documentType, side, ocrText.length(), confidence);
 
         return switch (documentType) {
-            case AADHAAR -> parseAadhaar(ocrText, confidence);
+            case AADHAAR -> parseAadhaar(ocrText, confidence, side);
             case PAN -> parsePan(ocrText, confidence);
             case BAR_COUNCIL_ID, BAR_CERTIFICATE, CERTIFICATE_OF_PRACTICE -> parseBarCouncil(ocrText, confidence);
             case DRIVING_LICENSE -> parseDrivingLicense(ocrText, confidence);
-        };
-    }
-
-    private ExtractionResult createDevFallbackResult(DocumentType documentType, String side) {
-        Map<String, String> fields = new HashMap<>();
-        boolean isBack = "back".equalsIgnoreCase(side);
-
-        return switch (documentType) {
-            case AADHAAR -> {
-                if (isBack) {
-                    // Back side ONLY contains address, guardian relation, and pincode
-                    fields.put("address", "W/O: Praveen, D-61 Shanti Bhawan, Gali No-4, Laxmi Nagar, Shakar Pur Baramad, East Delhi, Delhi, 110092");
-                    fields.put("addressHindi", "पता: W/O: प्रवीन, डी-61 शांति भवन, गली न-4, लक्ष्मी नगर, शकर पुर बरामद, पूर्वी दिल्ली, दिल्ली, 110092");
-                    fields.put("guardianRelation", "W/O: Praveen");
-                    fields.put("pincode", "110092");
-                    fields.put("printDate", "25/03/2021");
-                    yield new ExtractionResult(true, fields, "XXXX-XXXX-0353", 0.98, null);
-                } else {
-                    // Front side ONLY contains name, DOB, gender, issue date
-                    fields.put("name", "Promila");
-                    fields.put("nameHindi", "प्रोमिला");
-                    fields.put("dob", "01/03/1983");
-                    fields.put("gender", "FEMALE");
-                    fields.put("issueDate", "22/12/2012");
-                    fields.put("verificationNote", "Front side verified (Aadhaar 12-digit format & Verhoeff checksum valid)");
-                    yield new ExtractionResult(true, fields, "XXXX-XXXX-0353", 0.98, null);
-                }
-            }
-            case PAN -> {
-                fields.put("name", "Promila");
-                fields.put("panNumber", "ABCDE5678F");
-                yield new ExtractionResult(true, fields, "XXXXXX5678", 0.95, null);
-            }
-            case BAR_COUNCIL_ID, BAR_CERTIFICATE, CERTIFICATE_OF_PRACTICE -> {
-                fields.put("name", "Adv. Promila");
-                fields.put("enrollmentNumber", "D/1234/2021");
-                fields.put("stateCouncil", "Bar Council of Delhi");
-                fields.put("stateCode", "D");
-                fields.put("enrollmentYear", "2021");
-                yield new ExtractionResult(true, fields, "D/XXXX/2021", 0.95, null);
-            }
-            case DRIVING_LICENSE -> {
-                fields.put("name", "Promila");
-                fields.put("dlNumber", "DL-1420110012345");
-                yield new ExtractionResult(true, fields, "DL-XXXXXX1234", 0.95, null);
-            }
         };
     }
 
@@ -165,18 +135,23 @@ public class OcrExtractionService {
      * Merges extraction results from multiple images (e.g. Aadhaar or Bar ID front + back).
      */
     public ExtractionResult mergeResults(ExtractionResult primary, ExtractionResult secondary) {
+        if (!primary.success() || !secondary.success()) {
+            return new ExtractionResult(false, Map.of(), null, 0.0,
+                    !primary.success() ? primary.error() : secondary.error());
+        }
         Map<String, String> merged = new HashMap<>(primary.extractedFields());
         // Add fields from secondary that are missing in primary
         secondary.extractedFields().forEach(merged::putIfAbsent);
 
         return new ExtractionResult(
-                primary.success() || secondary.success(),
+                primary.success() && secondary.success(),
                 merged,
                 primary.maskedDocumentNumber() != null
                         ? primary.maskedDocumentNumber()
                         : secondary.maskedDocumentNumber(),
                 Math.max(primary.confidence(), secondary.confidence()),
-                primary.success() ? null : secondary.error()
+                null,
+                primary.aadhaarNumber() != null ? primary.aadhaarNumber() : secondary.aadhaarNumber()
         );
     }
 
@@ -272,53 +247,114 @@ public class OcrExtractionService {
 
     // ── Aadhaar Parser ──────────────────────────────────────────────────
 
-    private ExtractionResult parseAadhaar(String text, double confidence) {
+    private ExtractionResult parseAadhaar(String text, double confidence, String side) {
         Map<String, String> fields = new HashMap<>();
         String maskedNumber = null;
-
-        // Extract Aadhaar number
+        String fullNumber = null;
+        boolean isBack = "back".equalsIgnoreCase(side);
+        boolean hasAadhaarMarker = AADHAAR_MARKER_PATTERN.matcher(text).find();
         Matcher aadhaarMatcher = AADHAAR_NUMBER_PATTERN.matcher(text);
-        if (aadhaarMatcher.find()) {
-            String rawNumber = aadhaarMatcher.group(1).replaceAll("\\s", "");
+        boolean invalidNumberFound = false;
+        while (aadhaarMatcher.find()) {
+            String rawNumber = aadhaarMatcher.group(1).replaceAll("[\\s-]", "");
             if (isValidAadhaarChecksum(rawNumber)) {
+                fullNumber = rawNumber;
                 maskedNumber = maskAadhaar(rawNumber);
-            } else {
-                // Still mask it even if checksum fails — it matched the pattern
-                maskedNumber = maskAadhaar(rawNumber);
-                fields.put("checksumWarning", "Aadhaar checksum validation failed");
+                break;
             }
+            invalidNumberFound = true;
         }
-
-        // Extract name
-        Matcher nameMatcher = NAME_AFTER_LABEL_PATTERN.matcher(text);
-        if (nameMatcher.find()) {
-            fields.put("name", normalizeName(nameMatcher.group(1)));
+        if (!hasAadhaarMarker && maskedNumber == null) {
+            return new ExtractionResult(false, Map.of(), null, confidence,
+                    "The image does not contain recognizable Aadhaar identifiers.");
         }
-
-        // Extract DOB
-        Matcher dobMatcher = DOB_PATTERN.matcher(text);
-        if (dobMatcher.find()) {
-            fields.put("dob", dobMatcher.group(1));
+        if (isBack) {
+            String address = extractAadhaarAddress(text);
+            if (address != null) {
+                fields.put("address", address);
+                Matcher pinMatcher = PINCODE_PATTERN.matcher(address);
+                if (pinMatcher.find()) fields.put("pincode", pinMatcher.group(1));
+            }
+            boolean success = fields.containsKey("address") && fields.containsKey("pincode");
+            return new ExtractionResult(success, fields, maskedNumber, confidence,
+                    success ? null : "Could not extract address and PIN code from the Aadhaar back Address/पता field.",
+                    success ? fullNumber : null);
         }
-
-        // Extract gender
+        if (!hasAadhaarMarker) {
+            return new ExtractionResult(false, Map.of(), null, confidence,
+                    "The front image does not contain recognizable Aadhaar identifiers.");
+        }
+        Matcher dobMatcher = AADHAAR_DOB_PATTERN.matcher(text);
+        Matcher yobMatcher = AADHAAR_YOB_PATTERN.matcher(text);
+        if (dobMatcher.find()) fields.put("dob", dobMatcher.group(1));
+        else if (yobMatcher.find()) fields.put("yearOfBirth", yobMatcher.group(1));
         Matcher genderMatcher = GENDER_PATTERN.matcher(text);
-        if (genderMatcher.find()) {
-            fields.put("gender", genderMatcher.group(1).toUpperCase());
-        }
-
-        // Extract address (often on back of card)
-        Matcher addressMatcher = ADDRESS_PATTERN.matcher(text);
-        if (addressMatcher.find()) {
-            fields.put("address", addressMatcher.group(1).trim());
-        }
-
-        boolean success = maskedNumber != null && fields.containsKey("name");
-        String error = success ? null : "Could not extract required Aadhaar fields (number and name).";
+        if (genderMatcher.find()) fields.put("gender", genderMatcher.group(1).toUpperCase());
+        String name = extractAadhaarName(text);
+        if (name != null) fields.put("name", name);
+        boolean success = maskedNumber != null && fields.containsKey("name")
+                && (fields.containsKey("dob") || fields.containsKey("yearOfBirth"))
+                && fields.containsKey("gender");
+        String error = success ? null : maskedNumber == null
+                ? (invalidNumberFound ? "Aadhaar number failed checksum validation." : "Could not extract Aadhaar number.")
+                : !fields.containsKey("name") ? "Could not extract Aadhaar front name."
+                : !fields.containsKey("dob") && !fields.containsKey("yearOfBirth")
+                    ? "Could not extract labeled Aadhaar DOB or year of birth."
+                    : "Could not extract Aadhaar front gender.";
 
         log.info("Aadhaar extraction result: success={}, fieldsFound={}", success, fields.size());
 
-        return new ExtractionResult(success, fields, maskedNumber, confidence, error);
+        return new ExtractionResult(success, fields, maskedNumber, confidence, error,
+                success ? fullNumber : null);
+    }
+
+    private String extractAadhaarName(String text) {
+        Matcher labeled = AADHAAR_NAME_LABEL_PATTERN.matcher(text);
+        if (labeled.find()) {
+            String candidate = normalizeName(labeled.group(1));
+            if (candidate != null && !candidate.isBlank()) return candidate;
+        }
+        String[] lines = text.split("\\R");
+        for (int i = 0; i < lines.length; i++) {
+            if (!AADHAAR_DOB_PATTERN.matcher(lines[i]).find() && !AADHAAR_YOB_PATTERN.matcher(lines[i]).find()) continue;
+            for (int j = i - 1; j >= Math.max(0, i - 3); j--) {
+                String candidate = normalizeName(lines[j]);
+                if (candidate != null && candidate.matches("[\\p{L}][\\p{L} .'-]{2,60}")
+                        && !AADHAAR_MARKER_PATTERN.matcher(candidate).find()
+                        && !candidate.matches("(?i).*(?:india|भारतीय|authority|enrolment|issue|print|female|male).*")) {
+                    return candidate;
+                }
+            }
+        }
+        return null;
+    }
+
+    private String extractAadhaarAddress(String text) {
+        String[] lines = text.split("\\R");
+        String english = readAddressAfterLabel(lines, AADHAAR_ENGLISH_ADDRESS_LABEL);
+        if (english != null && PINCODE_PATTERN.matcher(english).find()) return english;
+        String hindi = readAddressAfterLabel(lines, AADHAAR_HINDI_ADDRESS_LABEL);
+        if (hindi != null && PINCODE_PATTERN.matcher(hindi).find()) return hindi;
+        return english != null ? english : hindi;
+    }
+
+    private String readAddressAfterLabel(String[] lines, Pattern labelPattern) {
+        for (int i = 0; i < lines.length; i++) {
+            Matcher label = labelPattern.matcher(lines[i]);
+            if (!label.matches()) continue;
+            StringBuilder address = new StringBuilder(label.group(1).trim());
+            for (int j = i + 1; j < Math.min(lines.length, i + 9)
+                    && !PINCODE_PATTERN.matcher(address).find(); j++) {
+                String line = lines[j].trim();
+                if (line.isEmpty()) continue;
+                if (AADHAAR_ADDRESS_STOP.matcher(line).matches()) break;
+                if (!address.isEmpty()) address.append(' ');
+                address.append(line);
+            }
+            String result = address.toString().trim();
+            if (!result.isEmpty()) return result;
+        }
+        return null;
     }
 
     // ── PAN Parser ──────────────────────────────────────────────────────
@@ -459,11 +495,17 @@ public class OcrExtractionService {
             if (data == null || data.isEmpty()) return null;
 
             Map<String, Object> firstPage = data.get(0);
+            // Cloudinary's adv_ocr response puts the complete OCR text in the
+            // first text annotation's description, not always in fullTextAnnotation.
+            List<Map<String, Object>> annotations =
+                    (List<Map<String, Object>>) firstPage.get("textAnnotations");
+            if (annotations != null && !annotations.isEmpty()) {
+                Object description = annotations.get(0).get("description");
+                if (description instanceof String value && !value.isBlank()) return value;
+            }
             Map<String, Object> fullTextAnnotation =
                     (Map<String, Object>) firstPage.get("fullTextAnnotation");
-            if (fullTextAnnotation == null) return null;
-
-            return (String) fullTextAnnotation.get("text");
+            return fullTextAnnotation != null ? (String) fullTextAnnotation.get("text") : null;
 
         } catch (ClassCastException e) {
             log.warn("Unexpected OCR response structure");
@@ -589,7 +631,12 @@ public class OcrExtractionService {
             Map<String, String> extractedFields,
             String maskedDocumentNumber,
             double confidence,
-            String error
+            String error,
+            String aadhaarNumber
     ) {
+        public ExtractionResult(boolean success, Map<String, String> extractedFields,
+                                String maskedDocumentNumber, double confidence, String error) {
+            this(success, extractedFields, maskedDocumentNumber, confidence, error, null);
+        }
     }
 }

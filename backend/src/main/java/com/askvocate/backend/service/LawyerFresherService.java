@@ -17,6 +17,9 @@ public class LawyerFresherService {
     @Autowired
     private LawyerFresherProfileRepository lawyerFresherProfileRepository;
 
+    @Autowired
+    private DocumentVerificationService documentVerificationService;
+
     private final BCryptPasswordEncoder passwordEncoder = new BCryptPasswordEncoder();
 
     /**
@@ -70,6 +73,13 @@ public class LawyerFresherService {
     public LawyerFresherProfile approve(String id) {
         LawyerFresherProfile profile = lawyerFresherProfileRepository.findById(id)
                 .orElseThrow(() -> new IllegalArgumentException("Lawyer fresher profile not found: " + id));
+
+        if (!documentVerificationService.areAllMandatoryDocumentsVerified(id)) {
+            profile.setVerificationStatus(Verification_Status.PENDING);
+            profile.setVerifiedAt(null);
+            lawyerFresherProfileRepository.save(profile);
+            throw new IllegalArgumentException("Aadhaar, PAN, and a Bar Council document must all be verified before approval.");
+        }
 
         profile.setVerificationStatus(Verification_Status.VERIFIED);
         profile.setVerifiedAt(System.currentTimeMillis());

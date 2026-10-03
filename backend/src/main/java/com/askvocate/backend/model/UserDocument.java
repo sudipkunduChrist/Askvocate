@@ -1,5 +1,7 @@
 package com.askvocate.backend.model;
 
+import com.fasterxml.jackson.annotation.JsonIgnore;
+import lombok.Setter;
 import org.springframework.data.annotation.Id;
 import org.springframework.data.mongodb.core.index.Indexed;
 import org.springframework.data.mongodb.core.mapping.Document;
@@ -15,20 +17,23 @@ import java.util.Map;
  * 
  * <p>Stored in the {@code documents} collection. Each record is scoped to a
  * single {@code userId} (from the JWT {@code sub} claim) and a single
- * {@link DocumentType}. Sensitive data (full document numbers, raw OCR text)
- * is <b>never</b> persisted — only masked numbers and parsed fields are stored.
+ * {@link DocumentType}. Raw OCR text is not persisted; Aadhaar records store
+ * the validated full number separately from the masked display number.
  */
 @Document(collection = "documents")
 public class UserDocument {
 
+    @Setter
     @Id
     private String id;
 
     /** User identifier extracted from the JWT {@code sub} claim. */
+    @Setter
     @Indexed
     private String userId;
 
     /** The type of identity document submitted. */
+    @Setter
     private DocumentType documentType;
 
     /** Current verification status. */
@@ -41,6 +46,7 @@ public class UserDocument {
      * Full document numbers are <b>never</b> included here — see
      * {@link #maskedDocumentNumber} instead.
      */
+    @Setter
     private Map<String, String> extractedData = new HashMap<>();
 
     /**
@@ -48,19 +54,32 @@ public class UserDocument {
      * 
      * <p>Examples: {@code XXXX-XXXX-1234} (Aadhaar), {@code XXXXXX6789} (PAN).
      */
+    @Setter
     private String maskedDocumentNumber;
 
+    /** Full checksum-valid Aadhaar number for a verified Aadhaar record. */
+    @Setter
+    @JsonIgnore
+    private String aadhaarNumber;
+
     /** References to the uploaded images on Cloudinary. */
+    @Setter
     private List<CloudinaryRef> cloudinaryReferences = new ArrayList<>();
 
     /** OCR confidence score (0.0–1.0). Raw OCR text is never stored. */
+    @Setter
     private Double ocrConfidence;
 
     /** Reason for failure if {@link #verificationStatus} is {@code FAILED}. */
+    @Setter
     private String failureReason;
+    @Setter
+    private String failureFile;
 
+    @Setter
     private Instant createdAt;
 
+    @Setter
     private Instant updatedAt;
 
     public UserDocument() {
@@ -68,30 +87,20 @@ public class UserDocument {
         this.updatedAt = Instant.now();
     }
 
+
+
     // ── Getters & Setters ───────────────────────────────────────────────
 
     public String getId() {
         return id;
     }
 
-    public void setId(String id) {
-        this.id = id;
-    }
-
     public String getUserId() {
         return userId;
     }
 
-    public void setUserId(String userId) {
-        this.userId = userId;
-    }
-
     public DocumentType getDocumentType() {
         return documentType;
-    }
-
-    public void setDocumentType(DocumentType documentType) {
-        this.documentType = documentType;
     }
 
     public VerificationStatus getVerificationStatus() {
@@ -107,55 +116,36 @@ public class UserDocument {
         return extractedData;
     }
 
-    public void setExtractedData(Map<String, String> extractedData) {
-        this.extractedData = extractedData;
-    }
-
     public String getMaskedDocumentNumber() {
         return maskedDocumentNumber;
     }
 
-    public void setMaskedDocumentNumber(String maskedDocumentNumber) {
-        this.maskedDocumentNumber = maskedDocumentNumber;
+    public String getAadhaarNumber() {
+        return aadhaarNumber;
     }
 
     public List<CloudinaryRef> getCloudinaryReferences() {
         return cloudinaryReferences;
     }
 
-    public void setCloudinaryReferences(List<CloudinaryRef> cloudinaryReferences) {
-        this.cloudinaryReferences = cloudinaryReferences;
-    }
-
     public Double getOcrConfidence() {
         return ocrConfidence;
-    }
-
-    public void setOcrConfidence(Double ocrConfidence) {
-        this.ocrConfidence = ocrConfidence;
     }
 
     public String getFailureReason() {
         return failureReason;
     }
 
-    public void setFailureReason(String failureReason) {
-        this.failureReason = failureReason;
+    public String getFailureFile() {
+        return failureFile;
     }
 
     public Instant getCreatedAt() {
         return createdAt;
     }
 
-    public void setCreatedAt(Instant createdAt) {
-        this.createdAt = createdAt;
-    }
-
     public Instant getUpdatedAt() {
         return updatedAt;
     }
 
-    public void setUpdatedAt(Instant updatedAt) {
-        this.updatedAt = updatedAt;
-    }
 }

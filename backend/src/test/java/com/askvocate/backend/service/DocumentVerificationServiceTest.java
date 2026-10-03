@@ -141,4 +141,51 @@ class DocumentVerificationServiceTest {
         assertTrue(summary.isIdentityVerified());
         assertEquals(3, summary.getVerifiedDocuments().size());
     }
+
+    @Test
+    void partialDocumentChecklistReportsPendingEvenIfProfileWasPreviouslyMarkedVerified() {
+        mockExperiencedLawyer.setVerificationStatus(Verification_Status.VERIFIED);
+        mockExperiencedLawyer.setBarCouncilId("D/1234/2021");
+        when(lawyerExperiencedProfileRepository.findById("lawyer-123"))
+                .thenReturn(Optional.of(mockExperiencedLawyer));
+        UserDocument aadhaar = new UserDocument();
+        aadhaar.setDocumentType(DocumentType.AADHAAR);
+        aadhaar.setVerificationStatus(VerificationStatus.VERIFIED);
+        when(documentRepository.findByUserId("lawyer-123")).thenReturn(List.of(aadhaar));
+
+        LawyerVerificationSummaryResponse summary = documentVerificationService.getLawyerVerificationSummary("lawyer-123");
+
+        assertEquals(Verification_Status.PENDING, summary.getVerificationStatus());
+        assertEquals(33, summary.getCompletionPercentage());
+        assertFalse(summary.isBarCouncilVerified());
+    }
+
+    @Test
+    void lastRequiredDocumentMarksLawyerVerified() {
+        when(lawyerExperiencedProfileRepository.findById("lawyer-123"))
+                .thenReturn(Optional.of(mockExperiencedLawyer));
+        UserDocument aadhaar = new UserDocument();
+        aadhaar.setId("aadhaar-id");
+        aadhaar.setDocumentType(DocumentType.AADHAAR);
+        aadhaar.setVerificationStatus(VerificationStatus.VERIFIED);
+        UserDocument pan = new UserDocument();
+        pan.setId("pan-id");
+        pan.setDocumentType(DocumentType.PAN);
+        pan.setVerificationStatus(VerificationStatus.VERIFIED);
+        when(documentRepository.findByUserId("lawyer-123")).thenReturn(List.of(aadhaar, pan));
+        when(documentRepository.save(any(UserDocument.class))).thenAnswer(invocation -> {
+            UserDocument doc = invocation.getArgument(0);
+            doc.setId("bar-id");
+            return doc;
+        });
+        BarCouncilVerificationRequest request = new BarCouncilVerificationRequest();
+        request.setUserId("lawyer-123");
+        request.setBarCouncilNumber("D/1234/2021");
+
+        DocumentVerificationResponse response = documentVerificationService.verifyBarCouncilDirect(request);
+
+        assertEquals(Verification_Status.VERIFIED, mockExperiencedLawyer.getVerificationStatus());
+        assertEquals("VERIFIED", response.getLawyerVerificationStatus());
+        assertNotNull(mockExperiencedLawyer.getVerifiedAt());
+    }
 }
