@@ -11,7 +11,7 @@ import java.util.Map;
  * 
  * <p><b>Privacy guarantees:</b>
  * <ul>
- *   <li>Full Aadhaar number is included only in the immediate successful upload response.</li>
+ *   <li>Full Aadhaar and PAN numbers are included only in their immediate successful upload responses.</li>
  *   <li>Raw OCR text is <b>never</b> included.</li>
  *   <li>Internal Cloudinary public IDs are <b>never</b> exposed.</li>
  * </ul>
@@ -23,6 +23,7 @@ public class DocumentVerificationResponse {
     private VerificationStatus verificationStatus;
     private String maskedDocumentNumber;
     private String aadhaarNumber;
+    private String panNumber;
     private Map<String, String> extractedFields;
     private Double ocrConfidence;
     private String failureReason;
@@ -124,6 +125,14 @@ public class DocumentVerificationResponse {
 
     public void setAadhaarNumber(String aadhaarNumber) {
         this.aadhaarNumber = aadhaarNumber;
+    }
+
+    public String getPanNumber() {
+        return panNumber;
+    }
+
+    public void setPanNumber(String panNumber) {
+        this.panNumber = panNumber;
     }
 
     public Map<String, String> getExtractedFields() {

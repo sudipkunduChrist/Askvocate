@@ -59,7 +59,7 @@ public class DocumentVerificationService {
      * @param userId       user identifier
      * @param documentType document type (AADHAAR, PAN, BAR_COUNCIL_ID, BAR_CERTIFICATE, etc.)
      * @param frontImage   front side image
-     * @param backImage    back side image (required for Aadhaar, optional for others)
+     * @param backImage    back side image (required for Aadhaar, not accepted for PAN)
      * @return verification response DTO with masked number and extracted fields
      */
     public DocumentVerificationResponse verifyDocument(String userId,
@@ -147,6 +147,8 @@ public class DocumentVerificationService {
         userDocument.setMaskedDocumentNumber(extractionResult.success() ? extractionResult.maskedDocumentNumber() : null);
         userDocument.setAadhaarNumber(extractionResult.success() && documentType == DocumentType.AADHAAR
                 ? extractionResult.aadhaarNumber() : null);
+        userDocument.setPanNumber(extractionResult.success() && documentType == DocumentType.PAN
+                ? extractionResult.panNumber() : null);
         userDocument.setCloudinaryReferences(cloudinaryRefs);
         userDocument.setOcrConfidence(extractionResult.confidence());
         userDocument.setUpdatedAt(Instant.now());
@@ -169,6 +171,8 @@ public class DocumentVerificationService {
         DocumentVerificationResponse response = toResponse(saved, lawyerUpdate);
         if (status == VerificationStatus.VERIFIED && documentType == DocumentType.AADHAAR) {
             response.setAadhaarNumber(saved.getAadhaarNumber());
+        } else if (status == VerificationStatus.VERIFIED && documentType == DocumentType.PAN) {
+            response.setPanNumber(saved.getPanNumber());
         }
         return response;
     }
@@ -589,6 +593,10 @@ public class DocumentVerificationService {
         if (documentType == DocumentType.AADHAAR && (backImage == null || backImage.isEmpty())) {
             throw new DocumentVerificationException(
                     "Both front and back images are required for Aadhaar card verification.",
+                    null, safeFileName(backImage));
+        }
+        if (documentType == DocumentType.PAN && backImage != null && !backImage.isEmpty()) {
+            throw new DocumentVerificationException("PAN verification requires only the front image.",
                     null, safeFileName(backImage));
         }
     }

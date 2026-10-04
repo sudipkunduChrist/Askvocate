@@ -157,12 +157,12 @@ class VerificationGuardTest {
         var back = new MockMultipartFile("back", "aadhaar_rear.jpg", "image/jpeg", new byte[]{1});
         when(cloudinary.uploadWithOcr(eq(front), anyString(), eq("front")))
                 .thenReturn(new CloudinaryService.UploadResult(new com.askvocate.backend.model.CloudinaryRef(),
-                        Map.of("text", "Name: Test Lawyer\nABCDE1234F")));
+                        Map.of("text", "Name: Test Lawyer\nDL1420110012345")));
         when(cloudinary.uploadWithOcr(eq(back), anyString(), eq("back")))
                 .thenReturn(new CloudinaryService.UploadResult(new com.askvocate.backend.model.CloudinaryRef(), Map.of()));
         when(documents.save(any())).thenAnswer(invocation -> invocation.getArgument(0));
 
-        var response = service.verifyDocument("fresher-id", DocumentType.PAN, front, back);
+        var response = service.verifyDocument("fresher-id", DocumentType.DRIVING_LICENSE, front, back);
 
         assertEquals("aadhaar_rear.jpg", response.getFile());
         assertEquals(com.askvocate.backend.model.VerificationStatus.FAILED, response.getVerificationStatus());
@@ -197,6 +197,48 @@ class VerificationGuardTest {
         assertEquals("XXXX-XXXX-" + number.substring(8), response.getMaskedDocumentNumber());
         when(documents.findById("doc-id")).thenReturn(Optional.of(stored.get()));
         assertNull(service.getDocumentById("fresher-id", "doc-id").getAadhaarNumber());
+    }
+
+    @Test
+    void successfulPanStoresFullNumberButOnlyUploadResponseRevealsIt() throws Exception {
+        var profile = new LawyerFresherProfile();
+        profile.setId("fresher-id");
+        profile.setName("Test Lawyer");
+        when(freshers.findById("fresher-id")).thenReturn(Optional.of(profile));
+        when(cloudinary.uploadWithOcr(eq(front), anyString(), eq("front")))
+                .thenReturn(new CloudinaryService.UploadResult(new com.askvocate.backend.model.CloudinaryRef(),
+                        Map.of("text", "PAN Card\nAAAPL1234C\nName: Test Lawyer\n"
+                                + "Father's Name: Test Father\nDOB: 01/02/1990")));
+        AtomicReference<com.askvocate.backend.model.UserDocument> stored = new AtomicReference<>();
+        when(documents.save(any())).thenAnswer(invocation -> {
+            com.askvocate.backend.model.UserDocument doc = invocation.getArgument(0);
+            doc.setId("pan-id");
+            stored.set(doc);
+            return doc;
+        });
+
+        var response = service.verifyDocument("fresher-id", DocumentType.PAN, front, null);
+
+        assertEquals("AAAPL1234C", stored.get().getPanNumber());
+        assertEquals("AAAPL1234C", response.getPanNumber());
+        assertEquals("XXXXXX234C", response.getMaskedDocumentNumber());
+        assertEquals("PENDING", response.getLawyerVerificationStatus());
+        when(documents.findById("pan-id")).thenReturn(Optional.of(stored.get()));
+        assertNull(service.getDocumentById("fresher-id", "pan-id").getPanNumber());
+    }
+
+    @Test
+    void panBackImageIsRejectedBeforeUpload() {
+        var profile = new LawyerFresherProfile();
+        profile.setId("fresher-id");
+        when(freshers.findById("fresher-id")).thenReturn(Optional.of(profile));
+        var back = new MockMultipartFile("back", "pan_back.jpg", "image/jpeg", new byte[]{1});
+
+        var error = assertThrows(DocumentVerificationException.class,
+                () -> service.verifyDocument("fresher-id", DocumentType.PAN, front, back));
+
+        assertEquals("pan_back.jpg", error.getFile());
+        verifyNoInteractions(cloudinary, documents);
     }
 
     private String validAadhaarNumber() {

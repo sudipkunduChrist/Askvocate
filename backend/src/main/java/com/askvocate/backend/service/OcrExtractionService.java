@@ -60,7 +60,15 @@ public class OcrExtractionService {
 
     // ── PAN patterns ────────────────────────────────────────────────────
     private static final Pattern PAN_NUMBER_PATTERN =
-            Pattern.compile("\\b([A-Z]{5}\\d{4}[A-Z])\\b");
+            Pattern.compile("(?i)\\b([A-Z]{5}[ \\t-]?\\d{4}[ \\t-]?[A-Z])\\b");
+    private static final Pattern PAN_MARKER_PATTERN = Pattern.compile(
+            "(?i)\\b(?:permanent account number|income tax department|pan card)\\b|आयकर विभाग|स्थायी लेखा संख्या|पैन कार्ड");
+    private static final Pattern PAN_NAME_LABEL_PATTERN = Pattern.compile(
+            "(?i)^[ \\t]*(?:Name(?: of Assessee)?|नाम)[ \\t]*[:：/-]?[ \\t]*(.*)$");
+    private static final Pattern PAN_FATHER_LABEL_PATTERN = Pattern.compile(
+            "(?i)^[ \\t]*(?:Father'?s?[ \\t]+Name|पिता का नाम)[ \\t]*[:：/-]?[ \\t]*(.*)$");
+    private static final Pattern PAN_DOB_LABEL_PATTERN = Pattern.compile(
+            "(?i)^[ \\t]*(?:Date[ \\t]+of[ \\t]+Birth|DOB|जन्म तिथि)[ \\t]*[:：/-]?[ \\t]*(.*)$");
     private static final Pattern FATHER_NAME_PATTERN =
             Pattern.compile("(?:Father'?s?\\s*Name|पिता का नाम)\\s*[:/]?\\s*(.+)", Pattern.CASE_INSENSITIVE);
 
@@ -151,7 +159,8 @@ public class OcrExtractionService {
                         : secondary.maskedDocumentNumber(),
                 Math.max(primary.confidence(), secondary.confidence()),
                 null,
-                primary.aadhaarNumber() != null ? primary.aadhaarNumber() : secondary.aadhaarNumber()
+                primary.aadhaarNumber() != null ? primary.aadhaarNumber() : secondary.aadhaarNumber(),
+                primary.panNumber() != null ? primary.panNumber() : secondary.panNumber()
         );
     }
 
@@ -361,48 +370,83 @@ public class OcrExtractionService {
 
     private ExtractionResult parsePan(String text, double confidence) {
         Map<String, String> fields = new HashMap<>();
-        String maskedNumber = null;
-
-        // Extract PAN number
+        if (!PAN_MARKER_PATTERN.matcher(text).find()) {
+            return new ExtractionResult(false, Map.of(), null, confidence,
+                    "The image does not contain recognizable PAN card identifiers.");
+        }
         Matcher panMatcher = PAN_NUMBER_PATTERN.matcher(text);
-        if (panMatcher.find()) {
-            String rawPan = panMatcher.group(1);
-            maskedNumber = maskPan(rawPan);
-            char entityType = rawPan.charAt(3);
-            fields.put("panType", switch (entityType) {
-                case 'P' -> "Individual";
-                case 'C' -> "Company";
-                case 'H' -> "HUF";
-                case 'F' -> "Firm / LLP";
-                case 'T' -> "Trust";
-                default -> "Other";
-            });
+        if (!panMatcher.find()) {
+            return new ExtractionResult(false, Map.of(), null, confidence,
+                    "Could not extract a valid PAN number from the card.");
+        }
+        String rawPan = panMatcher.group(1).replaceAll("[ \\t-]", "").toUpperCase();
+        if (rawPan.charAt(3) != 'P') {
+            return new ExtractionResult(false, Map.of(), null, confidence,
+                    "Only an individual PAN card can verify a lawyer profile.");
+        }
+        fields.put("panType", "Individual");
+        String[] lines = text.split("\\R");
+        String name = readPanLabeledValue(lines, PAN_NAME_LABEL_PATTERN);
+        String fatherName = readPanLabeledValue(lines, PAN_FATHER_LABEL_PATTERN);
+        String dateText = readPanLabeledValue(lines, PAN_DOB_LABEL_PATTERN);
+        if (name != null) fields.put("name", normalizeName(name));
+        if (fatherName != null) fields.put("fatherName", normalizeName(fatherName));
+        if (dateText != null) {
+            Matcher dobMatcher = DOB_PATTERN.matcher(dateText);
+            if (dobMatcher.find()) fields.put("dob", dobMatcher.group(1));
         }
 
-        // Extract name — PAN cards typically have the name after "Name" or in a specific position
-        Matcher nameMatcher = NAME_AFTER_LABEL_PATTERN.matcher(text);
-        if (nameMatcher.find()) {
-            fields.put("name", normalizeName(nameMatcher.group(1)));
-        }
-
-        // Extract father's name
-        Matcher fatherMatcher = FATHER_NAME_PATTERN.matcher(text);
-        if (fatherMatcher.find()) {
-            fields.put("fatherName", normalizeName(fatherMatcher.group(1)));
-        }
-
-        // Extract DOB
-        Matcher dobMatcher = DOB_PATTERN.matcher(text);
-        if (dobMatcher.find()) {
-            fields.put("dob", dobMatcher.group(1));
-        }
-
-        boolean success = maskedNumber != null && fields.containsKey("name");
-        String error = success ? null : "Could not extract required PAN fields (number and name).";
+        boolean success = fields.containsKey("name") && fields.containsKey("fatherName")
+                && fields.containsKey("dob");
+        String error = success ? null : !fields.containsKey("name")
+                ? "Could not extract the PAN cardholder name."
+                : !fields.containsKey("fatherName") ? "Could not extract the PAN father's name."
+                : "Could not extract the labeled PAN date of birth.";
 
         log.info("PAN extraction result: success={}, fieldsFound={}", success, fields.size());
 
-        return new ExtractionResult(success, fields, maskedNumber, confidence, error);
+        return new ExtractionResult(success, fields, success ? maskPan(rawPan) : null, confidence,
+                error, null, success ? rawPan : null);
+    }
+
+    private String readPanLabeledValue(String[] lines, Pattern labelPattern) {
+        for (int i = 0; i < lines.length; i++) {
+            Matcher label = labelPattern.matcher(lines[i]);
+            if (!label.matches()) continue;
+            String value = stripRepeatedPanLabel(label.group(1), labelPattern);
+            if (isPanFieldValue(value)) return value;
+            for (int j = i + 1; j < lines.length && j <= i + 3; j++) {
+                value = stripRepeatedPanLabel(lines[j], labelPattern);
+                if (value.isEmpty()) continue;
+                if (isPanLabel(value)) break;
+                if (isPanFieldValue(value)) return value;
+            }
+        }
+        return null;
+    }
+
+    private String stripRepeatedPanLabel(String raw, Pattern labelPattern) {
+        String value = raw.trim().replaceFirst("^[\\s:/：-]+", "");
+        for (int count = 0; count < 3; count++) {
+            Matcher repeated = labelPattern.matcher(value);
+            if (!repeated.matches()) break;
+            String remainder = repeated.group(1).trim().replaceFirst("^[\\s:/：-]+", "");
+            if (remainder.equals(value)) break;
+            value = remainder;
+        }
+        return value;
+    }
+
+    private boolean isPanLabel(String value) {
+        return PAN_NAME_LABEL_PATTERN.matcher(value).matches()
+                || PAN_FATHER_LABEL_PATTERN.matcher(value).matches()
+                || PAN_DOB_LABEL_PATTERN.matcher(value).matches();
+    }
+
+    private boolean isPanFieldValue(String value) {
+        return !value.isBlank() && !isPanLabel(value)
+                && !PAN_MARKER_PATTERN.matcher(value).find()
+                && !PAN_NUMBER_PATTERN.matcher(value).find();
     }
 
     // ── Driving License Parser ──────────────────────────────────────────
@@ -632,11 +676,18 @@ public class OcrExtractionService {
             String maskedDocumentNumber,
             double confidence,
             String error,
-            String aadhaarNumber
+            String aadhaarNumber,
+            String panNumber
     ) {
         public ExtractionResult(boolean success, Map<String, String> extractedFields,
                                 String maskedDocumentNumber, double confidence, String error) {
-            this(success, extractedFields, maskedDocumentNumber, confidence, error, null);
+            this(success, extractedFields, maskedDocumentNumber, confidence, error, null, null);
+        }
+
+        public ExtractionResult(boolean success, Map<String, String> extractedFields,
+                                String maskedDocumentNumber, double confidence, String error,
+                                String aadhaarNumber) {
+            this(success, extractedFields, maskedDocumentNumber, confidence, error, aadhaarNumber, null);
         }
     }
 }

@@ -44,7 +44,7 @@ public class DocumentVerificationController {
      * <ul>
      *   <li>{@code documentType} — AADHAAR, PAN, BAR_COUNCIL_ID, BAR_CERTIFICATE, CERTIFICATE_OF_PRACTICE, DRIVING_LICENSE</li>
      *   <li>{@code front} — front image of the document (required)</li>
-     *   <li>{@code back}  — back image of the document (required for AADHAAR, optional for others)</li>
+     *   <li>{@code back}  — back image (required for AADHAAR; omit for PAN)</li>
      *   <li>{@code userId} — optional if JWT token provided, required otherwise</li>
      * </ul>
      */

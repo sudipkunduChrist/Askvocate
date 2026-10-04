@@ -18,7 +18,7 @@ import java.util.Map;
  * <p>Stored in the {@code documents} collection. Each record is scoped to a
  * single {@code userId} (from the JWT {@code sub} claim) and a single
  * {@link DocumentType}. Raw OCR text is not persisted; Aadhaar records store
- * the validated full number separately from the masked display number.
+ * validated full Aadhaar or PAN numbers separately from the masked display number.
  */
 @Document(collection = "documents")
 public class UserDocument {
@@ -61,6 +61,11 @@ public class UserDocument {
     @Setter
     @JsonIgnore
     private String aadhaarNumber;
+
+    /** Full PAN for a verified individual PAN card. */
+    @Setter
+    @JsonIgnore
+    private String panNumber;
 
     /** References to the uploaded images on Cloudinary. */
     @Setter
@@ -122,6 +127,10 @@ public class UserDocument {
 
     public String getAadhaarNumber() {
         return aadhaarNumber;
+    }
+
+    public String getPanNumber() {
+        return panNumber;
     }
 
     public List<CloudinaryRef> getCloudinaryReferences() {
