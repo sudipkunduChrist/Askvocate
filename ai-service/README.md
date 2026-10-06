@@ -1,5 +1,9 @@
 # Askvocate AI service
 
+Document and selfie verification now run under `backend/verification`; this service is
+only for lawyer matching and legal-assistant features. It is not needed when testing
+`/api/documents/**` on the Spring backend.
+
 This service powers two separate client experiences:
 
 - `POST /legal-assistant/chat` provides a multi-turn, legal-only preliminary guidance conversation.

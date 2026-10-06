@@ -35,6 +35,50 @@ mvn clean spring-boot:run
 ```
 Base API URL: `http://localhost:8080/api`
 
+### Lawyer Aadhaar OCR and live selfie verification
+
+Document verification runs under the Spring backend. Install the local worker's free
+Python dependencies once with `python -m pip install -r verification/requirements.txt`
+from the `backend` directory, and install Tesseract OCR. On Windows the default
+`C:\Program Files\Tesseract-OCR\tesseract.exe` is detected; otherwise set `TESSERACT_CMD`.
+Spring invokes `verification/worker.py` on demand, so **port 8000 and ai-service are
+not needed for document or selfie verification**. On Windows it checks local Python
+installations and the `py` launcher automatically; set `VERIFICATION_PYTHON` to a
+specific executable if needed. If Spring starts from outside the repository
+or `backend` directory, set `VERIFICATION_WORKER_PATH` to the absolute worker path.
+Set a stable, secret `AADHAAR_HASH_KEY` to enable keyed
+Aadhaar-number hashes for duplicate detection. The full Aadhaar number follows the
+existing document schema; restrict access to the MongoDB collection and Cloudinary
+images in deployment.
+Before production rollout, reconcile that existing full-number/raw-image storage with
+[UIDAI's offline-verification guidance](https://uidai.gov.in/images/Dos_and_Don_ts_for_Offline_Verification_Seeking_entities.pdf),
+which calls for retaining only the last four digits and redacting stored card copies.
+
+`POST /api/documents/verify` accepts Aadhaar `front` and `back`. Local Tesseract OCR
+reads the English name, labeled date of birth, gender, and full printed number from the front;
+it reads only the English `Address` field from the back. Multiple local English-only
+Tesseract reads are compared for Aadhaar images. The selected OCR text is saved as
+`ocrText.front` and `ocrText.back` in the MongoDB `documents` record, including when
+field extraction fails. The Aadhaar document becomes `VERIFIED` when those fields
+are extracted; this OCR status does not establish that the card is authentic. This
+upload does not check the QR. PAN and Bar Council verification retain their existing
+parsing and status rules.
+
+After Aadhaar is verified, call `POST /api/documents/selfie/challenge?userId=...` to
+obtain a single-use three-minute `challengeId` and random `expectedTurn`. The Android
+lawyer profile has a **Verify live selfie** button that captures center, turned, and
+returned frames directly from its front camera. For API testing, submit those frames
+as multipart fields to `POST /api/documents/selfie/verify?userId=...` with `challengeId`.
+The attempt is stored in `selfie_verifications` using the existing `DocType.SELFIE`.
+The selfie step checks the signed Aadhaar QR and compares its embedded photo to the
+live capture; an Aadhaar upload without a readable signed QR cannot pass selfie matching.
+The overall lawyer profile becomes `VERIFIED` only after Bar Council, Aadhaar, PAN,
+and a selfie tied to that verified Aadhaar are all verified. A new Aadhaar submission
+requires a new selfie match.
+
+All OCR, QR, signature, and face checks run locally without a paid per-verification API.
+Cloudinary image storage remains subject to its account quota and pricing.
+
 ---
 
 ## 🔑 Authentication & User Endpoints (`/api/users`)

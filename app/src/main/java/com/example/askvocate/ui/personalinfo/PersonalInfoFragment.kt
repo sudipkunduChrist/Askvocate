@@ -2,6 +2,7 @@ package com.example.askvocate.ui.personalinfo
 
 import android.os.Bundle
 import android.content.Context
+import android.content.Intent
 import android.util.Log
 import android.view.LayoutInflater
 import android.view.View
@@ -15,6 +16,7 @@ import androidx.navigation.fragment.findNavController
 import com.example.askvocate.R
 import com.example.askvocate.network.ApiConfig
 import com.example.askvocate.util.SessionManager
+import com.example.askvocate.ui.verification.LiveSelfieActivity
 import com.example.askvocate.util.ToastType
 import com.example.askvocate.util.showCustomToast
 import com.google.android.material.appbar.MaterialToolbar
@@ -140,6 +142,11 @@ class PersonalInfoFragment : Fragment() {
         isLawyer = userRole.equals("LAWYER_FRESHER", ignoreCase = true) || 
                    userRole.equals("LAWYER_EXPERIENCED", ignoreCase = true)
         isExperienced = userRole.equals("LAWYER_EXPERIENCED", ignoreCase = true)
+
+        view.findViewById<MaterialButton>(R.id.btn_live_selfie).apply {
+            isVisible = isLawyer
+            setOnClickListener { startActivity(Intent(requireContext(), LiveSelfieActivity::class.java)) }
+        }
 
         tvDisplayRole.text = formatRole(userRole)
 

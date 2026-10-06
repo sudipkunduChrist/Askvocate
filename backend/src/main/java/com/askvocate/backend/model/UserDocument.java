@@ -17,8 +17,8 @@ import java.util.Map;
  * 
  * <p>Stored in the {@code documents} collection. Each record is scoped to a
  * single {@code userId} (from the JWT {@code sub} claim) and a single
- * {@link DocumentType}. Raw OCR text is not persisted; Aadhaar records store
- * validated full Aadhaar or PAN numbers separately from the masked display number.
+ * {@link DocumentType}. Aadhaar OCR text is persisted separately for each side;
+ * full document numbers remain separate from the masked display number.
  */
 @Document(collection = "documents")
 public class UserDocument {
@@ -49,6 +49,11 @@ public class UserDocument {
     @Setter
     private Map<String, String> extractedData = new HashMap<>();
 
+    /** Raw OCR output from the Aadhaar front and back, retained for extraction review. */
+    @Setter
+    @JsonIgnore
+    private Map<String, String> ocrText = new HashMap<>();
+
     /**
      * Masked document number for display purposes.
      * 
@@ -57,10 +62,15 @@ public class UserDocument {
     @Setter
     private String maskedDocumentNumber;
 
-    /** Full checksum-valid Aadhaar number for a verified Aadhaar record. */
+    /** Full number read from the Aadhaar front by OCR; it may contain OCR errors. */
     @Setter
     @JsonIgnore
     private String aadhaarNumber;
+
+    /** Keyed digest for duplicate detection; never a plain SHA-256 of the number. */
+    @Setter
+    @JsonIgnore
+    private String aadhaarNumberHash;
 
     /** Full PAN for a verified individual PAN card. */
     @Setter
@@ -71,9 +81,34 @@ public class UserDocument {
     @Setter
     private List<CloudinaryRef> cloudinaryReferences = new ArrayList<>();
 
-    /** OCR confidence score (0.0–1.0). Raw OCR text is never stored. */
+    /** OCR confidence score (0.0–1.0). */
     @Setter
     private Double ocrConfidence;
+
+    /** Data decoded from a signature-verified UIDAI QR, excluding the photograph. */
+    @Setter
+    private Map<String, String> qrDecodedData;
+    @Setter
+    private Boolean isQrVerified;
+    @Setter
+    @JsonIgnore
+    private String submissionToken;
+    @Setter
+    private String qrImageSide;
+    @Setter
+    private Boolean qrPrintedMismatch;
+    @Setter
+    private List<String> qrMismatchFields;
+    @Setter
+    private Double confidenceScore;
+    @Setter
+    private Boolean autoApproved;
+    @Setter
+    private Boolean requiresManualReview;
+    @Setter
+    private String manualReviewReason;
+    @Setter
+    private Instant verifiedAt;
 
     /** Reason for failure if {@link #verificationStatus} is {@code FAILED}. */
     @Setter
@@ -121,6 +156,10 @@ public class UserDocument {
         return extractedData;
     }
 
+    public Map<String, String> getOcrText() {
+        return ocrText;
+    }
+
     public String getMaskedDocumentNumber() {
         return maskedDocumentNumber;
     }
@@ -128,6 +167,8 @@ public class UserDocument {
     public String getAadhaarNumber() {
         return aadhaarNumber;
     }
+
+    public String getAadhaarNumberHash() { return aadhaarNumberHash; }
 
     public String getPanNumber() {
         return panNumber;
@@ -140,6 +181,18 @@ public class UserDocument {
     public Double getOcrConfidence() {
         return ocrConfidence;
     }
+
+    public Map<String, String> getQrDecodedData() { return qrDecodedData; }
+    public Boolean getIsQrVerified() { return isQrVerified; }
+    public String getSubmissionToken() { return submissionToken; }
+    public String getQrImageSide() { return qrImageSide; }
+    public Boolean getQrPrintedMismatch() { return qrPrintedMismatch; }
+    public List<String> getQrMismatchFields() { return qrMismatchFields; }
+    public Double getConfidenceScore() { return confidenceScore; }
+    public Boolean getAutoApproved() { return autoApproved; }
+    public Boolean getRequiresManualReview() { return requiresManualReview; }
+    public String getManualReviewReason() { return manualReviewReason; }
+    public Instant getVerifiedAt() { return verifiedAt; }
 
     public String getFailureReason() {
         return failureReason;

@@ -26,6 +26,10 @@ public class DocumentController {
             @RequestParam DocType docType,
             @RequestParam("file") MultipartFile file) {
         try {
+            if (docType == DocType.SELFIE) {
+                return ResponseEntity.ok(Map.of("success", false,
+                        "error", "Use /api/documents/selfie/challenge and /api/documents/selfie/verify for live selfie verification."));
+            }
             UserDoc doc = documentService.uploadDocument(userId, docType, file);
             return ResponseEntity.ok(Map.of(
                     "success", true,

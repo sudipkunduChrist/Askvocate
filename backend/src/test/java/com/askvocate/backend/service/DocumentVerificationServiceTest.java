@@ -12,6 +12,7 @@ import com.askvocate.backend.repository.ClientProfileRepository;
 import com.askvocate.backend.repository.LawyerExperiencedProfileRepository;
 import com.askvocate.backend.repository.LawyerFresherProfileRepository;
 import com.askvocate.backend.repository.UserDocumentRepository;
+import com.askvocate.backend.repository.SelfieVerificationRepository;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
@@ -51,6 +52,12 @@ class DocumentVerificationServiceTest {
 
     @Mock
     private ClientProfileRepository clientProfileRepository;
+
+    @Mock
+    private VisionVerificationClient visionVerificationClient;
+
+    @Mock
+    private SelfieVerificationRepository selfieVerificationRepository;
 
     @InjectMocks
     private DocumentVerificationService documentVerificationService;
@@ -119,6 +126,9 @@ class DocumentVerificationServiceTest {
         aadharDoc.setUserId("lawyer-123");
         aadharDoc.setDocumentType(DocumentType.AADHAAR);
         aadharDoc.setVerificationStatus(VerificationStatus.VERIFIED);
+        aadharDoc.setIsQrVerified(true);
+        aadharDoc.setQrPrintedMismatch(false);
+        aadharDoc.setSubmissionToken("aadhaar-revision");
 
         UserDocument panDoc = new UserDocument();
         panDoc.setId("doc-pan");
@@ -128,6 +138,8 @@ class DocumentVerificationServiceTest {
 
         when(documentRepository.findByUserId("lawyer-123"))
                 .thenReturn(List.of(barDoc, aadharDoc, panDoc));
+        when(selfieVerificationRepository.existsByUserIdAndAadhaarDocumentIdAndAadhaarSubmissionTokenAndVerificationStatus(
+                "lawyer-123", "doc-aadhaar", "aadhaar-revision", VerificationStatus.VERIFIED)).thenReturn(true);
 
         LawyerVerificationSummaryResponse summary = documentVerificationService.getLawyerVerificationSummary("lawyer-123");
 
@@ -151,12 +163,15 @@ class DocumentVerificationServiceTest {
         UserDocument aadhaar = new UserDocument();
         aadhaar.setDocumentType(DocumentType.AADHAAR);
         aadhaar.setVerificationStatus(VerificationStatus.VERIFIED);
+        aadhaar.setIsQrVerified(true);
+        aadhaar.setQrPrintedMismatch(false);
+        aadhaar.setSubmissionToken("aadhaar-revision");
         when(documentRepository.findByUserId("lawyer-123")).thenReturn(List.of(aadhaar));
 
         LawyerVerificationSummaryResponse summary = documentVerificationService.getLawyerVerificationSummary("lawyer-123");
 
         assertEquals(Verification_Status.PENDING, summary.getVerificationStatus());
-        assertEquals(33, summary.getCompletionPercentage());
+        assertEquals(25, summary.getCompletionPercentage());
         assertFalse(summary.isBarCouncilVerified());
     }
 
@@ -168,11 +183,16 @@ class DocumentVerificationServiceTest {
         aadhaar.setId("aadhaar-id");
         aadhaar.setDocumentType(DocumentType.AADHAAR);
         aadhaar.setVerificationStatus(VerificationStatus.VERIFIED);
+        aadhaar.setIsQrVerified(true);
+        aadhaar.setQrPrintedMismatch(false);
+        aadhaar.setSubmissionToken("aadhaar-revision");
         UserDocument pan = new UserDocument();
         pan.setId("pan-id");
         pan.setDocumentType(DocumentType.PAN);
         pan.setVerificationStatus(VerificationStatus.VERIFIED);
         when(documentRepository.findByUserId("lawyer-123")).thenReturn(List.of(aadhaar, pan));
+        when(selfieVerificationRepository.existsByUserIdAndAadhaarDocumentIdAndAadhaarSubmissionTokenAndVerificationStatus(
+                "lawyer-123", "aadhaar-id", "aadhaar-revision", VerificationStatus.VERIFIED)).thenReturn(true);
         when(documentRepository.save(any(UserDocument.class))).thenAnswer(invocation -> {
             UserDocument doc = invocation.getArgument(0);
             doc.setId("bar-id");

@@ -5,6 +5,7 @@ import com.askvocate.backend.model.VerificationStatus;
 
 import java.time.Instant;
 import java.util.Map;
+import java.util.List;
 
 /**
  * Response DTO returned to the client after document verification.
@@ -26,6 +27,16 @@ public class DocumentVerificationResponse {
     private String panNumber;
     private Map<String, String> extractedFields;
     private Double ocrConfidence;
+    private Map<String, String> qrDecodedData;
+    private Boolean isQrVerified;
+    private String qrImageSide;
+    private Boolean qrPrintedMismatch;
+    private List<String> qrMismatchFields;
+    private Double confidenceScore;
+    private Boolean autoApproved;
+    private Boolean requiresManualReview;
+    private String manualReviewReason;
+    private Instant verifiedAt;
     private String failureReason;
     private String file;
     private Instant submittedAt;
@@ -150,6 +161,27 @@ public class DocumentVerificationResponse {
     public void setOcrConfidence(Double ocrConfidence) {
         this.ocrConfidence = ocrConfidence;
     }
+
+    public Map<String, String> getQrDecodedData() { return qrDecodedData; }
+    public void setQrDecodedData(Map<String, String> value) { qrDecodedData = value; }
+    public Boolean getIsQrVerified() { return isQrVerified; }
+    public void setIsQrVerified(Boolean value) { isQrVerified = value; }
+    public String getQrImageSide() { return qrImageSide; }
+    public void setQrImageSide(String value) { qrImageSide = value; }
+    public Boolean getQrPrintedMismatch() { return qrPrintedMismatch; }
+    public void setQrPrintedMismatch(Boolean value) { qrPrintedMismatch = value; }
+    public List<String> getQrMismatchFields() { return qrMismatchFields; }
+    public void setQrMismatchFields(List<String> value) { qrMismatchFields = value; }
+    public Double getConfidenceScore() { return confidenceScore; }
+    public void setConfidenceScore(Double value) { confidenceScore = value; }
+    public Boolean getAutoApproved() { return autoApproved; }
+    public void setAutoApproved(Boolean value) { autoApproved = value; }
+    public Boolean getRequiresManualReview() { return requiresManualReview; }
+    public void setRequiresManualReview(Boolean value) { requiresManualReview = value; }
+    public String getManualReviewReason() { return manualReviewReason; }
+    public void setManualReviewReason(String value) { manualReviewReason = value; }
+    public Instant getVerifiedAt() { return verifiedAt; }
+    public void setVerifiedAt(Instant value) { verifiedAt = value; }
 
     public String getFailureReason() {
         return failureReason;

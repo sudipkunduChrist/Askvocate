@@ -1,0 +1,52 @@
+<?xml version="1.0" encoding="utf-8"?>
+<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    android:layout_width="match_parent"
+    android:layout_height="match_parent"
+    android:background="@color/splash_background"
+    android:gravity="center"
+    android:orientation="vertical"
+    android:padding="32dp">
+
+    <ImageView
+        android:id="@+id/iv_logo"
+        android:layout_width="112dp"
+        android:layout_height="112dp"
+        android:contentDescription="@string/app_name"
+        android:src="@drawable/app_logo" />
+
+    <TextView
+        android:id="@+id/tv_brand_name"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:layout_marginTop="20dp"
+        android:text="Askvocate"
+        android:textColor="@color/splash_text"
+        android:textSize="32sp"
+        android:textStyle="bold" />
+
+    <LinearLayout
+        android:id="@+id/tagline_container"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:layout_marginTop="10dp">
+        <TextView
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:text="Legal help, made accessible"
+            android:textColor="@color/splash_text_variant"
+            android:textSize="16sp" />
+    </LinearLayout>
+
+    <FrameLayout
+        android:id="@+id/progress_container"
+        android:layout_width="200dp"
+        android:layout_height="4dp"
+        android:layout_marginTop="36dp"
+        android:background="@color/splash_primary">
+        <View
+            android:id="@+id/progress_sheen"
+            android:layout_width="70dp"
+            android:layout_height="match_parent"
+            android:background="@android:color/white" />
+    </FrameLayout>
+</LinearLayout>

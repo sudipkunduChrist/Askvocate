@@ -4,10 +4,10 @@ package com.askvocate.backend.model;
  * Lifecycle status of a document verification attempt.
  */
 public enum VerificationStatus {
-    /** Document uploaded, OCR in progress or pending review. */
+    /** Submitted document or selfie awaiting all required checks. */
     PENDING,
 
-    /** OCR extraction succeeded and data passed validation. */
+    /** All required checks for this document type passed. */
     VERIFIED,
 
     /** OCR extraction failed or extracted data did not pass validation. */

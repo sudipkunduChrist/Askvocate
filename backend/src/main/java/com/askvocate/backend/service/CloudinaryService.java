@@ -8,6 +8,11 @@ import org.springframework.stereotype.Service;
 import org.springframework.web.multipart.MultipartFile;
 
 import java.io.IOException;
+import java.net.URI;
+import java.net.http.HttpClient;
+import java.net.http.HttpRequest;
+import java.net.http.HttpResponse;
+import java.time.Duration;
 import java.util.Map;
 
 @Service
@@ -16,33 +21,64 @@ public class CloudinaryService {
     @Autowired
     private Cloudinary cloudinary;
 
+    @Autowired
+    private VisionVerificationClient visionVerificationClient;
+
     public String uploadFile(MultipartFile file, String folder) throws IOException {
         Map<String, Object> options = ObjectUtils.asMap("folder", folder);
         Map<?, ?> uploadResult = cloudinary.uploader().upload(file.getBytes(), options);
         return (String) uploadResult.get("secure_url");
     }
 
+    public CloudinaryRef uploadSelfie(MultipartFile file, String folder) throws IOException {
+        Map<?, ?> result = cloudinary.uploader().upload(file.getBytes(), ObjectUtils.asMap("folder", folder));
+        return new CloudinaryRef((String) result.get("public_id"), (String) result.get("secure_url"), "selfie");
+    }
+
+    public byte[] downloadReference(CloudinaryRef ref) throws IOException {
+        try {
+            URI uri = URI.create(ref.getSecureUrl());
+            if (!"https".equals(uri.getScheme()) || !"res.cloudinary.com".equals(uri.getHost())) {
+                throw new IOException("Invalid Cloudinary image URL.");
+            }
+            HttpClient client = HttpClient.newBuilder().followRedirects(HttpClient.Redirect.NEVER)
+                    .connectTimeout(Duration.ofSeconds(5)).build();
+            HttpResponse<byte[]> response = client.send(HttpRequest.newBuilder(uri).timeout(Duration.ofSeconds(10))
+                    .GET().build(), HttpResponse.BodyHandlers.ofByteArray());
+            if (response.statusCode() != 200 || response.body().length > 10 * 1024 * 1024) {
+                throw new IOException("Aadhaar back image is unavailable or too large.");
+            }
+            return response.body();
+        } catch (InterruptedException e) {
+            Thread.currentThread().interrupt();
+            throw new IOException("Aadhaar image download interrupted.", e);
+        } catch (IllegalArgumentException e) {
+            throw new IOException("Invalid Cloudinary image URL.", e);
+        }
+    }
+
     /**
-     * Uploads a file with OCR enabled and returns both the Cloudinary reference
-     * and the raw OCR data extracted from the image.
+     * Runs free local OCR before uploading the file to Cloudinary storage.
      */
     public UploadResult uploadWithOcr(MultipartFile file, String folder, String tag) throws IOException {
+        byte[] image = file.getBytes();
+        Map<String, Object> ocrData = visionVerificationClient.localOcr(
+                image, folder.endsWith("/AADHAAR") ? tag : "");
         Map<String, Object> options = ObjectUtils.asMap(
                 "folder", folder,
-                "tags", tag,
-                "ocr", "adv_ocr"
+                "tags", tag
         );
         
         @SuppressWarnings("unchecked")
-        Map<String, Object> uploadResult = (Map<String, Object>) cloudinary.uploader().upload(file.getBytes(), options);
+        Map<String, Object> uploadResult = (Map<String, Object>) cloudinary.uploader().upload(image, options);
         
         String publicId = (String) uploadResult.get("public_id");
         String secureUrl = (String) uploadResult.get("secure_url");
-        Object ocrData = uploadResult.get("info");
         
         CloudinaryRef ref = new CloudinaryRef();
         ref.setPublicId(publicId);
         ref.setSecureUrl(secureUrl);
+        ref.setLabel(tag);
         
         return new UploadResult(ref, ocrData);
     }

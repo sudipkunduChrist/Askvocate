@@ -11,12 +11,17 @@ import com.askvocate.backend.repository.ClientProfileRepository;
 import com.askvocate.backend.repository.LawyerExperiencedProfileRepository;
 import com.askvocate.backend.repository.LawyerFresherProfileRepository;
 import com.askvocate.backend.repository.UserDocumentRepository;
+import com.askvocate.backend.repository.SelfieVerificationRepository;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.stereotype.Service;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.web.multipart.MultipartFile;
 
 import java.time.Instant;
+import java.nio.charset.StandardCharsets;
+import javax.crypto.Mac;
+import javax.crypto.spec.SecretKeySpec;
 import java.util.*;
 
 /**
@@ -36,6 +41,9 @@ public class DocumentVerificationService {
     private final LawyerExperiencedProfileRepository lawyerExperiencedProfileRepository;
     private final LawyerFresherProfileRepository lawyerFresherProfileRepository;
     private final ClientProfileRepository clientProfileRepository;
+    private final VisionVerificationClient visionVerificationClient;
+    private final SelfieVerificationRepository selfieVerificationRepository;
+    private final String aadhaarHashKey;
 
     public DocumentVerificationService(CloudinaryService cloudinaryService,
                                        OcrExtractionService ocrExtractionService,
@@ -43,7 +51,10 @@ public class DocumentVerificationService {
                                        UserDocumentRepository documentRepository,
                                        LawyerExperiencedProfileRepository lawyerExperiencedProfileRepository,
                                        LawyerFresherProfileRepository lawyerFresherProfileRepository,
-                                       ClientProfileRepository clientProfileRepository) {
+                                       ClientProfileRepository clientProfileRepository,
+                                       VisionVerificationClient visionVerificationClient,
+                                       SelfieVerificationRepository selfieVerificationRepository,
+                                       @Value("${verification.aadhaar-hash-key:}") String aadhaarHashKey) {
         this.cloudinaryService = cloudinaryService;
         this.ocrExtractionService = ocrExtractionService;
         this.barCouncilValidationService = barCouncilValidationService;
@@ -51,6 +62,9 @@ public class DocumentVerificationService {
         this.lawyerExperiencedProfileRepository = lawyerExperiencedProfileRepository;
         this.lawyerFresherProfileRepository = lawyerFresherProfileRepository;
         this.clientProfileRepository = clientProfileRepository;
+        this.visionVerificationClient = visionVerificationClient;
+        this.selfieVerificationRepository = selfieVerificationRepository;
+        this.aadhaarHashKey = aadhaarHashKey;
     }
 
     /**
@@ -75,12 +89,17 @@ public class DocumentVerificationService {
         OcrExtractionService.ExtractionResult extractionResult;
         String failureFile = null;
         String currentFile = safeFileName(frontImage);
+        Map<String, String> aadhaarOcrText = new LinkedHashMap<>();
 
         try {
             // 2. Upload front image with OCR
             log.info("Uploading front image for userId={}, documentType={}", userId, documentType);
             CloudinaryService.UploadResult frontResult = uploadWithOcr(frontImage, folder, "front");
             cloudinaryRefs.add(frontResult.cloudinaryRef());
+            if (documentType == DocumentType.AADHAAR) {
+                aadhaarOcrText.put("front", Objects.toString(
+                        ocrExtractionService.extractTextFromOcrResponse(frontResult.rawOcrData()), ""));
+            }
 
             // 3. Extract OCR from front
             OcrExtractionService.ExtractionResult frontExtraction =
@@ -93,21 +112,19 @@ public class DocumentVerificationService {
                 log.info("Uploading back image for userId={}, documentType={}", userId, documentType);
                 CloudinaryService.UploadResult backResult = uploadWithOcr(backImage, folder, "back");
                 cloudinaryRefs.add(backResult.cloudinaryRef());
+                if (documentType == DocumentType.AADHAAR) {
+                    aadhaarOcrText.put("back", Objects.toString(
+                            ocrExtractionService.extractTextFromOcrResponse(backResult.rawOcrData()), ""));
+                }
 
                 OcrExtractionService.ExtractionResult backExtraction =
                         ocrExtractionService.extract(backResult.rawOcrData(), documentType, "back");
                 if (!backExtraction.success() && failureFile == null) failureFile = currentFile;
 
                 // Merge front + back results
-                extractionResult = ocrExtractionService.mergeResults(frontExtraction, backExtraction);
-                if (documentType == DocumentType.AADHAAR && extractionResult.success()
-                        && frontExtraction.aadhaarNumber() != null
-                        && backExtraction.aadhaarNumber() != null
-                        && !frontExtraction.aadhaarNumber().equals(backExtraction.aadhaarNumber())) {
-                    extractionResult = new OcrExtractionService.ExtractionResult(false, Map.of(), null, 0.0,
-                            "Aadhaar numbers on front and back do not match.");
-                    failureFile = currentFile;
-                }
+                extractionResult = documentType == DocumentType.AADHAAR
+                        ? ocrExtractionService.mergeAadhaarResults(frontExtraction, backExtraction)
+                        : ocrExtractionService.mergeResults(frontExtraction, backExtraction);
             } else {
                 extractionResult = frontExtraction;
             }
@@ -119,14 +136,16 @@ public class DocumentVerificationService {
             } catch (Exception cleanupException) {
                 log.warn("Failed to clean up Cloudinary assets after verification failure", cleanupException);
             }
+            if (e instanceof DocumentVerificationException verificationError) {
+                throw new DocumentVerificationException(verificationError.getMessage(), verificationError, currentFile);
+            }
             throw new DocumentVerificationException("Document upload or OCR processing failed. Please try again.",
                     e, currentFile);
         }
 
         // 5. Determine verification status
         VerificationStatus status = extractionResult.success()
-                ? VerificationStatus.VERIFIED
-                : VerificationStatus.FAILED;
+                ? VerificationStatus.VERIFIED : VerificationStatus.FAILED;
 
         // If verification failed, delete the uploaded image from Cloudinary immediately to avoid storing junk/invalid files
         if (!extractionResult.success()) {
@@ -142,16 +161,34 @@ public class DocumentVerificationService {
 
         userDocument.setUserId(userId);
         userDocument.setDocumentType(documentType);
+        if (documentType == DocumentType.AADHAAR) userDocument.setSubmissionToken(UUID.randomUUID().toString());
         userDocument.setVerificationStatus(status);
-        userDocument.setExtractedData(extractionResult.success() ? extractionResult.extractedFields() : Map.of());
-        userDocument.setMaskedDocumentNumber(extractionResult.success() ? extractionResult.maskedDocumentNumber() : null);
-        userDocument.setAadhaarNumber(extractionResult.success() && documentType == DocumentType.AADHAAR
+        userDocument.setExtractedData(documentType == DocumentType.AADHAAR || extractionResult.success()
+                ? extractionResult.extractedFields() : Map.of());
+        userDocument.setOcrText(documentType == DocumentType.AADHAAR ? aadhaarOcrText : Map.of());
+        userDocument.setMaskedDocumentNumber(documentType == DocumentType.AADHAAR || extractionResult.success()
+                ? extractionResult.maskedDocumentNumber() : null);
+        userDocument.setAadhaarNumber(documentType == DocumentType.AADHAAR
                 ? extractionResult.aadhaarNumber() : null);
+        userDocument.setAadhaarNumberHash(documentType == DocumentType.AADHAAR
+                ? hashAadhaar(extractionResult.aadhaarNumber()) : null);
         userDocument.setPanNumber(extractionResult.success() && documentType == DocumentType.PAN
                 ? extractionResult.panNumber() : null);
         userDocument.setCloudinaryReferences(cloudinaryRefs);
         userDocument.setOcrConfidence(extractionResult.confidence());
         userDocument.setUpdatedAt(Instant.now());
+        if (documentType == DocumentType.AADHAAR) {
+            userDocument.setIsQrVerified(null);
+            userDocument.setQrImageSide(null);
+            userDocument.setQrDecodedData(null);
+            userDocument.setQrPrintedMismatch(null);
+            userDocument.setQrMismatchFields(null);
+            userDocument.setRequiresManualReview(false);
+            userDocument.setManualReviewReason(null);
+            userDocument.setAutoApproved(false);
+            userDocument.setConfidenceScore(extractionResult.confidence());
+        }
+        userDocument.setVerifiedAt(status == VerificationStatus.VERIFIED ? Instant.now() : null);
 
         if (!extractionResult.success()) {
             userDocument.setFailureReason(extractionResult.error());
@@ -162,6 +199,17 @@ public class DocumentVerificationService {
         }
 
         UserDocument saved = documentRepository.save(userDocument);
+        if (documentType == DocumentType.AADHAAR && saved.getId() != null) {
+            var olderSelfies = selfieVerificationRepository.findByUserIdAndAadhaarDocumentIdAndVerificationStatus(
+                    userId, saved.getId(), VerificationStatus.VERIFIED);
+            for (SelfieVerification selfie : olderSelfies) {
+                selfie.setVerificationStatus(VerificationStatus.PENDING);
+                selfie.setVerifiedAt(null);
+                selfie.setFailureReason("Aadhaar was resubmitted; capture a new live selfie.");
+                selfie.setUpdatedAt(Instant.now());
+                selfieVerificationRepository.save(selfie);
+            }
+        }
         log.info("Document verification saved: id={}, userId={}, type={}, status={}",
                 saved.getId(), userId, documentType, status);
 
@@ -278,40 +326,36 @@ public class DocumentVerificationService {
                         && d.getVerificationStatus() == VerificationStatus.VERIFIED
         );
 
-        boolean aadhaarVerified = documents.stream().anyMatch(d ->
-                d.getDocumentType() == DocumentType.AADHAAR
-                        && d.getVerificationStatus() == VerificationStatus.VERIFIED
-        );
+        boolean aadhaarVerified = documents.stream().anyMatch(this::isVerifiedAadhaar);
 
         boolean panVerified = documents.stream().anyMatch(d ->
                 d.getDocumentType() == DocumentType.PAN
                         && d.getVerificationStatus() == VerificationStatus.VERIFIED
         );
 
-        boolean identityVerified = aadhaarVerified && panVerified;
+        boolean selfieVerified = documents.stream().anyMatch(d -> hasVerifiedSelfie(userId, d));
+        boolean identityVerified = aadhaarVerified && panVerified && selfieVerified;
 
-        int verifiedCount = (barCouncilVerified ? 1 : 0) + (aadhaarVerified ? 1 : 0) + (panVerified ? 1 : 0);
-        int completionPercentage = switch (verifiedCount) {
-            case 3 -> 100;
-            case 2 -> 67;
-            case 1 -> 33;
-            default -> 0;
-        };
-        if (verifiedCount < 3) overallStatus = Verification_Status.PENDING;
+        int verifiedCount = (barCouncilVerified ? 1 : 0) + (aadhaarVerified ? 1 : 0)
+                + (panVerified ? 1 : 0) + (selfieVerified ? 1 : 0);
+        int completionPercentage = verifiedCount * 25;
+        if (verifiedCount < 4) overallStatus = Verification_Status.PENDING;
 
         List<String> missing = new ArrayList<>();
         if (!barCouncilVerified) missing.add("Bar Council ID / Certificate");
         if (!aadhaarVerified) missing.add("Aadhaar Card (front + back)");
         if (!panVerified) missing.add("PAN Card");
+        if (!selfieVerified) missing.add("Live Selfie");
 
         String nextStep = missing.isEmpty()
-                ? "All 3 mandatory documents (Bar Council, Aadhaar, PAN) are fully verified. 100% document verification process complete!"
+                ? "Bar Council, Aadhaar, PAN, and live selfie are verified."
                 : "Missing: " + String.join(" and ", missing) + " to achieve 100% document verification process complete (" + completionPercentage + "% completed).";
 
         Map<String, Object> summaryDetails = new LinkedHashMap<>();
         summaryDetails.put("totalDocumentsSubmitted", documents.size());
         summaryDetails.put("isFullyVerified", completionPercentage == 100);
-        summaryDetails.put("mandatoryDocumentsRequired", 3);
+        summaryDetails.put("mandatoryDocumentsRequired", 4);
+        summaryDetails.put("selfieVerified", selfieVerified);
         summaryDetails.put("mandatoryDocumentsVerified", verifiedCount);
 
         return LawyerVerificationSummaryResponse.builder()
@@ -391,33 +435,28 @@ public class DocumentVerificationService {
                         && d.getVerificationStatus() == VerificationStatus.VERIFIED
         );
 
-        boolean hasAadhaarVerified = allDocs.stream().anyMatch(d ->
-                d.getDocumentType() == DocumentType.AADHAAR
-                        && d.getVerificationStatus() == VerificationStatus.VERIFIED
-        );
+        boolean hasAadhaarVerified = allDocs.stream().anyMatch(this::isVerifiedAadhaar);
 
         boolean hasPanVerified = allDocs.stream().anyMatch(d ->
                 d.getDocumentType() == DocumentType.PAN
                         && d.getVerificationStatus() == VerificationStatus.VERIFIED
         );
 
-        int verifiedCount = (hasBarCouncilVerified ? 1 : 0) + (hasAadhaarVerified ? 1 : 0) + (hasPanVerified ? 1 : 0);
-        int percentage = switch (verifiedCount) {
-            case 3 -> 100;
-            case 2 -> 67;
-            case 1 -> 33;
-            default -> 0;
-        };
-        boolean isFullyVerified = verifiedCount == 3;
+        boolean hasSelfieVerified = allDocs.stream().anyMatch(d -> hasVerifiedSelfie(userId, d));
+        int verifiedCount = (hasBarCouncilVerified ? 1 : 0) + (hasAadhaarVerified ? 1 : 0)
+                + (hasPanVerified ? 1 : 0) + (hasSelfieVerified ? 1 : 0);
+        int percentage = verifiedCount * 25;
+        boolean isFullyVerified = verifiedCount == 4;
 
         List<String> remainingDocs = new ArrayList<>();
         if (!hasBarCouncilVerified) remainingDocs.add("Bar Council ID / Certificate");
         if (!hasAadhaarVerified) remainingDocs.add("Aadhaar Card");
         if (!hasPanVerified) remainingDocs.add("PAN Card");
+        if (!hasSelfieVerified) remainingDocs.add("Live Selfie");
 
         String progressMsg = isFullyVerified
-                ? "All 3 mandatory documents (Bar Council, Aadhaar, PAN) verified! 100% document verification process complete."
-                : doc.getDocumentType() + " verified successfully (" + percentage + "% complete). Missing: " + String.join(", ", remainingDocs) + " to achieve 100% document verification process complete.";
+                ? "Bar Council, Aadhaar, PAN, and live selfie verified."
+                : doc.getDocumentType() + " processed (" + percentage + "% complete). Missing: " + String.join(", ", remainingDocs) + ".";
 
         if (expOpt.isEmpty() && fresherOpt.isEmpty()) {
             throw new DocumentVerificationException("Invalid userID or lawyer role.");
@@ -447,7 +486,9 @@ public class DocumentVerificationService {
                 exp.setVerifiedAt(null);
                 lawyerExperiencedProfileRepository.save(exp);
                 return new LawyerUpdateResult(true, Verification_Status.PENDING, nameMatch,
-                        "Document verification failed: " + doc.getFailureReason());
+                        doc.getVerificationStatus() == VerificationStatus.PENDING
+                                ? "Aadhaar is pending signed QR and printed-field matching: " + doc.getManualReviewReason()
+                                : "Document verification failed: " + doc.getFailureReason());
             }
         } else {
             LawyerFresherProfile fresher = fresherOpt.get();
@@ -473,7 +514,9 @@ public class DocumentVerificationService {
                 fresher.setVerifiedAt(null);
                 lawyerFresherProfileRepository.save(fresher);
                 return new LawyerUpdateResult(true, Verification_Status.PENDING, nameMatch,
-                        "Document verification failed: " + doc.getFailureReason());
+                        doc.getVerificationStatus() == VerificationStatus.PENDING
+                                ? "Aadhaar is pending signed QR and printed-field matching: " + doc.getManualReviewReason()
+                                : "Document verification failed: " + doc.getFailureReason());
             }
         }
     }
@@ -513,6 +556,17 @@ public class DocumentVerificationService {
         }
     }
 
+    private String hashAadhaar(String number) {
+        if (number == null || aadhaarHashKey == null || aadhaarHashKey.isBlank()) return null;
+        try {
+            Mac mac = Mac.getInstance("HmacSHA256");
+            mac.init(new SecretKeySpec(aadhaarHashKey.getBytes(StandardCharsets.UTF_8), "HmacSHA256"));
+            return HexFormat.of().formatHex(mac.doFinal(number.getBytes(StandardCharsets.UTF_8)));
+        } catch (Exception e) {
+            throw new IllegalStateException("Could not hash Aadhaar number", e);
+        }
+    }
+
     // ── Validation ──────────────────────────────────────────────────────
 
     private void validateExistingLawyer(String userId) {
@@ -534,6 +588,10 @@ public class DocumentVerificationService {
         }
     }
 
+    public void requireExistingLawyer(String userId) {
+        validateExistingLawyer(userId);
+    }
+
     private void rejectCompletedLawyerVerification(String userId) {
         Optional<LawyerExperiencedProfile> experienced = findExperiencedLawyer(userId);
         Optional<LawyerFresherProfile> fresher = findFresherLawyer(userId);
@@ -542,7 +600,7 @@ public class DocumentVerificationService {
         if (!markedVerified) return;
 
         List<UserDocument> documents = documentRepository.findByUserId(userId);
-        if (hasAllRequiredDocuments(documents)) {
+        if (hasAllRequiredDocuments(userId, documents)) {
             throw new DocumentVerificationException("Lawyer verification is already complete; re-verification is not required.");
         }
 
@@ -559,21 +617,46 @@ public class DocumentVerificationService {
         });
     }
 
-    private boolean hasAllRequiredDocuments(List<UserDocument> documents) {
+    private boolean hasAllRequiredDocuments(String userId, List<UserDocument> documents) {
         boolean bar = documents.stream().anyMatch(d ->
                 (d.getDocumentType() == DocumentType.BAR_COUNCIL_ID
                         || d.getDocumentType() == DocumentType.BAR_CERTIFICATE
                         || d.getDocumentType() == DocumentType.CERTIFICATE_OF_PRACTICE)
                         && d.getVerificationStatus() == VerificationStatus.VERIFIED);
-        boolean aadhaar = documents.stream().anyMatch(d -> d.getDocumentType() == DocumentType.AADHAAR
-                && d.getVerificationStatus() == VerificationStatus.VERIFIED);
+        boolean aadhaar = documents.stream().anyMatch(this::isVerifiedAadhaar);
         boolean pan = documents.stream().anyMatch(d -> d.getDocumentType() == DocumentType.PAN
                 && d.getVerificationStatus() == VerificationStatus.VERIFIED);
-        return bar && aadhaar && pan;
+        boolean selfie = documents.stream().anyMatch(d -> hasVerifiedSelfie(userId, d));
+        return bar && aadhaar && pan && selfie;
+    }
+
+    private boolean isVerifiedAadhaar(UserDocument document) {
+        return document.getDocumentType() == DocumentType.AADHAAR
+                && document.getVerificationStatus() == VerificationStatus.VERIFIED;
+    }
+
+    private boolean hasVerifiedSelfie(String userId, UserDocument aadhaar) {
+        return isVerifiedAadhaar(aadhaar) && aadhaar.getId() != null && aadhaar.getSubmissionToken() != null
+                && selfieVerificationRepository.existsByUserIdAndAadhaarDocumentIdAndAadhaarSubmissionTokenAndVerificationStatus(
+                        userId, aadhaar.getId(), aadhaar.getSubmissionToken(), VerificationStatus.VERIFIED);
     }
 
     public boolean areAllMandatoryDocumentsVerified(String userId) {
-        return hasAllRequiredDocuments(documentRepository.findByUserId(userId));
+        return hasAllRequiredDocuments(userId, documentRepository.findByUserId(userId));
+    }
+
+    public void refreshLawyerStatus(String userId) {
+        boolean complete = areAllMandatoryDocumentsVerified(userId);
+        findExperiencedLawyer(userId).ifPresent(profile -> {
+            profile.setVerificationStatus(complete ? Verification_Status.VERIFIED : Verification_Status.PENDING);
+            profile.setVerifiedAt(complete ? System.currentTimeMillis() : null);
+            lawyerExperiencedProfileRepository.save(profile);
+        });
+        findFresherLawyer(userId).ifPresent(profile -> {
+            profile.setVerificationStatus(complete ? Verification_Status.VERIFIED : Verification_Status.PENDING);
+            profile.setVerifiedAt(complete ? System.currentTimeMillis() : null);
+            lawyerFresherProfileRepository.save(profile);
+        });
     }
 
     private void validateRequest(String userId, DocumentType documentType,
@@ -582,7 +665,7 @@ public class DocumentVerificationService {
 
         if (documentType == null) {
             throw new DocumentVerificationException(
-                    "Document type is required. Supported types: AADHAAR, PAN, BAR_COUNCIL_ID, BAR_CERTIFICATE, CERTIFICATE_OF_PRACTICE, DRIVING_LICENSE.");
+                    "Document type is required. Supported types: AADHAAR, PAN, BAR_COUNCIL_ID, BAR_CERTIFICATE, CERTIFICATE_OF_PRACTICE.");
         }
 
         if (frontImage == null || frontImage.isEmpty()) {
@@ -628,6 +711,16 @@ public class DocumentVerificationService {
                 message
         );
         response.setFile(doc.getFailureFile());
+        response.setQrDecodedData(doc.getQrDecodedData());
+        response.setIsQrVerified(doc.getIsQrVerified());
+        response.setQrImageSide(doc.getQrImageSide());
+        response.setQrPrintedMismatch(doc.getQrPrintedMismatch());
+        response.setQrMismatchFields(doc.getQrMismatchFields());
+        response.setConfidenceScore(doc.getConfidenceScore());
+        response.setAutoApproved(doc.getAutoApproved());
+        response.setRequiresManualReview(doc.getRequiresManualReview());
+        response.setManualReviewReason(doc.getManualReviewReason());
+        response.setVerifiedAt(doc.getVerifiedAt());
         return response;
     }
 }

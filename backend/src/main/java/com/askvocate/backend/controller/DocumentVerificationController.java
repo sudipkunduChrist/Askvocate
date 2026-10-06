@@ -42,7 +42,7 @@ public class DocumentVerificationController {
      * 
      * <p>Request must be {@code multipart/form-data} with:
      * <ul>
-     *   <li>{@code documentType} — AADHAAR, PAN, BAR_COUNCIL_ID, BAR_CERTIFICATE, CERTIFICATE_OF_PRACTICE, DRIVING_LICENSE</li>
+     *   <li>{@code documentType} — AADHAAR, PAN, BAR_COUNCIL_ID, BAR_CERTIFICATE, CERTIFICATE_OF_PRACTICE</li>
      *   <li>{@code front} — front image of the document (required)</li>
      *   <li>{@code back}  — back image (required for AADHAAR; omit for PAN)</li>
      *   <li>{@code userId} — optional if JWT token provided, required otherwise</li>
@@ -140,14 +140,19 @@ public class DocumentVerificationController {
     // ── Helpers ─────────────────────────────────────────────────────────
 
     private String resolveUserId(Jwt jwt, String paramUserId, String headerUserId) {
+        if (jwt != null && jwt.getSubject() != null && !jwt.getSubject().isBlank()) {
+            String subject = jwt.getSubject();
+            if ((paramUserId != null && !paramUserId.isBlank() && !subject.equals(paramUserId.trim()))
+                    || (headerUserId != null && !headerUserId.isBlank() && !subject.equals(headerUserId.trim()))) {
+                throw new DocumentVerificationException("User ID does not match authenticated user.");
+            }
+            return subject;
+        }
         if (paramUserId != null && !paramUserId.isBlank()) {
             return paramUserId.trim();
         }
         if (headerUserId != null && !headerUserId.isBlank()) {
             return headerUserId.trim();
-        }
-        if (jwt != null && jwt.getSubject() != null && !jwt.getSubject().isBlank()) {
-            return jwt.getSubject();
         }
         throw new DocumentVerificationException("User authentication or 'userId' parameter is required.");
     }
@@ -155,14 +160,14 @@ public class DocumentVerificationController {
     private DocumentType parseDocumentType(String documentType) {
         if (documentType == null || documentType.isBlank()) {
             throw new DocumentVerificationException(
-                    "Document type is required. Supported types: AADHAAR, PAN, BAR_COUNCIL_ID, BAR_CERTIFICATE, CERTIFICATE_OF_PRACTICE, DRIVING_LICENSE.");
+                    "Document type is required. Supported types: AADHAAR, PAN, BAR_COUNCIL_ID, BAR_CERTIFICATE, CERTIFICATE_OF_PRACTICE.");
         }
         try {
             return DocumentType.valueOf(documentType.toUpperCase().trim());
         } catch (IllegalArgumentException e) {
             throw new DocumentVerificationException(
                     "Invalid document type: '" + documentType
-                    + "'. Supported types: AADHAAR, PAN, BAR_COUNCIL_ID, BAR_CERTIFICATE, CERTIFICATE_OF_PRACTICE, DRIVING_LICENSE.");
+                    + "'. Supported types: AADHAAR, PAN, BAR_COUNCIL_ID, BAR_CERTIFICATE, CERTIFICATE_OF_PRACTICE.");
         }
     }
 }
