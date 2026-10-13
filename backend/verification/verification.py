@@ -53,7 +53,7 @@ def local_ocr(image_bytes: bytes, side: str = "") -> dict:
     try:
         candidates = [(rgb, "--psm 6",
                        pytesseract.image_to_string(rgb, lang="eng", config="--psm 6", timeout=10))]
-        if side in ("front", "back"):
+        if side in ("front", "back", "pan"):
             gray = cv2.cvtColor(image, cv2.COLOR_BGR2GRAY)
             enhanced = cv2.createCLAHE(clipLimit=2.0, tileGridSize=(8, 8)).apply(gray)
             if enhanced.shape[1] < 1400:
@@ -68,7 +68,8 @@ def local_ocr(image_bytes: bytes, side: str = "") -> dict:
                                                                    config=config, timeout=10)))
                 except (pytesseract.TesseractError, RuntimeError):
                     pass
-        rank = _address_read_quality if side == "back" else _front_read_quality if side == "front" else _general_read_quality
+        rank = (_address_read_quality if side == "back" else _front_read_quality if side == "front"
+                else _pan_read_quality if side == "pan" else _general_read_quality)
         selected_image, selected_config, text = max(candidates, key=lambda entry: rank(entry[2]))
         data = pytesseract.image_to_data(selected_image, lang="eng", config=selected_config,
                                          output_type=Output.DICT, timeout=10)
@@ -93,6 +94,30 @@ def _front_read_quality(text: str) -> float:
         score += 10
     if re.search(r"(?im)^\s*Name\s*[:/-]?\s*[A-Za-z]{2,}", text):
         score += 10
+    return score
+
+
+def _pan_read_quality(text: str) -> float:
+    """Prefer the English OCR pass with a PAN number and labeled identity rows."""
+    score = _general_read_quality(text) * 0.1
+    if re.search(r"\b[A-Z]{5}[\s-]*\d{4}[\s-]*[A-Z]\b", text, re.I):
+        score += 30
+    if re.search(r"(?im)^\s*Name\s*[:/-]?\s*[A-Za-z]{2,}", text):
+        score += 10
+    if re.search(r"(?im)^\s*Father'?s?\s+Name\s*[:/-]?\s*[A-Za-z]{2,}", text):
+        score += 10
+    if re.search(r"\b(?:DOB|Date\s*of\s*Birth)\s*[:/-]?\s*\d{1,2}[/.-]\d{1,2}[/.-]\d{4}\b", text, re.I):
+        score += 10
+    lines = text.splitlines()
+    pan_line = next((i for i, line in enumerate(lines)
+                     if re.search(r"\b[A-Z]{5}[\s-]*\d{4}[\s-]*[A-Z]\b", line, re.I)), -1)
+    dob_line = next((i for i in range(pan_line + 1, len(lines))
+                     if re.search(r"\b(?:DOB|Date\s*of\s*Birth)\b", lines[i], re.I)), len(lines))
+    if pan_line >= 0:
+        names = [line.strip() for line in lines[pan_line + 1:min(dob_line, pan_line + 12)]
+                 if re.fullmatch(r"[A-Za-z][A-Za-z .'-]{2,70}", line.strip())
+                 and not re.search(r"\b(?:name|father|income|tax|department|india|signature)\b", line, re.I)]
+        score += min(len(names), 2) * 8
     return score
 
 

@@ -44,7 +44,11 @@ The two PKL caches are regenerated when missing, incompatible, or when their sou
 
 Set `NVIDIA_API_KEY`, `GEMINI_API_KEY`, and/or `GROQ_API_KEY` in `ai-service/.env`. Nemotron is tried first for uncertain classifications, followed by Gemini Flash-Lite and Groq. If no external provider is available, the service remains functional in local-only mode and marks uncertain results with `needs_clarification: true`.
 
-Optional model overrides are `GEMINI_MODEL` and `GROQ_MODEL`. Defaults are `gemini-3.8-flash` and `openai/gpt-oss-120b`.
+Optional model overrides are `GEMINI_MODEL` and `GROQ_MODEL`. The router first
+discovers models the configured API keys can actually access, then prefers
+Gemini 3.8 Flash / 3.5 Flash-Lite / 2.5 Flash and Groq GPT-OSS 20B / 120B in
+that order. This prevents unavailable or permission-restricted model IDs from
+breaking the fallback chain.
 
 ## Run locally
 

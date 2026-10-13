@@ -89,15 +89,15 @@ public class DocumentVerificationService {
         OcrExtractionService.ExtractionResult extractionResult;
         String failureFile = null;
         String currentFile = safeFileName(frontImage);
-        Map<String, String> aadhaarOcrText = new LinkedHashMap<>();
+        Map<String, String> identityOcrText = new LinkedHashMap<>();
 
         try {
             // 2. Upload front image with OCR
             log.info("Uploading front image for userId={}, documentType={}", userId, documentType);
             CloudinaryService.UploadResult frontResult = uploadWithOcr(frontImage, folder, "front");
             cloudinaryRefs.add(frontResult.cloudinaryRef());
-            if (documentType == DocumentType.AADHAAR) {
-                aadhaarOcrText.put("front", Objects.toString(
+            if (documentType == DocumentType.AADHAAR || documentType == DocumentType.PAN) {
+                identityOcrText.put("front", Objects.toString(
                         ocrExtractionService.extractTextFromOcrResponse(frontResult.rawOcrData()), ""));
             }
 
@@ -113,7 +113,7 @@ public class DocumentVerificationService {
                 CloudinaryService.UploadResult backResult = uploadWithOcr(backImage, folder, "back");
                 cloudinaryRefs.add(backResult.cloudinaryRef());
                 if (documentType == DocumentType.AADHAAR) {
-                    aadhaarOcrText.put("back", Objects.toString(
+                    identityOcrText.put("back", Objects.toString(
                             ocrExtractionService.extractTextFromOcrResponse(backResult.rawOcrData()), ""));
                 }
 
@@ -163,9 +163,11 @@ public class DocumentVerificationService {
         userDocument.setDocumentType(documentType);
         if (documentType == DocumentType.AADHAAR) userDocument.setSubmissionToken(UUID.randomUUID().toString());
         userDocument.setVerificationStatus(status);
-        userDocument.setExtractedData(documentType == DocumentType.AADHAAR || extractionResult.success()
+        userDocument.setExtractedData(documentType == DocumentType.AADHAAR
+                || documentType == DocumentType.PAN || extractionResult.success()
                 ? extractionResult.extractedFields() : Map.of());
-        userDocument.setOcrText(documentType == DocumentType.AADHAAR ? aadhaarOcrText : Map.of());
+        userDocument.setOcrText(documentType == DocumentType.AADHAAR || documentType == DocumentType.PAN
+                ? identityOcrText : Map.of());
         userDocument.setMaskedDocumentNumber(documentType == DocumentType.AADHAAR || extractionResult.success()
                 ? extractionResult.maskedDocumentNumber() : null);
         userDocument.setAadhaarNumber(documentType == DocumentType.AADHAAR

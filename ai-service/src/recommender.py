@@ -4,6 +4,7 @@ import math
 import hashlib
 import json
 import pickle
+import re
 from pathlib import Path
 from typing import Any
 
@@ -57,6 +58,9 @@ DOMAIN_TAXONOMY = {
     "Property & Land": (["Property Law"], ["Real Estate Law", "Civil Litigation"]),
     "Real Estate & Housing": (["Real Estate Law"], ["Property Law", "Civil Litigation"]),
     "Tax & GST": (["Tax Law"], ["GST Law", "Corporate Law"]),
+    "Traffic & Motor Vehicle Violations": (
+        ["Traffic & Motor Vehicle Law"], ["Criminal Law", "Administrative Law"]
+    ),
     "White Collar Crime": (["White Collar Crime"], ["Criminal Law", "Banking and Finance"]),
 }
 
@@ -73,6 +77,7 @@ DOMAIN_HINTS = {
     "Consumer Protection": "defective product warranty refund consumer service complaint unfair recovery practice unauthorized repossession उपभोक्ता रिफंड",
     "Banking & Finance": "bank loan vehicle loan emi cheque bounce debt sarfaesi account hypothecation repossession recovery agent financier बैंक लोन चेक",
     "Tax & GST": "income tax gst assessment audit refund आयकर जीएसटी टैक्स",
+    "Traffic & Motor Vehicle Violations": "traffic challan e-challan helmet speeding red light parking driving licence vehicle violation traffic police contest challan यातायात चालान हेलमेट",
 }
 
 SPECIAL_ROUTES = {
@@ -81,6 +86,23 @@ SPECIAL_ROUTES = {
     "मारपीट": "Criminal Law", "498a": "Criminal Law", "dowry": "Criminal Law",
     "दहेज": "Criminal Law", "stridhan": "Family & Succession", "स्त्रीधन": "Family & Succession",
 }
+
+CHALLAN_TERMS = re.compile(r"\b(?:e[\s-]?challan|challan|chalan|traffic ticket|speeding ticket|traffic fine|parking ticket)\b|चालान|चलान", re.IGNORECASE)
+TRAFFIC_TERMS = re.compile(
+    r"\b(?:traffic|vehicle|motor vehicle|driving|driver|car|bike|scooter|helmet|speeding|red light|parking|rto)\b|यातायात|ट्रैफिक|गाड़ी|गाड़ी|वाहन|हेलमेट",
+    re.IGNORECASE,
+)
+CRIMINAL_CASE_TERMS = re.compile(
+    r"\b(?:fir|charge[\s-]?sheet|criminal case|arrest|bail|assault|theft|dui|drunk driving)\b|गिरफ्तार|जमानत|मारपीट",
+    re.IGNORECASE,
+)
+
+
+def _challan_intent(query: str) -> str | None:
+    """Separate routine traffic penalties from criminal-case use of 'challan'."""
+    if not CHALLAN_TERMS.search(query) or CRIMINAL_CASE_TERMS.search(query):
+        return None
+    return "traffic" if TRAFFIC_TERMS.search(query) else "ambiguous"
 
 
 def _is_ambiguous_vehicle_seizure(query: str) -> bool:
@@ -262,14 +284,44 @@ class RecommendationEngine:
     def recommend(self, query: str, top_k: int = 10) -> dict[str, Any]:
         processed = preprocess_query(query)
         normalized_query = processed["normalized"]
+        challan_intent = _challan_intent(normalized_query)
+        if challan_intent == "ambiguous":
+            return {
+                "query": query,
+                "detected_domain": "Needs clarification",
+                "confidence": 0.0,
+                "margin": None,
+                "ambiguous": True,
+                "top3_domains": [],
+                "language": processed["detected_language"],
+                "intent_source": "challan_guard",
+                "route_used": "needs_context",
+                "classification_reason": "A challan may refer to a traffic penalty or a criminal case.",
+                "needs_clarification": True,
+                "clarification_question": "Is this a traffic/e-challan for a vehicle, or a police/court criminal-case challan?",
+                "threshold_used": None,
+                "recommended_lawyers": [],
+                "total_lawyers": 0,
+            }
         query_vector = self.embedder.encode(
             [normalized_query], convert_to_numpy=True, normalize_embeddings=True
         )[0]
-        local_intent = self._classify(normalized_query, query_vector)
+        if challan_intent == "traffic":
+            local_intent = {
+                "primary_domain": "Traffic & Motor Vehicle Violations",
+                "confidence": 1.0,
+                "raw_cosine": 1.0,
+                "margin": 1.0,
+                "top3_domains": [{"domain": "Traffic & Motor Vehicle Violations", "score": 1.0}],
+                "ambiguous": False,
+                "source": "challan_guard",
+            }
+        else:
+            local_intent = self._classify(normalized_query, query_vector)
         language_key = processed["detected_language"].lower()
         threshold = LANGUAGE_THRESHOLDS.get(language_key, LANGUAGE_THRESHOLDS["english"])
         context_sensitive = _is_ambiguous_vehicle_seizure(normalized_query)
-        local_confident = local_intent["source"] == "special_route" or (
+        local_confident = local_intent["source"] in {"special_route", "challan_guard"} or (
             local_intent["confidence"] >= threshold["confidence"]
             and local_intent["margin"] >= threshold["margin"]
             and not local_intent["ambiguous"]
@@ -282,19 +334,20 @@ class RecommendationEngine:
                 and float(llm_intent.get("confidence", 0.0)) < LLM_CONFIDENCE_THRESHOLD):
             llm_status = "needs_context"
         if llm_intent and llm_status != "matched":
+            out_of_taxonomy = llm_status == "out_of_taxonomy"
             return {
                 "query": query,
-                "detected_domain": "Needs clarification",
+                "detected_domain": "No supported domain" if out_of_taxonomy else "Needs clarification",
                 "confidence": round(float(llm_intent.get("confidence", 0.0)), 4),
                 "margin": local_intent["margin"],
-                "ambiguous": True,
+                "ambiguous": not out_of_taxonomy,
                 "top3_domains": local_intent["top3_domains"],
                 "language": processed["detected_language"],
                 "intent_source": llm_intent["source"],
                 "route_used": llm_status,
                 "classification_reason": llm_intent.get("reason", ""),
-                "needs_clarification": True,
-                "clarification_question": llm_intent.get("clarification_question") or _clarification_question(query),
+                "needs_clarification": not out_of_taxonomy,
+                "clarification_question": "" if out_of_taxonomy else (llm_intent.get("clarification_question") or _clarification_question(query)),
                 "threshold_used": threshold,
                 "recommended_lawyers": [],
                 "total_lawyers": 0,
@@ -332,8 +385,10 @@ class RecommendationEngine:
             domain = local_intent["primary_domain"]
             confidence = local_intent["confidence"]
             source = local_intent["source"]
-            route_used = "special_route" if source == "special_route" else (
+            route_used = "challan_guard" if source == "challan_guard" else (
+                "special_route" if source == "special_route" else (
                 "local_confident" if local_confident else "local_unsure"
+                )
             )
             reason = ""
 
@@ -384,7 +439,10 @@ class RecommendationEngine:
             "language": processed["detected_language"],
             "intent_source": source,
             "route_used": route_used,
-            "classification_reason": reason,
+            "classification_reason": reason or (
+                "Matched to synthetic Traffic & Motor Vehicle Law profiles, with Criminal Law and Administrative Law as related practices."
+                if domain == "Traffic & Motor Vehicle Violations" else ""
+            ),
             "needs_clarification": route_used == "local_unsure",
             "clarification_question": _clarification_question(query) if route_used == "local_unsure" else "",
             "threshold_used": threshold,

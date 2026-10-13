@@ -392,10 +392,6 @@ public class OcrExtractionService {
 
     private ExtractionResult parsePan(String text, double confidence) {
         Map<String, String> fields = new HashMap<>();
-        if (!PAN_MARKER_PATTERN.matcher(text).find()) {
-            return new ExtractionResult(false, Map.of(), null, confidence,
-                    "The image does not contain recognizable PAN card identifiers.");
-        }
         Matcher panMatcher = PAN_NUMBER_PATTERN.matcher(text);
         if (!panMatcher.find()) {
             return new ExtractionResult(false, Map.of(), null, confidence,
@@ -410,6 +406,22 @@ public class OcrExtractionService {
         String[] lines = text.split("\\R");
         String name = readPanLabeledValue(lines, PAN_NAME_LABEL_PATTERN);
         String fatherName = readPanLabeledValue(lines, PAN_FATHER_LABEL_PATTERN);
+        if (name == null) name = readPanCardholderBeforeFather(lines, fatherName);
+        if (name == null || fatherName == null) {
+            List<String> orderedNames = readPanNamesBetweenNumberAndDob(lines);
+            if (name == null && fatherName == null && orderedNames.size() >= 2) {
+                name = orderedNames.get(0);
+                fatherName = orderedNames.get(1);
+            } else if (name == null && fatherName != null) {
+                String knownFather = normalizeName(fatherName);
+                name = orderedNames.stream().filter(candidate -> !candidate.equalsIgnoreCase(knownFather))
+                        .findFirst().orElse(null);
+            } else if (fatherName == null && name != null) {
+                String knownName = normalizeName(name);
+                fatherName = orderedNames.stream().filter(candidate -> !candidate.equalsIgnoreCase(knownName))
+                        .findFirst().orElse(null);
+            }
+        }
         String dateText = readPanLabeledValue(lines, PAN_DOB_LABEL_PATTERN);
         if (name != null) fields.put("name", normalizeName(name));
         if (fatherName != null) fields.put("fatherName", normalizeName(fatherName));
@@ -445,6 +457,52 @@ public class OcrExtractionService {
             }
         }
         return null;
+    }
+
+    /** The printed cardholder name is commonly the line immediately above Father's Name. */
+    private String readPanCardholderBeforeFather(String[] lines, String fatherName) {
+        int fatherLabel = -1;
+        for (int i = 0; i < lines.length; i++) {
+            if (PAN_FATHER_LABEL_PATTERN.matcher(lines[i]).matches()) {
+                fatherLabel = i;
+                break;
+            }
+        }
+        if (fatherLabel < 0) return null;
+        for (int i = fatherLabel - 1; i >= Math.max(0, fatherLabel - 6); i--) {
+            // Do not cross the PAN number into unrelated card headings.
+            if (PAN_NUMBER_PATTERN.matcher(lines[i]).find()) break;
+            String candidate = normalizeName(lines[i]);
+            if (isPanPersonNameCandidate(candidate)
+                    && !candidate.equalsIgnoreCase(normalizeName(fatherName))) return candidate;
+        }
+        return null;
+    }
+
+    private List<String> readPanNamesBetweenNumberAndDob(String[] lines) {
+        int panLine = -1;
+        int dobLine = lines.length;
+        for (int i = 0; i < lines.length; i++) {
+            if (panLine < 0 && PAN_NUMBER_PATTERN.matcher(lines[i]).find()) panLine = i;
+            if (panLine >= 0 && PAN_DOB_LABEL_PATTERN.matcher(lines[i]).matches()) {
+                dobLine = i;
+                break;
+            }
+        }
+        if (panLine < 0 || dobLine <= panLine) return List.of();
+        List<String> names = new java.util.ArrayList<>();
+        for (int i = panLine + 1; i < Math.min(dobLine, panLine + 12); i++) {
+            String candidate = normalizeName(lines[i]);
+            if (isPanPersonNameCandidate(candidate)) names.add(candidate);
+        }
+        return names;
+    }
+
+    private boolean isPanPersonNameCandidate(String value) {
+        return value != null && value.matches("[A-Za-z][A-Za-z .'-]{2,70}")
+                && !isPanLabel(value) && !PAN_MARKER_PATTERN.matcher(value).find()
+                && !PAN_NUMBER_PATTERN.matcher(value).find()
+                && !value.matches("(?i).*\\b(?:name|date|birth|income|tax|department|govt|government|signature|permanent|account|number|india|pan)\\b.*");
     }
 
     private String stripRepeatedPanLabel(String raw, Pattern labelPattern) {

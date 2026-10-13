@@ -54,6 +54,8 @@ class MainActivity : AppCompatActivity() {
             fabAsk.visibility = if (isClient) View.VISIBLE else View.GONE
             centerNavSlot.visibility = if (isClient) View.VISIBLE else View.GONE
             navView.menu.findItem(R.id.nav_find_lawyers)?.isVisible = isClient
+            navView.menu.findItem(R.id.nav_search_history)?.isVisible = isClient
+            navView.menu.findItem(R.id.nav_chat_history)?.isVisible = isClient
         }
 
         val navHostFragment = supportFragmentManager

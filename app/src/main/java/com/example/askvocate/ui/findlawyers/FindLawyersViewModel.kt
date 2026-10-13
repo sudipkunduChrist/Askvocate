@@ -2,7 +2,8 @@ package com.example.askvocate.ui.findlawyers
 
 import androidx.lifecycle.LiveData
 import androidx.lifecycle.MutableLiveData
-import androidx.lifecycle.ViewModel
+import android.app.Application
+import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.viewModelScope
 import com.example.askvocate.data.model.Lawyer
 import com.example.askvocate.data.repository.LawyerMatchingRepository
@@ -10,7 +11,7 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 
-class FindLawyersViewModel : ViewModel() {
+class FindLawyersViewModel(application: Application) : AndroidViewModel(application) {
 
     sealed class UiState {
         data object Idle : UiState()
@@ -63,7 +64,7 @@ class FindLawyersViewModel : ViewModel() {
         }
     }
 
-    private val matchingRepository = LawyerMatchingRepository()
+    private val matchingRepository = LawyerMatchingRepository(application)
 
     private fun formatUserFriendlyError(message: String): String =
         matchingRepository.formatUserFriendlyError(message)

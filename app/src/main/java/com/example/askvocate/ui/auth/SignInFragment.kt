@@ -141,7 +141,7 @@ class SignInFragment : Fragment() {
                 val stream = if (responseCode in 200..299) conn.inputStream else conn.errorStream
                 val responseText = stream.bufferedReader(Charsets.UTF_8).readText()
 
-                Log.d("SignIn", "[$responseCode] /login → $responseText")
+                Log.d("SignIn", "[$responseCode] /login")
 
                 withContext(Dispatchers.Main) {
                     val json = runCatching { JSONObject(responseText) }.getOrNull()
@@ -155,7 +155,8 @@ class SignInFragment : Fragment() {
                                 userId = userObj.optString("id", ""),
                                 name = userObj.optString("name", "User"),
                                 emailOrPhone = userObj.optString("email", ""),
-                                role = json.optString("role", "")
+                                role = json.optString("role", ""),
+                                appToken = json.optString("appToken", "")
                             )
                         }
                         requireContext().showCustomToast("Signed in successfully!", ToastType.SUCCESS)

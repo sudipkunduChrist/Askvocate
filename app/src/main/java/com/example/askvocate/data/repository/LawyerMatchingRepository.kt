@@ -1,13 +1,18 @@
 package com.example.askvocate.data.repository
 
+import android.content.Context
+import android.util.Log
 import com.example.askvocate.data.model.Lawyer
 import com.example.askvocate.network.ApiConfig
+import com.example.askvocate.util.SessionManager
 import java.net.HttpURLConnection
 import java.net.URL
 import org.json.JSONObject
 
 /** Shared by the matching page and inline legal assistant results. Call match on Dispatchers.IO. */
-class LawyerMatchingRepository {
+class LawyerMatchingRepository(context: Context) {
+    private val appContext = context.applicationContext
+    private val history = SearchHistoryRepository(context)
     sealed class Result {
         data class Success(val detectedDomain: String, val lawyers: List<Lawyer>) : Result()
         data class Clarification(val question: String, val originalQuery: String) : Result()
@@ -67,14 +72,8 @@ class LawyerMatchingRepository {
                 throw IllegalStateException(formatUserFriendlyError(rawMessage))
             }
 
-            if (json?.optBoolean("needs_clarification", false) == true) {
-                val question = json.optString("clarification_question")
-                    .takeIf { it.isNotBlank() }
-                    ?: "Please add a little more context so we can identify the right legal issue."
-                return Result.Clarification(question, query)
-            }
-
-            val recommendations = json?.optJSONArray("recommended_lawyers")
+            if (json == null) throw IllegalStateException(formatUserFriendlyError("The matching service returned an invalid response."))
+            val recommendations = json.optJSONArray("recommended_lawyers")
                 ?: throw IllegalStateException(formatUserFriendlyError("The matching service returned an invalid response."))
             val lawyers = buildList {
                 for (index in 0 until recommendations.length()) {
@@ -94,6 +93,22 @@ class LawyerMatchingRepository {
                         consultationFee = item.optInt("consultation_fee_inr", 0)
                     ))
                 }
+            }
+            val needsClarification = json.optBoolean("needs_clarification", false)
+            // Search history sync must not turn a successful recommendation into a failed match.
+            if (SessionManager.getAppToken(appContext).isNotBlank()) {
+                try {
+                    history.add(query, json)
+                } catch (error: Exception) {
+                    Log.w("LawyerMatching", "Could not sync search history", error)
+                }
+            }
+
+            if (needsClarification) {
+                val question = json.optString("clarification_question")
+                    .takeIf { it.isNotBlank() }
+                    ?: "Please add a little more context so we can identify the right legal issue."
+                return Result.Clarification(question, query)
             }
 
             Result.Success(

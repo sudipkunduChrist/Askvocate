@@ -61,8 +61,10 @@ Tesseract reads are compared for Aadhaar images. The selected OCR text is saved 
 `ocrText.front` and `ocrText.back` in the MongoDB `documents` record, including when
 field extraction fails. The Aadhaar document becomes `VERIFIED` when those fields
 are extracted; this OCR status does not establish that the card is authentic. This
-upload does not check the QR. PAN and Bar Council verification retain their existing
-parsing and status rules.
+upload does not check the QR. PAN uses multiple English-only OCR reads too, and stores
+the selected raw text in `ocrText.front`; a missing card heading alone does not reject
+a PAN if its number and required labeled fields are readable. Bar Council verification
+retains its existing parsing and status rules.
 
 After Aadhaar is verified, call `POST /api/documents/selfie/challenge?userId=...` to
 obtain a single-use three-minute `challengeId` and random `expectedTurn`. The Android
@@ -148,3 +150,22 @@ All error responses return a standardized `200 OK` JSON envelope with `success: 
 2. **Unified Error Handling**: [`GlobalExceptionHandler`](file:///d:/Askvocate/backend/src/main/java/com/askvocate/backend/exception/GlobalExceptionHandler.java) handles validation errors and duplicate account exceptions gracefully.
 3. **Structured Timestamps**: `createdAt` timestamps saved as standardized ISO-8601 UTC strings (`YYYY-MM-DDTHH:mm:ss.sssZ`).
 4. **SLF4J Terminal Logging**: Real-time console logs printed on endpoint access and MongoDB persistence events.
+
+## Shared search history
+
+The Android app writes AI matching requests to MongoDB `search_history` through
+`/api/search-history`. A search is copied to `saved_searches` only when the user
+selects **Save search** in the app. The web backend reads these same collections.
+Both backends must point to the same MongoDB host **and database**; the web
+backend's `MONGO_DATABASE` must match the database selected by the Spring
+backend's `MONGO_URL`. Users with an app session created before this change
+must sign in once more to receive an app API token.
+
+## Legal guide chat history
+
+The Android legal guide stores each conversation in MongoDB `saved_ai_chat`.
+Authenticated client requests to `/api/ai-chats` create and list chats;
+`/api/ai-chats/{id}` reads, updates, and deletes only that client's chat.
+Each document contains the full message list, including lawyer matching results,
+plus its owner, title, and creation/update timestamps. The app saves after each
+message and shows past conversations under **Chat history** in the drawer.

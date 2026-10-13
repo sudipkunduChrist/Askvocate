@@ -49,7 +49,7 @@ public class UserDocument {
     @Setter
     private Map<String, String> extractedData = new HashMap<>();
 
-    /** Raw OCR output from the Aadhaar front and back, retained for extraction review. */
+    /** Raw OCR output from Aadhaar/PAN images, retained for extraction review. */
     @Setter
     @JsonIgnore
     private Map<String, String> ocrText = new HashMap<>();

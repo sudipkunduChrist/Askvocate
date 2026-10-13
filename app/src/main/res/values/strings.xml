@@ -33,6 +33,7 @@
     <string name="search_placeholder">Search advocates, legal areas, or services...</string>
     <string name="find_lawyer">Find an Advocate</string>
     <string name="ask_ai">AI Assistant</string>
+    <string name="open_chat_assistant">Open chat assistant</string>
     <string name="my_appointments_short">Appointments</string>
     <string name="legal_documents">My Documents</string>
     <string name="explore_legal_services">Explore Legal Areas</string>
@@ -248,7 +249,7 @@
     <string name="complete_profile_desc">Add your information to personalize your Askvocate experience.</string>
     <string name="complete_profile_cta">Complete Profile</string>
     <string name="quick_access">Quick Access</string>
-    <string name="saved_advocates">Saved Advocates</string>
+    <string name="saved_advocates">Saved Searches</string>
     <string name="saved_advocates_desc">Your saved profiles</string>
     <string name="my_appointments_desc">View consultations</string>
     <string name="my_documents_desc">Manage your files</string>
@@ -293,9 +294,37 @@
         <item quantity="one">%1$d matching lawyer</item>
         <item quantity="other">%1$d matching lawyers</item>
     </plurals>
-    <string name="saved_advocates_title">Saved Advocates</string>
-    <string name="no_saved_advocates_title">No Saved Advocates Yet</string>
-    <string name="no_saved_advocates_desc">When you search for lawyers using the AI match tool, your matched advocate profiles and detected domain will be saved here automatically.</string>
+    <string name="saved_advocates_title">Saved Searches</string>
+    <string name="no_saved_advocates_title">No Saved Searches Yet</string>
+    <string name="no_saved_advocates_desc">Choose Save search from Search History to keep a search here.</string>
+    <string name="saved_searches_loading">Loading saved searches…</string>
+    <string name="saved_searches_load_failed">Could not load saved searches.</string>
     <string name="find_lawyers_now">Find Advocates Now</string>
     <string name="delete_saved_search">Delete search</string>
+    <string name="search_history_title">Search History</string>
+    <string name="history_empty_title">No searches yet</string>
+    <string name="history_empty_description">Your AI matching searches and their advocate results will appear here.</string>
+    <string name="history_default_domain">Legal</string>
+    <string name="history_follow_up">Follow-up: %1$s</string>
+    <string name="history_delete">Delete this search</string>
+    <string name="history_no_matches">No advocates were matched for this search.</string>
+    <string name="history_loading">Loading your searches…</string>
+    <string name="history_load_failed">Could not load search history.</string>
+    <string name="history_sync_failed">Could not sync this search.</string>
+    <string name="history_save">Save search</string>
+    <string name="history_saved">Saved</string>
+    <string name="chat_history_title">AI Chat History</string>
+    <string name="chat_history_loading">Loading your chats…</string>
+    <string name="chat_history_load_failed">Could not load chat history.</string>
+    <string name="chat_history_empty">No saved chats yet</string>
+    <string name="chat_new">New chat</string>
+    <string name="chat_delete">Delete this chat</string>
+    <plurals name="chat_history_messages">
+        <item quantity="one">%1$d message</item>
+        <item quantity="other">%1$d messages</item>
+    </plurals>
+    <plurals name="history_matched_advocates">
+        <item quantity="one">%1$d matched advocate</item>
+        <item quantity="other">%1$d matched advocates</item>
+    </plurals>
 </resources>

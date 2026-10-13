@@ -66,6 +66,7 @@ class HomeFragment : Fragment() {
         binding.topLawyersHeader.isVisible = isClient
         binding.rvTopLawyers.isVisible = isClient
         binding.assistantCard.isVisible = isClient
+        binding.btnChatAssistant.isVisible = isClient
         binding.quickActionsGrid.columnCount = if (isClient) 3 else 2
         if (!isClient) {
             binding.quickActionsGrid.removeView(binding.actionFindLawyer)
@@ -100,6 +101,9 @@ class HomeFragment : Fragment() {
     }
 
     private fun setupLegalAssistant() {
+        binding.btnChatAssistant.setOnClickListener {
+            findNavController().navigate(R.id.action_home_to_legal_assistant)
+        }
         binding.assistantCard.setOnClickListener {
             findNavController().navigate(R.id.action_home_to_legal_assistant)
         }

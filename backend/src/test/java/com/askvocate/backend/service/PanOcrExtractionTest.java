@@ -35,6 +35,38 @@ class PanOcrExtractionTest {
     }
 
     @Test
+    void readsUnlabeledCardholderNameAboveFatherLabel() {
+        var result = ocr.extract("INCOME TAX DEPARTMENT\nAAAPL1234C\n"
+                + "Test Lawyer\nFather's Name: Test Father\nDOB: 01/02/1990",
+                DocumentType.PAN, "front");
+
+        assertTrue(result.success(), result.error());
+        assertEquals("Test Lawyer", result.extractedFields().get("name"));
+        assertEquals("Test Father", result.extractedFields().get("fatherName"));
+    }
+
+    @Test
+    void readsTwoUnlabeledNamesBetweenPanNumberAndDobInPrintedOrder() {
+        var result = ocr.extract("INCOME TAX DEPARTMENT\nAAAPL1234C\n"
+                + "Test Lawyer\nTest Father\nDate of Birth: 01/02/1990",
+                DocumentType.PAN, "front");
+
+        assertTrue(result.success(), result.error());
+        assertEquals("Test Lawyer", result.extractedFields().get("name"));
+        assertEquals("Test Father", result.extractedFields().get("fatherName"));
+    }
+
+    @Test
+    void missingNameDoesNotSubstitutePanHeadingOrFatherName() {
+        var result = ocr.extract("INCOME TAX DEPARTMENT\nGOVT OF INDIA\nAAAPL1234C\n"
+                + "Father's Name: Test Father\nDOB: 01/02/1990",
+                DocumentType.PAN, "front");
+
+        assertFalse(result.success());
+        assertFalse(result.extractedFields().containsKey("name"));
+    }
+
+    @Test
     void bilingualPrintedLabelsAreSkippedBeforeReadingActualNames() {
         var result = ocr.extract("आयकर विभाग\nPermanent Account Number\nAAAPL1234C\n"
                 + "नाम / Name\nTest Lawyer\nपिता का नाम / Father's Name\nTest Father\n"
@@ -57,7 +89,7 @@ class PanOcrExtractionTest {
     }
 
     @Test
-    void rejectsOtherDocumentCorporatePanAndIssueDate() {
+    void acceptsPanWithoutHeadingButRejectsCorporatePanAndIssueDate() {
         var noMarker = ocr.extract("Name: Test Lawyer\nFather's Name: Test Father\n"
                 + "DOB: 01/02/1990\nAAAPL1234C", DocumentType.PAN, "front");
         var company = ocr.extract("PAN Card\nAAACL1234C\nName: Test Lawyer\n"
@@ -65,7 +97,8 @@ class PanOcrExtractionTest {
         var issueOnly = ocr.extract("PAN Card\nAAAPL1234C\nName: Test Lawyer\n"
                 + "Father's Name: Test Father\nIssue Date: 01/02/2020", DocumentType.PAN, "front");
 
-        assertFalse(noMarker.success());
+        assertTrue(noMarker.success(), noMarker.error());
+        assertEquals("AAAPL1234C", noMarker.panNumber());
         assertFalse(company.success());
         assertTrue(company.error().contains("individual"));
         assertFalse(issueOnly.success());

@@ -297,11 +297,54 @@ class VerificationGuardTest {
         var response = service.verifyDocument("fresher-id", DocumentType.PAN, front, null);
 
         assertEquals("AAAPL1234C", stored.get().getPanNumber());
+        assertTrue(stored.get().getOcrText().get("front").contains("Father's Name: Test Father"));
         assertEquals("AAAPL1234C", response.getPanNumber());
         assertEquals("XXXXXX234C", response.getMaskedDocumentNumber());
         assertEquals("PENDING", response.getLawyerVerificationStatus());
         when(documents.findById("pan-id")).thenReturn(Optional.of(stored.get()));
         assertNull(service.getDocumentById("fresher-id", "pan-id").getPanNumber());
+    }
+
+    @Test
+    void failedPanKeepsRawOcrTextForDiagnosis() throws Exception {
+        var profile = new LawyerFresherProfile();
+        profile.setId("fresher-id");
+        when(freshers.findById("fresher-id")).thenReturn(Optional.of(profile));
+        String ocrText = "Name: Test Lawyer\nFather's Name: Test Father\nDOB: 01/02/1990";
+        when(cloudinary.uploadWithOcr(eq(front), anyString(), eq("front")))
+                .thenReturn(new CloudinaryService.UploadResult(new com.askvocate.backend.model.CloudinaryRef(),
+                        Map.of("text", ocrText)));
+        AtomicReference<com.askvocate.backend.model.UserDocument> stored = new AtomicReference<>();
+        when(documents.save(any())).thenAnswer(invocation -> {
+            stored.set(invocation.getArgument(0));
+            return stored.get();
+        });
+
+        var response = service.verifyDocument("fresher-id", DocumentType.PAN, front, null);
+
+        assertEquals(com.askvocate.backend.model.VerificationStatus.FAILED, response.getVerificationStatus());
+        assertEquals("photo.jpg", response.getFile());
+        assertEquals(ocrText, stored.get().getOcrText().get("front"));
+        assertTrue(response.getFailureReason().contains("PAN number"));
+    }
+
+    @Test
+    void failedPanReturnsFieldsOcrDidReadWithoutClaimingVerification() throws Exception {
+        var profile = new LawyerFresherProfile();
+        profile.setId("fresher-id");
+        when(freshers.findById("fresher-id")).thenReturn(Optional.of(profile));
+        when(cloudinary.uploadWithOcr(eq(front), anyString(), eq("front")))
+                .thenReturn(new CloudinaryService.UploadResult(new com.askvocate.backend.model.CloudinaryRef(),
+                        Map.of("text", "AAAPL1234C\nFather's Name: Test Father\nDOB: 01/02/1990")));
+        when(documents.save(any())).thenAnswer(invocation -> invocation.getArgument(0));
+
+        var response = service.verifyDocument("fresher-id", DocumentType.PAN, front, null);
+
+        assertEquals(com.askvocate.backend.model.VerificationStatus.FAILED, response.getVerificationStatus());
+        assertEquals("Test Father", response.getExtractedFields().get("fatherName"));
+        assertEquals("01/02/1990", response.getExtractedFields().get("dob"));
+        assertFalse(response.getExtractedFields().containsKey("name"));
+        assertNull(response.getPanNumber());
     }
 
     @Test

@@ -37,6 +37,17 @@ public class UserController {
 
     @Autowired
     private com.askvocate.backend.service.AuthService authService;
+    @Autowired
+    private com.askvocate.backend.service.AppSessionService appSessions;
+
+    private String tokenFor(Object user, String role) {
+        String id;
+        if (user instanceof com.askvocate.backend.model.ClientProfile profile) id = profile.getId();
+        else if (user instanceof com.askvocate.backend.model.LawyerFresherProfile profile) id = profile.getId();
+        else if (user instanceof com.askvocate.backend.model.LawyerExperiencedProfile profile) id = profile.getId();
+        else throw new IllegalStateException("Unsupported user profile");
+        return appSessions.issue(id, role);
+    }
 
     // ─── Authentication ───────────────────────────────────────────────────────
 
@@ -49,7 +60,8 @@ public class UserController {
                 "success", true,
                 "message", "Login successful",
                 "role", data.get("role"),
-                "user", data.get("user")
+                "user", data.get("user"),
+                "appToken", tokenFor(data.get("user"), String.valueOf(data.get("role")))
         ));
     }
 
@@ -73,6 +85,7 @@ public class UserController {
                     ? "Account created with Google" : "Login successful");
             response.put("role", data.get("role"));
             response.put("user", data.get("user"));
+            response.put("appToken", tokenFor(data.get("user"), String.valueOf(data.get("role"))));
             response.put("profileImageUrl", data.get("profileImageUrl"));
             return ResponseEntity.ok(response);
         } catch (IllegalArgumentException e) {
@@ -100,7 +113,8 @@ public class UserController {
         return ResponseEntity.ok(Map.of(
                 "success", true,
                 "message", "Client registered successfully",
-                "user", profile
+                "user", profile,
+                "appToken", tokenFor(profile, "CLIENT")
         ));
     }
 
@@ -112,7 +126,8 @@ public class UserController {
         return ResponseEntity.ok(Map.of(
                 "success", true,
                 "message", "Fresher lawyer registered successfully.",
-                "user", profile
+                "user", profile,
+                "appToken", tokenFor(profile, "LAWYER_FRESHER")
         ));
     }
 
@@ -124,7 +139,8 @@ public class UserController {
         return ResponseEntity.ok(Map.of(
                 "success", true,
                 "message", "Experienced lawyer registered successfully.",
-                "user", profile
+                "user", profile,
+                "appToken", tokenFor(profile, "LAWYER_EXPERIENCED")
         ));
     }
 

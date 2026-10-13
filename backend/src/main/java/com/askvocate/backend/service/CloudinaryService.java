@@ -63,7 +63,7 @@ public class CloudinaryService {
     public UploadResult uploadWithOcr(MultipartFile file, String folder, String tag) throws IOException {
         byte[] image = file.getBytes();
         Map<String, Object> ocrData = visionVerificationClient.localOcr(
-                image, folder.endsWith("/AADHAAR") ? tag : "");
+                image, folder.endsWith("/AADHAAR") ? tag : folder.endsWith("/PAN") ? "pan" : "");
         Map<String, Object> options = ObjectUtils.asMap(
                 "folder", folder,
                 "tags", tag

@@ -209,12 +209,22 @@
         android:name="com.example.askvocate.ui.legalassistant.LegalAssistantFragment"
         android:label="@string/ask_ai"
         tools:layout="@layout/fragment_legal_assistant">
+        <argument
+            android:name="chatId"
+            app:argType="string"
+            android:defaultValue="" />
         <action
             android:id="@+id/action_legal_assistant_to_lawyer_profile"
             app:destination="@id/nav_lawyer_profile"
             app:enterAnim="@anim/slide_in_right"
             app:exitAnim="@anim/slide_out_left" />
     </fragment>
+
+    <fragment
+        android:id="@+id/nav_chat_history"
+        android:name="com.example.askvocate.ui.legalassistant.ChatHistoryFragment"
+        android:label="@string/chat_history_title"
+        tools:layout="@layout/fragment_chat_history" />
 
     <fragment
         android:id="@+id/nav_find_lawyers"
@@ -233,6 +243,12 @@
             app:popEnterAnim="@anim/slide_in_left"
             app:popExitAnim="@anim/slide_out_right" />
     </fragment>
+
+    <fragment
+        android:id="@+id/nav_search_history"
+        android:name="com.example.askvocate.ui.searchhistory.SearchHistoryFragment"
+        android:label="@string/search_history_title"
+        tools:layout="@layout/fragment_search_history" />
 
     <fragment
         android:id="@+id/nav_chat_list"

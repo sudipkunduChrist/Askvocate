@@ -21,12 +21,24 @@ except ImportError:
     pass
 
 
-GEMINI_MODELS = (
-    os.getenv("GEMINI_MODEL", "gemini-3.5-flash-lite"),
-    "gemini-3.1-flash-lite",
+# Provider availability differs by project, region, plan, and model permissions.
+# Keep current public models as preferences, but discover the models available to the
+# caller's API key before requesting one. This avoids retrying model IDs the project
+# cannot use.
+GEMINI_MODEL_PREFERENCES = (
+    os.getenv("GEMINI_MODEL", "").strip(),
     "gemini-3.8-flash",
+    "gemini-3.5-flash-lite",
+    "gemini-2.5-flash",
+    "gemini-2.5-flash-lite",
 )
-GROQ_MODEL = os.getenv("GROQ_MODEL", "openai/gpt-oss-120b")
+GROQ_MODEL_PREFERENCES = (
+    os.getenv("GROQ_MODEL", "").strip(),
+    "openai/gpt-oss-20b",
+    "openai/gpt-oss-120b",
+    "qwen/qwen3.8-27b",
+    "llama-3.3-70b-versatile",
+)
 NVIDIA_MODEL = os.getenv("NVIDIA_MODEL", "nvidia/nemotron-3-super-120b-a12b")
 NVIDIA_API_URL = "https://integrate.api.nvidia.com/v1/chat/completions"
 
@@ -54,6 +66,10 @@ Use status "matched" when one domain is reasonably supported. Use "needs_context
 missing fact could materially change the domain (for example, whether a vehicle was seized by
 police, a lender/recovery agent, or a private person). Use "out_of_taxonomy" only when the
 situation is clear but none of the allowed domains covers it.
+Classify an ordinary traffic/e-challan or vehicle fine under "Traffic & Motor Vehicle Violations".
+Do not use Motor Accident Claims unless the user describes an accident and seeks compensation.
+If the user only says "challan" without context, ask whether it is a traffic penalty or a
+criminal-case challan. Separate criminal charges should be classified on their own facts.
 
 Allowed domains:
 {json.dumps(domains, ensure_ascii=False)}
@@ -112,6 +128,65 @@ def _parse_json(content: str, domains: set[str]) -> dict[str, Any]:
     return parsed
 
 
+def _unique_models(preferences: tuple[str, ...], available: set[str] | None = None) -> tuple[str, ...]:
+    """Return configured model IDs in preference order, optionally key-filtered."""
+    output: list[str] = []
+    for model in preferences:
+        normalized = model.strip().removeprefix("models/")
+        if not normalized or normalized in output:
+            continue
+        if available is not None and normalized not in available:
+            continue
+        output.append(normalized)
+    return tuple(output)
+
+
+def _gemini_models_for_key(client: Any) -> tuple[str, ...]:
+    try:
+        available = {
+            str(getattr(model, "name", "")).removeprefix("models/")
+            for model in client.models.list()
+            if getattr(model, "name", None)
+            and (
+                not getattr(model, "supported_actions", None)
+                or "generateContent" in getattr(model, "supported_actions", [])
+            )
+        }
+    except Exception as error:
+        logger.info("Gemini model discovery unavailable: %s", type(error).__name__)
+        available = set()
+    return _unique_models(GEMINI_MODEL_PREFERENCES, available or None)
+
+
+def _groq_models_for_key(client: Any) -> tuple[str, ...]:
+    try:
+        response = client.models.list()
+        available = {
+            str(getattr(model, "id", ""))
+            for model in getattr(response, "data", response)
+            if getattr(model, "id", None)
+        }
+    except Exception as error:
+        logger.info("Groq model discovery unavailable: %s", type(error).__name__)
+        available = set()
+    return _unique_models(GROQ_MODEL_PREFERENCES, available or None)
+
+
+def _gemini_text(response: Any) -> str:
+    """Read Gemini JSON safely when response.text is empty or unavailable."""
+    try:
+        if response.text:
+            return str(response.text)
+    except (AttributeError, ValueError):
+        pass
+    for candidate in getattr(response, "candidates", []) or []:
+        parts = getattr(getattr(candidate, "content", None), "parts", []) or []
+        text = "".join(str(getattr(part, "text", "") or "") for part in parts)
+        if text:
+            return text
+    return ""
+
+
 @lru_cache(maxsize=1)
 def _gemini_client():
     if not _valid_key("GEMINI_API_KEY"):
@@ -148,8 +223,8 @@ def _classify_with_gemini(query: str, domains: list[str]) -> dict[str, Any] | No
     prompt = _prompt(query, domains)
     attempted: set[str] = set()
     failures: list[str] = []
-    for model in GEMINI_MODELS:
-        if not model or model in attempted:
+    for model in _gemini_models_for_key(client):
+        if model in attempted:
             continue
         attempted.add(model)
         try:
@@ -158,7 +233,7 @@ def _classify_with_gemini(query: str, domains: list[str]) -> dict[str, Any] | No
                 contents=prompt,
                 config={"response_mime_type": "application/json"},
             )
-            result = _parse_json(response.text or "", set(domains))
+            result = _parse_json(_gemini_text(response), set(domains))
             result["source"] = f"gemini:{model}"
             return result
         except Exception as error:
@@ -212,20 +287,24 @@ def _classify_with_groq(query: str, domains: list[str]) -> dict[str, Any] | None
     if client is None:
         return None
 
-    try:
-        response = client.chat.completions.create(
-            model=GROQ_MODEL,
-            messages=[{"role": "user", "content": _prompt(query, domains)}],
-            response_format={"type": "json_object"},
-            temperature=0.0,
-        )
-        content = response.choices[0].message.content or ""
-        result = _parse_json(content, set(domains))
-        result["source"] = f"groq:{GROQ_MODEL}"
-        return result
-    except Exception as error:
-        logger.warning("Groq classification failed: %s", type(error).__name__)
-        return None
+    failures: list[str] = []
+    for model in _groq_models_for_key(client):
+        try:
+            response = client.chat.completions.create(
+                model=model,
+                messages=[{"role": "user", "content": _prompt(query, domains)}],
+                response_format={"type": "json_object"},
+                temperature=0.0,
+            )
+            content = response.choices[0].message.content or ""
+            result = _parse_json(content, set(domains))
+            result["source"] = f"groq:{model}"
+            return result
+        except Exception as error:
+            failures.append(f"{model}:{type(error).__name__}")
+    if failures:
+        logger.warning("Groq classification unavailable (%s)", ", ".join(failures))
+    return None
 
 
 def classify_with_llm(query: str, domains: list[str]) -> dict[str, Any] | None:

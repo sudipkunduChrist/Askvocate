@@ -19,23 +19,51 @@ import androidx.fragment.app.viewModels
 import androidx.navigation.fragment.findNavController
 import androidx.recyclerview.widget.RecyclerView
 import com.example.askvocate.R
-import com.example.askvocate.data.model.SavedAdvocate
-import com.example.askvocate.data.repository.LawyerMatchingRepository
-import com.example.askvocate.data.repository.SavedAdvocatesRepository
 import com.example.askvocate.util.applyStatusBarInset
 
 class LegalAssistantFragment : Fragment() {
 
     private val viewModel: LegalAssistantViewModel by viewModels()
+    private var hasOpenedArgument = false
+
+    override fun onSaveInstanceState(outState: Bundle) {
+        outState.putBoolean("hasOpenedChatArgument", hasOpenedArgument)
+        super.onSaveInstanceState(outState)
+    }
+
+    override fun onResume() {
+        super.onResume()
+        viewModel.resumeActiveChat()
+    }
 
     override fun onCreateView(inflater: LayoutInflater, container: ViewGroup?, state: Bundle?): View =
         inflater.inflate(R.layout.fragment_legal_assistant, container, false)
 
     override fun onViewCreated(view: View, state: Bundle?) {
         super.onViewCreated(view, state)
+        hasOpenedArgument = state?.getBoolean("hasOpenedChatArgument") ?: hasOpenedArgument
         view.findViewById<View>(R.id.appbar).applyStatusBarInset()
-        view.findViewById<androidx.appcompat.widget.Toolbar>(R.id.toolbar).setNavigationOnClickListener {
+        val toolbar = view.findViewById<androidx.appcompat.widget.Toolbar>(R.id.toolbar)
+        toolbar.setNavigationOnClickListener {
             findNavController().navigateUp()
+        }
+        toolbar.inflateMenu(R.menu.legal_assistant_menu)
+        toolbar.setOnMenuItemClickListener { item ->
+            when (item.itemId) {
+                R.id.action_guide_history -> {
+                    findNavController().navigate(R.id.nav_chat_history)
+                    true
+                }
+                R.id.action_guide_new -> {
+                    viewModel.newChat()
+                    true
+                }
+                else -> false
+            }
+        }
+        if (!hasOpenedArgument) {
+            arguments?.getString("chatId")?.takeIf { it.isNotBlank() }?.let(viewModel::openChat)
+            hasOpenedArgument = true
         }
 
         val list = view.findViewById<RecyclerView>(R.id.rv_assistant_messages)
@@ -59,17 +87,28 @@ class LegalAssistantFragment : Fragment() {
         list.adapter = adapter
 
         val inputPadding = inputContainer.paddingBottom
+        var previousImeBottom = 0
         ViewCompat.setOnApplyWindowInsetsListener(inputContainer) { container, insets ->
             val imeBottom = insets.getInsets(WindowInsetsCompat.Type.ime()).bottom
             val navigationBottom = insets.getInsets(WindowInsetsCompat.Type.navigationBars()).bottom
             container.updatePadding(bottom = inputPadding + maxOf(imeBottom, navigationBottom))
+            if (imeBottom > 0 && imeBottom != previousImeBottom) {
+                list.post {
+                    if (adapter.itemCount > 0) {
+                        list.scrollToPosition(adapter.itemCount - 1)
+                        list.post { list.scrollBy(0, list.computeVerticalScrollRange()) }
+                    }
+                }
+            }
+            previousImeBottom = imeBottom
             insets
         }
         ViewCompat.requestApplyInsets(inputContainer)
 
         fun submit() {
             val message = input.text.toString()
-            if (message.trim().length < 3 || viewModel.uiState.value?.isLoading == true) return
+            if (message.trim().length < 3 || viewModel.uiState.value?.isLoading == true ||
+                viewModel.uiState.value?.error != null) return
             input.text.clear()
             viewModel.send(message)
         }
@@ -82,8 +121,6 @@ class LegalAssistantFragment : Fragment() {
             } else false
         }
 
-        val savedSearches = SavedAdvocatesRepository(requireContext())
-        val savedMessageIds = mutableSetOf<String>()
         var previousMessages = emptyList<LegalAssistantMessage>()
         viewModel.uiState.observe(viewLifecycleOwner) { ui ->
             val matchingIndex = ui.messages.indexOfFirst { message ->
@@ -97,25 +134,8 @@ class LegalAssistantFragment : Fragment() {
                     list.scrollToPosition(if (matchingIndex >= 0) matchingIndex else ui.messages.lastIndex)
                 }
             }
-            ui.messages.forEach { message ->
-                val result = message.matchingResult as? LawyerMatchingRepository.Result.Success
-                if (result != null && savedMessageIds.add(message.id)) {
-                    savedSearches.saveSearch(
-                        domain = result.detectedDomain,
-                        query = message.recommendationQuery,
-                        advocates = result.lawyers.map { lawyer ->
-                            SavedAdvocate(
-                                lawyerId = lawyer.id, name = lawyer.name, specialty = lawyer.specialty,
-                                location = lawyer.location, rating = lawyer.rating,
-                                yearsExperience = lawyer.yearsExperience, consultationFee = lawyer.consultationFee,
-                                isVerified = lawyer.isVerified
-                            )
-                        }
-                    )
-                }
-            }
             loading.isVisible = ui.isLoading
-            send.isEnabled = !ui.isLoading
+            send.isEnabled = !ui.isLoading && ui.error == null
             errorContainer.isVisible = ui.error != null && !ui.isLoading
             errorText.text = ui.error
         }

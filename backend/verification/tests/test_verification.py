@@ -13,7 +13,7 @@ from cryptography.hazmat.primitives.asymmetric import padding, rsa
 from cryptography.x509.oid import NameOID
 from PIL import Image
 
-from verification import VerificationError, _address_read_quality, compare_printed_with_qr, local_ocr, verify_qr_payload, match_live_selfie
+from verification import VerificationError, _address_read_quality, _pan_read_quality, compare_printed_with_qr, local_ocr, verify_qr_payload, match_live_selfie
 
 
 class AddressOcrSelectionTests(unittest.TestCase):
@@ -45,6 +45,19 @@ class AddressOcrSelectionTests(unittest.TestCase):
                 patch("verification.pytesseract.image_to_data", return_value={"conf": [80, 90]}):
             result = local_ocr(b"example", "back")
         self.assertEqual(english, result["ocrText"])
+        self.assertTrue(all(call.kwargs["lang"] == "eng" for call in ocr.call_args_list))
+
+    def test_pan_ocr_chooses_read_with_number_and_fields_without_heading(self):
+        weak = "INCOME TAX DEPARTMENT\nName: Test Lawyer"
+        complete = ("AAAPL1234C\nName: Test Lawyer\nFather's Name: Test Father\n"
+                    "DOB: 01/02/1990")
+        self.assertGreater(_pan_read_quality(complete), _pan_read_quality(weak))
+        image = np.full((300, 500, 3), 255, dtype=np.uint8)
+        with patch("verification._image", return_value=image), \
+                patch("verification.pytesseract.image_to_string", side_effect=[weak, complete, weak]) as ocr, \
+                patch("verification.pytesseract.image_to_data", return_value={"conf": [40, 80]}):
+            result = local_ocr(b"example", "pan")
+        self.assertEqual(complete, result["ocrText"])
         self.assertTrue(all(call.kwargs["lang"] == "eng" for call in ocr.call_args_list))
 
 
