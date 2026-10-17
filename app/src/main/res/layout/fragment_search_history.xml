@@ -9,16 +9,19 @@
     <LinearLayout
         android:id="@+id/search_history_app_bar"
         android:layout_width="match_parent"
-        android:layout_height="?attr/actionBarSize"
+        android:layout_height="wrap_content"
         android:gravity="center_vertical"
-        android:paddingHorizontal="16dp">
+        android:minHeight="?attr/actionBarSize"
+        android:paddingHorizontal="16dp"
+        android:paddingTop="12dp"
+        android:paddingBottom="8dp">
         <ImageButton
-            android:id="@+id/btn_history_menu"
+            android:id="@+id/btn_history_back"
             android:layout_width="40dp"
             android:layout_height="40dp"
             android:background="?attr/selectableItemBackgroundBorderless"
-            android:contentDescription="@string/navigation_drawer_open"
-            android:src="@drawable/ic_menu"
+            android:contentDescription="@string/back"
+            android:src="@drawable/ic_back"
             app:tint="@color/text_primary" />
         <TextView
             android:layout_width="wrap_content"
@@ -48,6 +51,7 @@
             android:layout_height="match_parent"
             android:clipToPadding="false"
             android:padding="16dp"
+            android:paddingTop="24dp"
             app:layoutManager="androidx.recyclerview.widget.LinearLayoutManager" />
         <LinearLayout
             android:id="@+id/history_empty_state"

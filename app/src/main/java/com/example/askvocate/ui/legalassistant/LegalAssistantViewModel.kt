@@ -141,7 +141,9 @@ class LegalAssistantViewModel(application: Application) : AndroidViewModel(appli
         }
         viewModelScope.launch {
             try {
-                val result = withContext(Dispatchers.IO) { matchingRepository.match(query) }
+                val result = withContext(Dispatchers.IO) {
+                    matchingRepository.match(query, recordInSearchHistory = false)
+                }
                 updateMatchingMessage(messageId) {
                     it.copy(isMatching = false, matchingResult = result, matchingError = null)
                 }

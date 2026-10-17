@@ -47,10 +47,25 @@ class SavedAiChatControllerTest {
 
         assertNotNull(result.getString("id"));
         assertEquals("user-123", result.getString("userId"));
-        assertEquals("My landlord kept my deposit", result.getString("title"));
+        assertEquals("Keep the receipts", result.getString("title"));
         assertEquals(3, result.getList("messages", Document.class).size());
         assertEquals("Please retry", result.getList("messages", Document.class).get(2).getString("matchingError"));
         verify(chats).insertOne(any(Document.class));
+    }
+
+    @Test
+    void titleTracksLatestMessageAndSkipsAutomaticWelcome() {
+        List<Document> messages = List.of(
+                new Document("id", "welcome").append("role", "assistant").append("content", "Welcome"),
+                new Document("role", "user").append("content", "My landlord kept my deposit"));
+        assertEquals("My landlord kept my deposit", SavedAiChatController.title(messages));
+
+        List<Document> withReply = new java.util.ArrayList<>(messages);
+        withReply.add(new Document("role", "assistant").append("content", "Keep the receipts.\nAsk for a written response."));
+        assertEquals("Keep the receipts. Ask for a written response.", SavedAiChatController.title(withReply));
+
+        withReply.add(new Document("role", "user").append("content", "What if they refuse?"));
+        assertEquals("What if they refuse?", SavedAiChatController.title(withReply));
     }
 
     @Test

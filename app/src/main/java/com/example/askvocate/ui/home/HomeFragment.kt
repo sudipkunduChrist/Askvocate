@@ -66,8 +66,7 @@ class HomeFragment : Fragment() {
         binding.topLawyersHeader.isVisible = isClient
         binding.rvTopLawyers.isVisible = isClient
         binding.assistantCard.isVisible = isClient
-        binding.btnChatAssistant.isVisible = isClient
-        binding.quickActionsGrid.columnCount = if (isClient) 3 else 2
+        binding.quickActionsGrid.columnCount = if (isClient) 2 else 1
         if (!isClient) {
             binding.quickActionsGrid.removeView(binding.actionFindLawyer)
             binding.tvHeroSubtitle.setText(R.string.lawyer_hero_subtitle)
@@ -101,9 +100,6 @@ class HomeFragment : Fragment() {
     }
 
     private fun setupLegalAssistant() {
-        binding.btnChatAssistant.setOnClickListener {
-            findNavController().navigate(R.id.action_home_to_legal_assistant)
-        }
         binding.assistantCard.setOnClickListener {
             findNavController().navigate(R.id.action_home_to_legal_assistant)
         }
@@ -134,9 +130,6 @@ class HomeFragment : Fragment() {
         }
         binding.actionAppointments.setOnClickListener {
             findNavController().navigate(R.id.nav_appointments)
-        }
-        binding.actionDocuments.setOnClickListener {
-            Toast.makeText(requireContext(), "Legal Documents coming soon!", Toast.LENGTH_SHORT).show()
         }
     }
 

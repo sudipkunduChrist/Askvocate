@@ -47,7 +47,7 @@ class LawyerMatchingRepository(context: Context) {
         }
     }
 
-    fun match(query: String): Result {
+    fun match(query: String, recordInSearchHistory: Boolean = true): Result {
         val connection = (URL("${ApiConfig.AI_BASE_URL}/recommend").openConnection() as HttpURLConnection).apply {
             requestMethod = "POST"
             connectTimeout = 15_000
@@ -96,7 +96,7 @@ class LawyerMatchingRepository(context: Context) {
             }
             val needsClarification = json.optBoolean("needs_clarification", false)
             // Search history sync must not turn a successful recommendation into a failed match.
-            if (SessionManager.getAppToken(appContext).isNotBlank()) {
+            if (recordInSearchHistory && SessionManager.getAppToken(appContext).isNotBlank()) {
                 try {
                     history.add(query, json)
                 } catch (error: Exception) {

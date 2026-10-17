@@ -95,9 +95,17 @@ public class SavedAiChatController {
         return text.substring(0, Math.min(max, text.length()));
     }
 
-    private String title(List<Document> messages) {
-        return messages.stream().filter(message -> "user".equals(message.getString("role")))
-                .map(message -> limit(message.getString("content"), 80)).findFirst().orElse("Legal guide chat");
+    static String title(List<Document> messages) {
+        for (int index = messages.size() - 1; index >= 0; index--) {
+            Document message = messages.get(index);
+            if ("welcome".equals(message.getString("id"))) continue;
+            String content = message.getString("content");
+            if (content != null && !content.isBlank()) {
+                String preview = content.replaceAll("\\s+", " ").trim();
+                return preview.substring(0, Math.min(80, preview.length()));
+            }
+        }
+        return "Legal guide chat";
     }
 
     @PostMapping
@@ -133,7 +141,7 @@ public class SavedAiChatController {
         List<Document> items = new ArrayList<>();
         chats().find(Filters.eq("userId", userId)).sort(Sorts.descending("updatedAt"))
                 .forEach(chat -> items.add(new Document("id", chat.getObjectId("_id").toString())
-                        .append("title", chat.getString("title"))
+                        .append("title", title(chat.getList("messages", Document.class, List.of())))
                         .append("createdAt", chat.getDate("createdAt"))
                         .append("updatedAt", chat.getDate("updatedAt"))
                         .append("messageCount", chat.getList("messages", Document.class, List.of()).size())));

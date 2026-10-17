@@ -11,6 +11,8 @@
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
         android:background="@color/white"
+        android:paddingTop="12dp"
+        android:paddingBottom="8dp"
         app:elevation="0dp">
 
         <com.google.android.material.appbar.MaterialToolbar
@@ -18,7 +20,7 @@
             android:layout_width="match_parent"
             android:layout_height="56dp"
             android:background="@color/white"
-            app:navigationIcon="@drawable/ic_menu"
+            app:navigationIcon="@drawable/ic_back"
             app:navigationIconTint="@color/navy_primary"
             app:title="@string/find_your_lawyer"
             app:titleTextAppearance="@style/TextAppearance.Askvocate.Title"

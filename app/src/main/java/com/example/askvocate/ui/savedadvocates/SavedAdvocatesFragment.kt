@@ -17,6 +17,7 @@ import com.example.askvocate.R
 import com.example.askvocate.data.repository.SearchHistoryRepository
 import com.example.askvocate.ui.adapters.SavedSearchAdapter
 import com.example.askvocate.util.AnimationUtils
+import com.example.askvocate.util.applyStatusBarInset
 import com.google.android.material.button.MaterialButton
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
@@ -40,6 +41,7 @@ class SavedAdvocatesFragment : Fragment() {
         super.onViewCreated(view, savedInstanceState)
 
         repository = SearchHistoryRepository(requireContext())
+        view.findViewById<View>(R.id.saved_searches_app_bar).applyStatusBarInset()
 
         val btnBack = view.findViewById<ImageButton>(R.id.btn_back)
         val btnFindLawyers = view.findViewById<MaterialButton>(R.id.btn_find_lawyers)

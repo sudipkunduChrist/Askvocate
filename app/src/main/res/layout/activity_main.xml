@@ -187,10 +187,10 @@
                 android:layout_gravity="center_horizontal|bottom"
                 android:layout_marginBottom="10dp"
                 android:background="@drawable/bg_fab_center"
-                android:contentDescription="@string/find_your_lawyer"
+                android:contentDescription="@string/open_chat_assistant"
                 android:elevation="6dp"
                 android:padding="15dp"
-                android:src="@drawable/ic_sparkle" />
+                android:src="@drawable/ic_ai_chat" />
         </FrameLayout>
 
     </androidx.constraintlayout.widget.ConstraintLayout>

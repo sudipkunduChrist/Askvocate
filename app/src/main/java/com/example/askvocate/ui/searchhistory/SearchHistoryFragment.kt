@@ -13,7 +13,6 @@ import androidx.fragment.app.Fragment
 import androidx.lifecycle.lifecycleScope
 import androidx.navigation.fragment.findNavController
 import androidx.recyclerview.widget.RecyclerView
-import com.example.askvocate.MainActivity
 import com.example.askvocate.R
 import com.example.askvocate.data.model.Lawyer
 import com.example.askvocate.data.model.SearchHistoryEntry
@@ -36,8 +35,8 @@ class SearchHistoryFragment : Fragment(R.layout.fragment_search_history) {
         super.onViewCreated(view, savedInstanceState)
         repository = SearchHistoryRepository(requireContext())
         view.findViewById<View>(R.id.search_history_app_bar).applyStatusBarInset()
-        view.findViewById<ImageButton>(R.id.btn_history_menu).setOnClickListener {
-            (requireActivity() as? MainActivity)?.openDrawer()
+        view.findViewById<ImageButton>(R.id.btn_history_back).setOnClickListener {
+            if (!findNavController().navigateUp()) findNavController().navigate(R.id.nav_home)
         }
         view.findViewById<View>(R.id.btn_history_find_lawyers).setOnClickListener {
             findNavController().navigate(R.id.nav_find_lawyers)

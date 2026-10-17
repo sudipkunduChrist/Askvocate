@@ -80,12 +80,12 @@ class MainActivity : AppCompatActivity() {
             findViewById<View>(tabId).setOnClickListener { selectTab(destId) }
         }
 
-        // Floating center "ask / find your lawyer" button.
+        // Floating center AI chat button.
         fabAsk.setOnClickListener {
             val options = NavOptions.Builder()
                 .setLaunchSingleTop(true)
                 .build()
-            navController.navigate(R.id.nav_find_lawyers, null, options)
+            navController.navigate(R.id.nav_chat_history, null, options)
         }
 
         // Drawer navigation.

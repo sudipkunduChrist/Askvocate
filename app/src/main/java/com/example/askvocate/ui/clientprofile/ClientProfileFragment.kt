@@ -20,6 +20,7 @@ import com.example.askvocate.R
 import com.example.askvocate.databinding.FragmentClientProfileBinding
 import com.example.askvocate.network.GoogleAuthHelper
 import com.example.askvocate.util.SessionManager
+import com.example.askvocate.util.applyStatusBarInset
 import com.google.android.material.dialog.MaterialAlertDialogBuilder
 import kotlinx.coroutines.launch
 
@@ -54,6 +55,7 @@ class ClientProfileFragment : Fragment() {
         super.onViewCreated(view, savedInstanceState)
 
         prefs = requireContext().getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
+        binding.appBar.applyStatusBarInset()
 
         loadUserData()
         setupAppVersion()
@@ -166,8 +168,8 @@ class ClientProfileFragment : Fragment() {
     }
 
     private fun setupClickListeners() {
-        binding.toolbar.setNavigationOnClickListener {
-            (requireActivity() as? com.example.askvocate.MainActivity)?.openDrawer()
+        binding.btnProfileBack.setOnClickListener {
+            if (!findNavController().navigateUp()) findNavController().navigate(R.id.nav_home)
         }
 
         binding.btnProfileSettings.setOnClickListener {

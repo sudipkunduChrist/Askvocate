@@ -21,7 +21,6 @@ import androidx.navigation.NavOptions
 import androidx.navigation.fragment.findNavController
 import androidx.recyclerview.widget.RecyclerView
 import androidx.core.widget.NestedScrollView
-import com.example.askvocate.MainActivity
 import com.example.askvocate.R
 import com.example.askvocate.ui.adapters.LawyerAdapter
 import com.example.askvocate.util.AnimationUtils
@@ -56,7 +55,7 @@ class FindLawyersFragment : Fragment() {
         view.findViewById<View>(R.id.find_lawyers_app_bar).applyStatusBarInset()
 
         view.findViewById<Toolbar>(R.id.toolbar).setNavigationOnClickListener {
-            (requireActivity() as? MainActivity)?.openDrawer()
+            if (!findNavController().navigateUp()) findNavController().navigate(R.id.nav_home)
         }
         view.findViewById<View>(R.id.btn_notifications).setOnClickListener {
             android.widget.Toast.makeText(requireContext(), "Notifications coming soon!", android.widget.Toast.LENGTH_SHORT).show()
