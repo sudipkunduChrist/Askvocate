@@ -13,10 +13,17 @@ from cryptography.hazmat.primitives.asymmetric import padding, rsa
 from cryptography.x509.oid import NameOID
 from PIL import Image
 
-from verification import VerificationError, _address_read_quality, _pan_read_quality, compare_printed_with_qr, local_ocr, verify_qr_payload, match_live_selfie
+from verification import VerificationError, _address_read_quality, _front_read_quality, _pan_read_quality, compare_printed_with_qr, local_ocr, verify_qr_payload, match_live_selfie
 
 
 class AddressOcrSelectionTests(unittest.TestCase):
+    def test_old_aadhaar_front_prefers_read_with_complete_english_name(self):
+        header = "Government of India\n"
+        footer = "\nDOB: 31/07/2000\nMale\n2345 6789 0123"
+        weak = header + "Mane As" + footer
+        complete = header + "Alex Morgan Rivera\nMane As si3Hl" + footer
+        self.assertGreater(_front_read_quality(complete), _front_read_quality(weak))
+
     def test_prefers_complete_english_address_over_unlabeled_noise(self):
         mixed = "Ops: es 90 65 a 2:30 Hiej\nIndia"
         english = "Address: S/O Rahul Bajaj, L-113 Vivek Vihar\nNoida 201304\nVID: 1234"

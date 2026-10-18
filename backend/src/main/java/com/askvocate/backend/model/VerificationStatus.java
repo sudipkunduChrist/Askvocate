@@ -8,6 +8,7 @@ public enum VerificationStatus {
     PENDING,
 
     /** All required checks for this document type passed. */
+    /** All required checks for this document type passed. */
     VERIFIED,
 
     /** OCR extraction failed or extracted data did not pass validation. */

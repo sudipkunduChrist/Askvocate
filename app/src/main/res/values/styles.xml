@@ -167,6 +167,10 @@
         <item name="itemIconTint">@color/navy_primary</item>
     </style>
 
+    <style name="TextAppearance.Askvocate.DrawerItem" parent="TextAppearance.Material3.LabelLarge">
+        <item name="android:textSize">13sp</item>
+    </style>
+
     <!-- ==================== PREMIUM TEXT APPEARANCES ==================== -->
 
     <style name="TextAppearance.Premium.Justitia" parent="TextAppearance.Material3.TitleLarge">

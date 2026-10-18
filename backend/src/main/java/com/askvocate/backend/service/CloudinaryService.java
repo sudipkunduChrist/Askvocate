@@ -45,8 +45,8 @@ public class CloudinaryService {
                     .connectTimeout(Duration.ofSeconds(5)).build();
             HttpResponse<byte[]> response = client.send(HttpRequest.newBuilder(uri).timeout(Duration.ofSeconds(10))
                     .GET().build(), HttpResponse.BodyHandlers.ofByteArray());
-            if (response.statusCode() != 200 || response.body().length > 10 * 1024 * 1024) {
-                throw new IOException("Aadhaar back image is unavailable or too large.");
+            if (response.statusCode() != 200 || response.body().length > 30 * 1024 * 1024) {
+                throw new IOException("Saved document image is unavailable or exceeds the 30 MB delivery limit.");
             }
             return response.body();
         } catch (InterruptedException e) {

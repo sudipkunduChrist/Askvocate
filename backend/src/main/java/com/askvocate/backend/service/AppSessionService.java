@@ -42,6 +42,16 @@ public class AppSessionService {
     }
 
     public String requireClient(String authorization) {
+        Account account = requireAccount(authorization);
+        if (!"CLIENT".equals(account.role())) {
+            throw new ResponseStatusException(HttpStatus.UNAUTHORIZED, "Client account required");
+        }
+        return account.userId();
+    }
+
+    public record Account(String userId, String role) {}
+
+    public Account requireAccount(String authorization) {
         if (authorization == null || !authorization.startsWith("Bearer ")) {
             throw new ResponseStatusException(HttpStatus.UNAUTHORIZED, "Sign in required");
         }
@@ -49,11 +59,15 @@ public class AppSessionService {
         if (token.isEmpty()) throw new ResponseStatusException(HttpStatus.UNAUTHORIZED, "Sign in required");
         Document session = sessions().find(Filters.and(
                 Filters.eq("tokenDigest", digest(token)),
-                Filters.gt("expiresAt", new Date()),
-                Filters.eq("role", "CLIENT")
+                Filters.gt("expiresAt", new Date())
         )).first();
         if (session == null) throw new ResponseStatusException(HttpStatus.UNAUTHORIZED, "Session expired. Sign in again.");
-        return session.getString("userId");
+        String role = session.getString("role");
+        if (!("CLIENT".equals(role) || "LAWYER_FRESHER".equals(role)
+                || "LAWYER_EXPERIENCED".equals(role))) {
+            throw new ResponseStatusException(HttpStatus.FORBIDDEN, "Account type is not supported");
+        }
+        return new Account(session.getString("userId"), role);
     }
 
     private String digest(String token) {

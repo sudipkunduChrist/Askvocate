@@ -6,13 +6,12 @@ import com.askvocate.backend.dto.LawyerVerificationSummaryResponse;
 import com.askvocate.backend.exception.DocumentVerificationException;
 import com.askvocate.backend.model.DocumentType;
 import com.askvocate.backend.service.DocumentVerificationService;
+import com.askvocate.backend.service.AppSessionService;
 import jakarta.validation.Valid;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
-import org.springframework.security.core.annotation.AuthenticationPrincipal;
-import org.springframework.security.oauth2.jwt.Jwt;
 import org.springframework.web.bind.annotation.*;
 import org.springframework.web.multipart.MultipartFile;
 
@@ -22,8 +21,7 @@ import java.util.List;
  * REST controller for lawyer & user identity document verification.
  * Supports Aadhaar, PAN Card, and Bar Council credentials (ID card, Enrollment Certificate, COP).
  * 
- * <p>Authentication:
- * Accepts user ID from JWT principal when available, or from {@code userId} request param / {@code X-User-Id} header.
+ * <p>Authentication uses the signed-in app session. An optional user ID must match its owner.
  */
 @RestController
 @RequestMapping("/api/documents")
@@ -32,9 +30,12 @@ public class DocumentVerificationController {
     private static final Logger log = LoggerFactory.getLogger(DocumentVerificationController.class);
 
     private final DocumentVerificationService verificationService;
+    private final AppSessionService sessions;
 
-    public DocumentVerificationController(DocumentVerificationService verificationService) {
+    public DocumentVerificationController(DocumentVerificationService verificationService,
+            AppSessionService sessions) {
         this.verificationService = verificationService;
+        this.sessions = sessions;
     }
 
     /**
@@ -45,22 +46,23 @@ public class DocumentVerificationController {
      *   <li>{@code documentType} — AADHAAR, PAN, BAR_COUNCIL_ID, BAR_CERTIFICATE, CERTIFICATE_OF_PRACTICE</li>
      *   <li>{@code front} — front image of the document (required)</li>
      *   <li>{@code back}  — back image (required for AADHAAR; omit for PAN)</li>
-     *   <li>{@code userId} — optional if JWT token provided, required otherwise</li>
+     *   <li>{@code userId} — optional; if supplied it must match the app session</li>
      * </ul>
      */
     @PostMapping(value = "/verify", consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
     public ResponseEntity<DocumentVerificationResponse> verifyDocument(
-            @AuthenticationPrincipal Jwt jwt,
+            @RequestHeader("Authorization") String authorization,
             @RequestParam(value = "userId", required = false) String paramUserId,
             @RequestHeader(value = "X-User-Id", required = false) String headerUserId,
             @RequestParam("documentType") String documentType,
             @RequestParam("front") MultipartFile front,
             @RequestParam(value = "back", required = false) MultipartFile back) {
 
-        String userId = resolveUserId(jwt, paramUserId, headerUserId);
+        String userId = resolveUserId(authorization, paramUserId, headerUserId);
         DocumentType type = parseDocumentType(documentType);
 
-        log.info("Document verification request: userId={}, documentType={}", userId, type);
+        log.info("Document verification request: type={}, frontBytes={}, backBytes={}", type,
+                front.getSize(), back == null ? 0 : back.getSize());
 
         DocumentVerificationResponse response =
                 verificationService.verifyDocument(userId, type, front, back);
@@ -75,10 +77,11 @@ public class DocumentVerificationController {
      */
     @PostMapping("/verify-bar-council")
     public ResponseEntity<DocumentVerificationResponse> verifyBarCouncil(
+            @RequestHeader("Authorization") String authorization,
             @Valid @RequestBody BarCouncilVerificationRequest request) {
+        requireOwner(authorization, request.getUserId());
 
-        log.info("Direct Bar Council verification request: userId={}, barCouncilNumber={}",
-                request.getUserId(), request.getBarCouncilNumber());
+        log.info("Direct Bar Council verification request received for signed-in account");
 
         DocumentVerificationResponse response = verificationService.verifyBarCouncilDirect(request);
         return ResponseEntity.ok(response);
@@ -90,7 +93,9 @@ public class DocumentVerificationController {
      */
     @GetMapping("/lawyer/{userId}/summary")
     public ResponseEntity<LawyerVerificationSummaryResponse> getLawyerVerificationSummary(
+            @RequestHeader("Authorization") String authorization,
             @PathVariable String userId) {
+        requireOwner(authorization, userId);
         LawyerVerificationSummaryResponse summary = verificationService.getLawyerVerificationSummary(userId);
         return ResponseEntity.ok(summary);
     }
@@ -100,21 +105,23 @@ public class DocumentVerificationController {
      */
     @GetMapping("/user/{userId}/verified")
     public ResponseEntity<List<DocumentVerificationResponse>> getVerifiedDocumentsForUser(
+            @RequestHeader("Authorization") String authorization,
             @PathVariable String userId) {
+        requireOwner(authorization, userId);
         List<DocumentVerificationResponse> documents = verificationService.getUserDocuments(userId);
         return ResponseEntity.ok(documents);
     }
 
     /**
-     * List all verification documents for the authenticated JWT user.
+     * List all verification documents for the signed-in account.
      */
     @GetMapping
     public ResponseEntity<List<DocumentVerificationResponse>> getUserDocuments(
-            @AuthenticationPrincipal Jwt jwt,
+            @RequestHeader("Authorization") String authorization,
             @RequestHeader(value = "X-User-Id", required = false) String headerUserId,
             @RequestParam(value = "userId", required = false) String paramUserId) {
 
-        String userId = resolveUserId(jwt, paramUserId, headerUserId);
+        String userId = resolveUserId(authorization, paramUserId, headerUserId);
         List<DocumentVerificationResponse> documents = verificationService.getUserDocuments(userId);
         return ResponseEntity.ok(documents);
     }
@@ -124,11 +131,11 @@ public class DocumentVerificationController {
      */
     @GetMapping("/details/{documentId}")
     public ResponseEntity<DocumentVerificationResponse> getDocumentDetails(
-            @AuthenticationPrincipal Jwt jwt,
+            @RequestHeader("Authorization") String authorization,
             @RequestHeader(value = "X-User-Id", required = false) String headerUserId,
             @PathVariable String documentId) {
 
-        String userId = resolveUserId(jwt, null, headerUserId);
+        String userId = resolveUserId(authorization, null, headerUserId);
 
         DocumentVerificationResponse response = verificationService.getDocumentById(userId, documentId);
         if (response == null) {
@@ -139,22 +146,21 @@ public class DocumentVerificationController {
 
     // ── Helpers ─────────────────────────────────────────────────────────
 
-    private String resolveUserId(Jwt jwt, String paramUserId, String headerUserId) {
-        if (jwt != null && jwt.getSubject() != null && !jwt.getSubject().isBlank()) {
-            String subject = jwt.getSubject();
-            if ((paramUserId != null && !paramUserId.isBlank() && !subject.equals(paramUserId.trim()))
-                    || (headerUserId != null && !headerUserId.isBlank() && !subject.equals(headerUserId.trim()))) {
-                throw new DocumentVerificationException("User ID does not match authenticated user.");
-            }
-            return subject;
+    private void requireOwner(String authorization, String userId) {
+        if (userId == null || !sessions.requireAccount(authorization).userId().equals(userId.trim())) {
+            throw new org.springframework.web.server.ResponseStatusException(
+                    org.springframework.http.HttpStatus.FORBIDDEN, "Document account mismatch");
         }
-        if (paramUserId != null && !paramUserId.isBlank()) {
-            return paramUserId.trim();
+    }
+
+    private String resolveUserId(String authorization, String paramUserId, String headerUserId) {
+        String userId = sessions.requireAccount(authorization).userId();
+        if ((paramUserId != null && !paramUserId.isBlank() && !userId.equals(paramUserId.trim()))
+                || (headerUserId != null && !headerUserId.isBlank() && !userId.equals(headerUserId.trim()))) {
+            throw new org.springframework.web.server.ResponseStatusException(
+                    org.springframework.http.HttpStatus.FORBIDDEN, "Document account mismatch");
         }
-        if (headerUserId != null && !headerUserId.isBlank()) {
-            return headerUserId.trim();
-        }
-        throw new DocumentVerificationException("User authentication or 'userId' parameter is required.");
+        return userId;
     }
 
     private DocumentType parseDocumentType(String documentType) {

@@ -83,6 +83,21 @@ class AadhaarOcrExtractionTest {
     }
 
     @Test
+    void olderBilingualCardPrefersCompleteEnglishNameOverNearbyOcrNoise() {
+        String number = validAadhaarNumber();
+        var front = ocr.extract("Government of India\nAlex Morgan Rivera\nMane As\n"
+                        + "DOB: 31/07/2000\nMale\n" + number,
+                DocumentType.AADHAAR, "front");
+        var noisyFront = ocr.extract("Government of India\nAlex Morgan Rivera\nMane As si3Hl\n"
+                        + "DOB: 31/07/2000\nMale\n" + number,
+                DocumentType.AADHAAR, "front");
+
+        assertTrue(front.success(), front.error());
+        assertEquals("Alex Morgan Rivera", front.extractedFields().get("name"));
+        assertEquals("Alex Morgan Rivera", noisyFront.extractedFields().get("name"));
+    }
+
+    @Test
     void englishOnlyAadhaarParsingDoesNotUseHindiNameAsEnglishName() {
         String number = validAadhaarNumber();
         var front = ocr.extract("आधार\nभारत सरकार\nGovernment of India\n"

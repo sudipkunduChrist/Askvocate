@@ -22,18 +22,20 @@ public class DocumentService {
 
     // ✅ Upload document - Saves to Cloudinary AND MongoDB
     public UserDoc uploadDocument(String userId, DocType docType, MultipartFile file) throws Exception {
+        file = DocumentImageCompressor.compressIfNeeded(file);
         // 1. Upload to Cloudinary
         String folder = "documents/" + userId + "/" + docType.name().toLowerCase();
         String fileUrl = cloudinaryService.uploadFile(file, folder);
 
         // 2. Save metadata to MongoDB
-        UserDoc userDoc = UserDoc.builder()
-                .userId(userId)
-                .docType(docType)
-                .fileUrl(fileUrl)           // Cloudinary URL stored in MongoDB
-                .storagePath(folder)        // Folder path stored in MongoDB
-                .uploadedAt(Instant.now().toEpochMilli())
-                .build();
+        UserDoc userDoc = userDocRepository.findByUserIdAndDocType(userId, docType)
+                .orElseGet(UserDoc::new);
+        userDoc.setUserId(userId);
+        userDoc.setDocType(docType);
+        userDoc.setFileUrl(fileUrl);
+        userDoc.setStoragePath(folder);
+        userDoc.setUploadedAt(Instant.now().toEpochMilli());
+        userDoc.setStatus(com.askvocate.backend.entity.DocStatus.UPLOADED);
 
         return userDocRepository.save(userDoc);  // ✅ Saves to MongoDB
     }

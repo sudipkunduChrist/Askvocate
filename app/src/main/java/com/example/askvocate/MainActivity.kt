@@ -29,7 +29,7 @@ import kotlinx.coroutines.launch
 class MainActivity : AppCompatActivity() {
 
     private lateinit var navController: NavController
-
+a
     private lateinit var drawerLayout: DrawerLayout
     private var isCheckingSession = false
 
@@ -44,6 +44,8 @@ class MainActivity : AppCompatActivity() {
         drawerLayout = findViewById(R.id.drawer_layout)
         val bottomNavContainer: View = findViewById(R.id.bottom_nav_container)
         val navView: NavigationView = findViewById(R.id.nav_view)
+        navView.getHeaderView(0).findViewById<View>(R.id.btn_close_drawer)
+            .setOnClickListener { animateDrawer(open = false) }
         val fabAsk: View = findViewById(R.id.fab_center_ask)
         val centerNavSlot: View = findViewById(R.id.center_nav_slot)
 
@@ -154,9 +156,27 @@ class MainActivity : AppCompatActivity() {
     /** Opens the navigation drawer from the top-left hamburger icon. */
     fun openDrawer() {
         if (drawerLayout.isDrawerOpen(GravityCompat.START)) {
-            drawerLayout.closeDrawer(GravityCompat.START)
+            animateDrawer(open = false)
         } else {
-            drawerLayout.openDrawer(GravityCompat.START)
+            animateDrawer(open = true)
+        }
+    }
+
+    private fun animateDrawer(open: Boolean) {
+        val drawer = findViewById<NavigationView>(R.id.nav_view)
+        val distance = (drawer.width.takeIf { it > 0 }
+            ?: resources.getDimensionPixelSize(R.dimen.nav_drawer_width)).toFloat()
+        drawer.animate().cancel()
+        if (open) {
+            drawerLayout.openDrawer(drawer, false)
+            drawer.translationX = -distance
+            drawer.animate().translationX(0f).setDuration(180L).start()
+        } else {
+            drawer.animate().translationX(-distance).setDuration(180L)
+                .withEndAction {
+                    drawerLayout.closeDrawer(drawer, false)
+                    drawer.translationX = 0f
+                }.start()
         }
     }
 

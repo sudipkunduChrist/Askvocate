@@ -94,6 +94,25 @@ def _front_read_quality(text: str) -> float:
         score += 10
     if re.search(r"(?im)^\s*Name\s*[:/-]?\s*[A-Za-z]{2,}", text):
         score += 10
+    lines = text.splitlines()
+    birth_line = next((index for index, line in enumerate(lines)
+                       if re.search(r"\b(?:DOB|Date\s*of\s*Birth)\s*[:/-]?\s*\d{1,2}[/.-]\d{1,2}[/.-]\d{4}\b",
+                                    line, re.I)), -1)
+    if birth_line >= 0:
+        name_scores = []
+        for index in range(max(0, birth_line - 8), birth_line):
+            line = lines[index].strip()
+            if not re.fullmatch(r"[A-Za-z][A-Za-z .'-]{2,60}", line):
+                continue
+            if re.search(r"\b(?:name|address|dob|yob|gender|male|female|india|government|authority|"
+                         r"uidai|aadhaar|enrolment|issue|print|year|birth|date|father|mother|"
+                         r"photo|signature|valid|vid)\b", line, re.I):
+                continue
+            words = line.split()
+            if len(words) >= 2:
+                name_scores.append(min(len(line), 40) * 0.5 + min(len(words), 4) * 3
+                                   - (birth_line - index) * 0.5)
+        score += max(name_scores, default=0)
     return score
 
 

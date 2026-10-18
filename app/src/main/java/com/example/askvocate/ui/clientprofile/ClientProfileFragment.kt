@@ -9,7 +9,7 @@ import android.view.View
 import android.view.ViewGroup
 import android.view.animation.DecelerateInterpolator
 import android.widget.EditText
-import android.widget.Toast
+import com.example.askvocate.util.AppToast as Toast
 import coil.load
 import androidx.appcompat.app.AppCompatDelegate
 import androidx.core.view.isVisible
@@ -200,7 +200,7 @@ class ClientProfileFragment : Fragment() {
             findNavController().navigate(R.id.action_client_profile_to_saved_advocates)
         }
         binding.actionDocuments.setOnClickListener {
-            showDocumentsDialog()
+            findNavController().navigate(R.id.action_client_profile_to_my_documents)
         }
         binding.actionRecentActivity.setOnClickListener {
             showRecentActivityDialog()
@@ -319,14 +319,6 @@ class ClientProfileFragment : Fragment() {
                 dialog.dismiss()
             }
             .setNegativeButton(R.string.cancel, null)
-            .show()
-    }
-
-    private fun showDocumentsDialog() {
-        MaterialAlertDialogBuilder(requireContext())
-            .setTitle(R.string.legal_documents)
-            .setMessage("No legal documents uploaded yet.\n\nDocuments shared during advocate consultations will securely appear in this section.")
-            .setPositiveButton(R.string.ok, null)
             .show()
     }
 

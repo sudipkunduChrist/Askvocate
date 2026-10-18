@@ -253,6 +253,7 @@
     <string name="saved_advocates_desc">Your saved profiles</string>
     <string name="my_appointments_desc">View consultations</string>
     <string name="my_documents_desc">Manage your files</string>
+    <string name="document_upload_limits">JPG, PNG or WebP · Maximum 10 MB per image. Photos are compressed before upload.</string>
     <string name="recent_activity">Recent Activity</string>
     <string name="recent_activity_desc">View recent actions</string>
     <string name="account_and_preferences">Account &amp; Preferences</string>

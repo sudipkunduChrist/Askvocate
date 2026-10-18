@@ -41,9 +41,12 @@ public class GlobalExceptionHandler {
     }
 
     @ExceptionHandler(MaxUploadSizeExceededException.class)
-    public ResponseEntity<Map<String, Object>> handleMaxUploadSize(MaxUploadSizeExceededException ex) {
+    public ResponseEntity<Map<String, Object>> handleMaxUploadSize(MaxUploadSizeExceededException ex,
+            jakarta.servlet.http.HttpServletRequest request) {
+        log.warn("Upload rejected by multipart limit: method={}, path={}, exception={}",
+                request.getMethod(), request.getRequestURI(), ex.getClass().getSimpleName());
         return buildResponse(HttpStatus.OK,
-                "File size exceeds the maximum allowed limit of 10 MB per file.");
+                "File size exceeds the 30 MB upload limit. Images below this limit are automatically compressed before processing.");
     }
 
     @ExceptionHandler(org.springframework.web.bind.MethodArgumentNotValidException.class)
@@ -61,8 +64,10 @@ public class GlobalExceptionHandler {
     }
 
     @ExceptionHandler(Exception.class)
-    public ResponseEntity<Map<String, Object>> handleGeneral(Exception ex) {
-        log.error("Unhandled exception", ex);
+    public ResponseEntity<Map<String, Object>> handleGeneral(Exception ex,
+            jakarta.servlet.http.HttpServletRequest request) {
+        log.error("Unhandled request exception: method={}, path={}, exception={}",
+                request.getMethod(), request.getRequestURI(), ex.getClass().getSimpleName(), ex);
         return buildResponse(HttpStatus.OK, ex.getMessage() != null ? ex.getMessage() : "An unexpected error occurred.");
     }
 

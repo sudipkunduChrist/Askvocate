@@ -14,6 +14,7 @@ import com.example.askvocate.R
 import com.example.askvocate.ui.adapters.ChatListAdapter
 import com.example.askvocate.util.AnimationUtils
 import com.example.askvocate.util.applyStatusBarInset
+import com.example.askvocate.util.AppToast as Toast
 
 class ChatListFragment : Fragment() {
 
@@ -33,7 +34,7 @@ class ChatListFragment : Fragment() {
             (requireActivity() as? MainActivity)?.openDrawer()
         }
         view.findViewById<View>(R.id.btn_notifications).setOnClickListener {
-            android.widget.Toast.makeText(requireContext(), "Notifications coming soon!", android.widget.Toast.LENGTH_SHORT).show()
+            Toast.makeText(requireContext(), "Notifications coming soon!", Toast.LENGTH_SHORT).show()
         }
 
         val rvChatList = view.findViewById<RecyclerView>(R.id.rv_chat_list)

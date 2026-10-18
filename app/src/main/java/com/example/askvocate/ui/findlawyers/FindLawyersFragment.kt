@@ -28,6 +28,7 @@ import com.example.askvocate.util.SessionManager
 import com.example.askvocate.util.ToastType
 import com.example.askvocate.util.applyStatusBarInset
 import com.example.askvocate.util.showCustomToast
+import com.example.askvocate.util.AppToast as Toast
 import com.google.android.material.button.MaterialButton
 import com.google.android.material.floatingactionbutton.FloatingActionButton
 import com.google.android.material.textfield.TextInputEditText
@@ -58,7 +59,7 @@ class FindLawyersFragment : Fragment() {
             if (!findNavController().navigateUp()) findNavController().navigate(R.id.nav_home)
         }
         view.findViewById<View>(R.id.btn_notifications).setOnClickListener {
-            android.widget.Toast.makeText(requireContext(), "Notifications coming soon!", android.widget.Toast.LENGTH_SHORT).show()
+            Toast.makeText(requireContext(), "Notifications coming soon!", Toast.LENGTH_SHORT).show()
         }
 
         val caseDescription = view.findViewById<EditText>(R.id.et_case_description)

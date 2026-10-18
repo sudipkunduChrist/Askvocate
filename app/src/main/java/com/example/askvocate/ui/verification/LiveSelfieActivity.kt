@@ -1,10 +1,10 @@
 package com.example.askvocate.ui.verification
 
 import android.Manifest
+import android.animation.ValueAnimator
 import android.os.Bundle
-import android.view.Gravity
-import android.widget.Button
-import android.widget.LinearLayout
+import android.view.View
+import android.widget.ImageView
 import android.widget.TextView
 import androidx.activity.ComponentActivity
 import androidx.activity.result.contract.ActivityResultContracts
@@ -15,9 +15,14 @@ import androidx.camera.core.Preview
 import androidx.camera.lifecycle.ProcessCameraProvider
 import androidx.camera.view.PreviewView
 import androidx.core.content.ContextCompat
+import androidx.core.view.isVisible
 import androidx.lifecycle.lifecycleScope
+import com.example.askvocate.R
 import com.example.askvocate.network.ApiConfig
 import com.example.askvocate.util.SessionManager
+import com.example.askvocate.util.applyStatusBarInset
+import com.google.android.material.button.MaterialButton
+import com.google.android.material.progressindicator.LinearProgressIndicator
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
@@ -33,12 +38,19 @@ import java.util.UUID
 class LiveSelfieActivity : ComponentActivity() {
     private lateinit var preview: PreviewView
     private lateinit var instruction: TextView
-    private lateinit var captureButton: Button
+    private lateinit var captureButton: MaterialButton
+    private lateinit var step: TextView
+    private lateinit var progress: LinearProgressIndicator
+    private lateinit var loadingOverlay: View
+    private lateinit var loadingText: TextView
+    private lateinit var loadingIcon: ImageView
+    private var loadingAnimator: ValueAnimator? = null
     private var imageCapture: ImageCapture? = null
     private var challengeId: String = ""
     private var expectedTurn: String = ""
     private val frames = mutableListOf<File>()
     private var busy = false
+    private var verificationComplete = false
 
     private val cameraPermission = registerForActivityResult(ActivityResultContracts.RequestPermission()) { granted ->
         if (granted) startCamera() else show("Camera permission is required for live selfie verification.")
@@ -52,25 +64,20 @@ class LiveSelfieActivity : ComponentActivity() {
             return
         }
         cacheDir.listFiles()?.filter { it.name.startsWith("askvocate_selfie_") }?.forEach { it.delete() }
-        val layout = LinearLayout(this).apply {
-            orientation = LinearLayout.VERTICAL
-            gravity = Gravity.CENTER_HORIZONTAL
-            setPadding(24, 24, 24, 24)
-        }
-        instruction = TextView(this).apply {
-            textSize = 18f
-            text = "Preparing live selfie challenge…"
-        }
-        preview = PreviewView(this)
-        captureButton = Button(this).apply {
-            text = "Capture"
-            isEnabled = false
+        setContentView(R.layout.activity_live_selfie)
+        findViewById<View>(R.id.selfie_app_bar).applyStatusBarInset()
+        findViewById<View>(R.id.selfie_back).setOnClickListener { if (!busy) finish() }
+        instruction = findViewById(R.id.selfie_instruction)
+        step = findViewById(R.id.selfie_step)
+        progress = findViewById(R.id.selfie_progress)
+        preview = findViewById(R.id.selfie_preview)
+        captureButton = findViewById<MaterialButton>(R.id.selfie_capture).apply {
             setOnClickListener { captureNext() }
         }
-        layout.addView(instruction, LinearLayout.LayoutParams(-1, -2))
-        layout.addView(preview, LinearLayout.LayoutParams(-1, 0, 1f))
-        layout.addView(captureButton, LinearLayout.LayoutParams(-1, -2))
-        setContentView(layout)
+        loadingOverlay = findViewById(R.id.selfie_loading_overlay)
+        loadingText = findViewById(R.id.selfie_loading_text)
+        loadingIcon = findViewById(R.id.selfie_loading_icon)
+        setLoading(true, "Preparing secure challenge…")
 
         cameraPermission.launch(Manifest.permission.CAMERA)
         lifecycleScope.launch {
@@ -79,9 +86,11 @@ class LiveSelfieActivity : ComponentActivity() {
                 challengeId = challenge.getString("challengeId")
                 expectedTurn = challenge.getString("expectedTurn")
                 show("Look straight at the camera, then tap Capture.")
+                setLoading(false)
                 enableCapture()
             } catch (error: Exception) {
                 show(error.message ?: "Could not start the selfie challenge.")
+                setLoading(false)
             }
         }
     }
@@ -92,7 +101,7 @@ class LiveSelfieActivity : ComponentActivity() {
             try {
                 val cameraProvider = provider.get()
                 val cameraPreview = Preview.Builder().build().also { it.surfaceProvider = preview.surfaceProvider }
-                imageCapture = ImageCapture.Builder().build()
+                imageCapture = ImageCapture.Builder().setJpegQuality(85).build()
                 cameraProvider.unbindAll()
                 cameraProvider.bindToLifecycle(this, CameraSelector.DEFAULT_FRONT_CAMERA,
                     cameraPreview, imageCapture)
@@ -108,6 +117,7 @@ class LiveSelfieActivity : ComponentActivity() {
         if (busy || challengeId.isBlank() || frames.size >= 3) return
         busy = true
         captureButton.isEnabled = false
+        captureButton.text = "Capturing…"
         val file = File.createTempFile("askvocate_selfie_", ".jpg", cacheDir)
         val options = ImageCapture.OutputFileOptions.Builder(file).build()
         camera.takePicture(options, ContextCompat.getMainExecutor(this),
@@ -136,14 +146,17 @@ class LiveSelfieActivity : ComponentActivity() {
         busy = true
         captureButton.isEnabled = false
         show("Checking your live selfie…")
+        setLoading(true, "Checking your live selfie…")
         lifecycleScope.launch {
             try {
                 val result = withContext(Dispatchers.IO) { postFrames() }
                 val status = result.optString("verificationStatus")
                 if (status == "VERIFIED") {
                     challengeId = ""
+                    verificationComplete = true
                     show("Selfie verified.")
                 } else {
+                    verificationComplete = false
                     val failure = result.optString("failureReason", "Selfie did not pass face and liveness checks.")
                     val next = withContext(Dispatchers.IO) { postChallenge() }
                     challengeId = next.getString("challengeId")
@@ -157,6 +170,7 @@ class LiveSelfieActivity : ComponentActivity() {
                 frames.forEach { it.delete() }
                 frames.clear()
                 busy = false
+                setLoading(false)
                 enableCapture()
             }
         }
@@ -167,6 +181,7 @@ class LiveSelfieActivity : ComponentActivity() {
         val connection = URL("${ApiConfig.BASE_URL}/api/documents/selfie/challenge?userId=$userId")
             .openConnection() as HttpURLConnection
         connection.requestMethod = "POST"
+        connection.setRequestProperty("Authorization", "Bearer ${SessionManager.getAppToken(this)}")
         connection.connectTimeout = 10_000
         connection.readTimeout = 15_000
         return readJson(connection)
@@ -178,6 +193,7 @@ class LiveSelfieActivity : ComponentActivity() {
         val connection = URL("${ApiConfig.BASE_URL}/api/documents/selfie/verify?userId=$userId")
             .openConnection() as HttpURLConnection
         connection.requestMethod = "POST"
+        connection.setRequestProperty("Authorization", "Bearer ${SessionManager.getAppToken(this)}")
         connection.connectTimeout = 10_000
         connection.readTimeout = 45_000
         connection.doOutput = true
@@ -211,12 +227,51 @@ class LiveSelfieActivity : ComponentActivity() {
     }
 
     private fun enableCapture() {
-        captureButton.isEnabled = !busy && imageCapture != null && challengeId.isNotBlank() && frames.size < 3
+        captureButton.isEnabled = !busy && !verificationComplete && imageCapture != null &&
+            challengeId.isNotBlank() && frames.size < 3
+        captureButton.text = when {
+            verificationComplete -> "Verified"
+            frames.size >= 3 -> "Checking…"
+            else -> "Capture step ${frames.size + 1}"
+        }
+        step.text = when {
+            verificationComplete -> "Verification complete"
+            frames.size >= 3 -> "Verifying"
+            else -> "Step ${frames.size + 1} of 3"
+        }
+        progress.setProgressCompat(if (verificationComplete) 3 else frames.size, true)
     }
 
     private fun show(message: String) { instruction.text = message }
 
+    private fun setLoading(visible: Boolean, message: String = "") {
+        loadingOverlay.isVisible = visible
+        if (visible) {
+            loadingText.text = message
+            loadingOverlay.alpha = 0f
+            loadingOverlay.animate().alpha(1f).setDuration(160).start()
+            if (ValueAnimator.areAnimatorsEnabled()) {
+                loadingAnimator?.cancel()
+                loadingAnimator = ValueAnimator.ofFloat(1f, 1.08f, 1f).apply {
+                    duration = 1100
+                    repeatCount = ValueAnimator.INFINITE
+                    addUpdateListener {
+                        loadingIcon.scaleX = it.animatedValue as Float
+                        loadingIcon.scaleY = it.animatedValue as Float
+                    }
+                    start()
+                }
+            }
+        } else {
+            loadingAnimator?.cancel()
+            loadingAnimator = null
+            loadingIcon.scaleX = 1f
+            loadingIcon.scaleY = 1f
+        }
+    }
+
     override fun onDestroy() {
+        loadingAnimator?.cancel()
         frames.forEach { it.delete() }
         super.onDestroy()
     }

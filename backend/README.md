@@ -138,9 +138,18 @@ All error responses return a standardized `200 OK` JSON envelope with `success: 
 
 ## 📄 Document Endpoints (`/api/documents`)
 
-- `POST /api/documents/upload?userId={userId}&docType={docType}`: Upload document to Cloudinary.
-- `GET /api/documents/{userId}/{docType}/signed-url`: Generate signed 1-hour access URL.
-- `GET /api/documents/user/{userId}`: Fetch all documents belonging to user.
+The Android **My Documents** screen uses `Authorization: Bearer <appToken>` on
+`/api/my-documents`. `GET /api/my-documents` returns the role-specific catalog;
+`GET /api/my-documents/{type}` returns one document's status and details;
+`POST /api/my-documents/{type}` accepts multipart `front` and optional `back` images;
+`GET /api/my-documents/{type}/media/{side}` serves account-scoped images for
+preview and download. Aadhaar needs both images. Live selfie uses the existing
+challenge and verify endpoints. Degree and AIBE certificates support upload and
+view only; they are labeled unverified until a verification backend is added.
+
+The older `/api/documents` upload, verification, listing, download URL, and deletion
+routes also require an app token belonging to the requested user. Selfie challenge
+and verification accept that token as well.
 
 ---
 

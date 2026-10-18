@@ -14,4 +14,5 @@ public interface SelfieVerificationRepository extends MongoRepository<SelfieVeri
             VerificationStatus verificationStatus);
     List<SelfieVerification> findByUserIdAndAadhaarDocumentIdAndVerificationStatus(
             String userId, String aadhaarDocumentId, VerificationStatus verificationStatus);
+    List<SelfieVerification> findByUserIdOrderByCreatedAtDesc(String userId);
 }

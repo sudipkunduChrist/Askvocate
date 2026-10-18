@@ -5,7 +5,7 @@ import android.text.Html
 import android.view.LayoutInflater
 import android.view.View
 import android.view.ViewGroup
-import android.widget.Toast
+import com.example.askvocate.util.AppToast as Toast
 import androidx.core.text.HtmlCompat
 import androidx.core.view.isVisible
 import androidx.fragment.app.Fragment
@@ -20,6 +20,7 @@ import com.example.askvocate.ui.adapters.KnowledgeHubAdapter
 import com.example.askvocate.ui.adapters.LawyerAdapter
 import com.example.askvocate.util.AnimationUtils
 import com.example.askvocate.util.SessionManager
+import com.example.askvocate.util.applyStatusBarInset
 
 class HomeFragment : Fragment() {
 
@@ -74,6 +75,7 @@ class HomeFragment : Fragment() {
     }
 
     private fun setupToolbar() {
+        binding.toolbar.applyStatusBarInset()
         binding.toolbar.setNavigationOnClickListener {
             (requireActivity() as? MainActivity)?.openDrawer()
         }

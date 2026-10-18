@@ -7,7 +7,8 @@ import android.view.View
 import android.view.ViewGroup
 import android.widget.ImageButton
 import android.widget.TextView
-import android.widget.Toast
+import com.example.askvocate.util.AppToast as Toast
+import com.example.askvocate.util.ToastType
 import androidx.core.view.isVisible
 import androidx.fragment.app.Fragment
 import androidx.lifecycle.lifecycleScope
@@ -67,7 +68,7 @@ class ChatHistoryFragment : Fragment(R.layout.fragment_chat_history) {
                             viewLifecycleOwner.lifecycleScope.launch {
                                 runCatching { withContext(Dispatchers.IO) { repository.delete(id) } }
                                     .onSuccess { refresh() }
-                                    .onFailure { Toast.makeText(requireContext(), it.message, Toast.LENGTH_LONG).show() }
+                                    .onFailure { Toast.makeText(requireContext(), it.message, Toast.LENGTH_LONG, ToastType.ERROR).show() }
                             }
                         })
                 }

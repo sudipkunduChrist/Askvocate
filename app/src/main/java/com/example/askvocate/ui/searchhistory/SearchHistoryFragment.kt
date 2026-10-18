@@ -7,7 +7,8 @@ import android.view.View
 import android.view.ViewGroup
 import android.widget.ImageButton
 import android.widget.TextView
-import android.widget.Toast
+import com.example.askvocate.util.AppToast as Toast
+import com.example.askvocate.util.ToastType
 import androidx.core.view.isVisible
 import androidx.fragment.app.Fragment
 import androidx.lifecycle.lifecycleScope
@@ -77,7 +78,7 @@ class SearchHistoryFragment : Fragment(R.layout.fragment_search_history) {
         viewLifecycleOwner.lifecycleScope.launch {
             runCatching { withContext(Dispatchers.IO) { action() } }
                 .onSuccess { refresh() }
-                .onFailure { Toast.makeText(requireContext(), it.message ?: getString(R.string.history_sync_failed), Toast.LENGTH_LONG).show() }
+                .onFailure { Toast.makeText(requireContext(), it.message ?: getString(R.string.history_sync_failed), Toast.LENGTH_LONG, ToastType.ERROR).show() }
         }
     }
 

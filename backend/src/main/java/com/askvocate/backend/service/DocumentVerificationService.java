@@ -82,6 +82,13 @@ public class DocumentVerificationService {
                                                         MultipartFile backImage) {
         // 1. Validate inputs
         validateRequest(userId, documentType, frontImage, backImage);
+        try {
+            frontImage = DocumentImageCompressor.compressIfNeeded(frontImage);
+            if (backImage != null && !backImage.isEmpty()) backImage = DocumentImageCompressor.compressIfNeeded(backImage);
+        } catch (java.io.IOException compressionError) {
+            log.warn("Document image compression failed: type={}, reason={}", documentType, compressionError.getMessage());
+            throw new DocumentVerificationException(compressionError.getMessage(), compressionError, safeFileName(frontImage));
+        }
         rejectCompletedLawyerVerification(userId);
 
         String folder = "askvocate/documents/" + userId + "/" + documentType.name();
@@ -93,7 +100,7 @@ public class DocumentVerificationService {
 
         try {
             // 2. Upload front image with OCR
-            log.info("Uploading front image for userId={}, documentType={}", userId, documentType);
+            log.info("Uploading front image for documentType={}, bytes={}", documentType, frontImage.getSize());
             CloudinaryService.UploadResult frontResult = uploadWithOcr(frontImage, folder, "front");
             cloudinaryRefs.add(frontResult.cloudinaryRef());
             if (documentType == DocumentType.AADHAAR || documentType == DocumentType.PAN) {
@@ -109,7 +116,7 @@ public class DocumentVerificationService {
             // 4. Upload and extract back image if provided
             if (backImage != null && !backImage.isEmpty()) {
                 currentFile = safeFileName(backImage);
-                log.info("Uploading back image for userId={}, documentType={}", userId, documentType);
+                log.info("Uploading back image for documentType={}, bytes={}", documentType, backImage.getSize());
                 CloudinaryService.UploadResult backResult = uploadWithOcr(backImage, folder, "back");
                 cloudinaryRefs.add(backResult.cloudinaryRef());
                 if (documentType == DocumentType.AADHAAR) {
@@ -149,8 +156,7 @@ public class DocumentVerificationService {
 
         // If verification failed, delete the uploaded image from Cloudinary immediately to avoid storing junk/invalid files
         if (!extractionResult.success()) {
-            log.info("Document verification failed: cleaning up uploaded assets from Cloudinary for userId={}, documentType={}",
-                    userId, documentType);
+            log.info("Document verification failed; cleaning temporary Cloudinary assets for documentType={}", documentType);
             cleanupCloudinaryAssets(cloudinaryRefs);
             cloudinaryRefs = new ArrayList<>();
         }
@@ -212,8 +218,8 @@ public class DocumentVerificationService {
                 selfieVerificationRepository.save(selfie);
             }
         }
-        log.info("Document verification saved: id={}, userId={}, type={}, status={}",
-                saved.getId(), userId, documentType, status);
+        log.info("Document verification saved: type={}, status={}, ocrConfidence={}",
+                documentType, status, saved.getOcrConfidence());
 
         // 7. Update Lawyer Profile credentials and verification status if applicable
         LawyerUpdateResult lawyerUpdate = applyDocumentVerificationToLawyer(userId, saved);
@@ -382,7 +388,7 @@ public class DocumentVerificationService {
      * Returns all verification documents for a user.
      */
     public List<DocumentVerificationResponse> getUserDocuments(String userId) {
-        validateExistingLawyer(userId);
+        validateDocumentOwner(userId);
         return documentRepository.findByUserId(userId)
                 .stream()
                 .map(this::toResponse)
@@ -393,7 +399,7 @@ public class DocumentVerificationService {
      * Returns a specific verification document by ID, checking user ownership if userId is non-empty.
      */
     public DocumentVerificationResponse getDocumentById(String userId, String documentId) {
-        validateExistingLawyer(userId);
+        validateDocumentOwner(userId);
         UserDocument doc = documentRepository.findById(documentId)
                 .orElseThrow(() -> new DocumentVerificationException("Document not found."));
 
@@ -461,6 +467,9 @@ public class DocumentVerificationService {
                 : doc.getDocumentType() + " processed (" + percentage + "% complete). Missing: " + String.join(", ", remainingDocs) + ".";
 
         if (expOpt.isEmpty() && fresherOpt.isEmpty()) {
+            if (clientProfileRepository.existsById(userId)) {
+                return new LawyerUpdateResult(false, null, null, "Identity document processed.");
+            }
             throw new DocumentVerificationException("Invalid userID or lawyer role.");
         }
 
@@ -663,11 +672,16 @@ public class DocumentVerificationService {
 
     private void validateRequest(String userId, DocumentType documentType,
                                   MultipartFile frontImage, MultipartFile backImage) {
-        validateExistingLawyer(userId);
+        validateDocumentOwner(userId);
 
         if (documentType == null) {
             throw new DocumentVerificationException(
                     "Document type is required. Supported types: AADHAAR, PAN, BAR_COUNCIL_ID, BAR_CERTIFICATE, CERTIFICATE_OF_PRACTICE.");
+        }
+
+        if (clientProfileRepository.existsById(userId)
+                && documentType != DocumentType.AADHAAR && documentType != DocumentType.PAN) {
+            throw new DocumentVerificationException("Client accounts can verify Aadhaar and PAN only.");
         }
 
         if (frontImage == null || frontImage.isEmpty()) {
@@ -684,6 +698,11 @@ public class DocumentVerificationService {
             throw new DocumentVerificationException("PAN verification requires only the front image.",
                     null, safeFileName(backImage));
         }
+    }
+
+    private void validateDocumentOwner(String userId) {
+        if (userId != null && !userId.isBlank() && clientProfileRepository.existsById(userId)) return;
+        validateExistingLawyer(userId);
     }
 
     // ── Mapping ─────────────────────────────────────────────────────────

@@ -16,6 +16,12 @@
         android:supportsRtl="true"
         android:usesCleartextTraffic="true"
         android:theme="@style/Theme.Askvocate">
+        <provider android:name="androidx.core.content.FileProvider"
+            android:authorities="${applicationId}.documents" android:exported="false"
+            android:grantUriPermissions="true">
+            <meta-data android:name="android.support.FILE_PROVIDER_PATHS"
+                android:resource="@xml/document_file_paths" />
+        </provider>
         <activity android:name=".ui.verification.LiveSelfieActivity" android:exported="false" />
         <activity
             android:name=".MainActivity"

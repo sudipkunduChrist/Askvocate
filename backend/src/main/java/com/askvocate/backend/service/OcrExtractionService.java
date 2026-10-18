@@ -318,11 +318,8 @@ public class OcrExtractionService {
             if (!labeled.matches()) continue;
             String candidate = normalizeName(labeled.group(1));
             if (isAadhaarNameCandidate(candidate)) return candidate;
-            for (int j = i + 1; j < Math.min(lines.length, i + 3); j++) {
-                candidate = normalizeName(lines[j]);
-                if (isAadhaarNameCandidate(candidate)) return candidate;
-                if (AADHAAR_DOB_PATTERN.matcher(lines[j]).find()) break;
-            }
+            candidate = bestAadhaarName(lines, i + 1, Math.min(lines.length, i + 3), i);
+            if (candidate != null) return candidate;
         }
         int birthLine = -1;
         int genderLine = -1;
@@ -333,16 +330,32 @@ public class OcrExtractionService {
         }
         int anchor = birthLine >= 0 ? birthLine : genderLine;
         if (anchor < 0) return null;
-        for (int j = anchor - 1; j >= Math.max(0, anchor - 8); j--) {
-            String candidate = normalizeName(lines[j]);
-            if (isAadhaarNameCandidate(candidate)) return candidate;
-        }
+        String candidate = bestAadhaarName(lines, Math.max(0, anchor - 8), anchor, anchor);
+        if (candidate != null) return candidate;
         // Some OCR layouts place the printed name after the DOB/gender row.
-        for (int j = anchor + 1; j < Math.min(lines.length, anchor + 5); j++) {
-            String candidate = normalizeName(lines[j]);
-            if (isAadhaarNameCandidate(candidate)) return candidate;
+        return bestAadhaarName(lines, anchor + 1, Math.min(lines.length, anchor + 5), anchor);
+    }
+
+    private String bestAadhaarName(String[] lines, int start, int end, int anchor) {
+        String best = null;
+        double bestScore = Double.NEGATIVE_INFINITY;
+        for (int i = start; i < end; i++) {
+            String raw = lines[i].trim();
+            if (AADHAAR_DOB_PATTERN.matcher(raw).find() || AADHAAR_YOB_PATTERN.matcher(raw).find()) break;
+            String candidate = normalizeName(raw);
+            if (!isAadhaarNameCandidate(candidate)) continue;
+            int words = candidate.split(" ").length;
+            double score = candidate.length() + Math.min(words, 4) * 4
+                    - Math.abs(anchor - i) * 0.5;
+            // OCR of the regional-script line often resembles a short English name.
+            // Prefer the complete, clean printed English line when both are present.
+            if (!raw.matches("[A-Za-z][A-Za-z .'-]{2,60}")) score -= 12;
+            if (score > bestScore) {
+                best = candidate;
+                bestScore = score;
+            }
         }
-        return null;
+        return best;
     }
 
     private boolean isAadhaarNameCandidate(String candidate) {
