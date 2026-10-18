@@ -4,8 +4,15 @@ Spring invokes `worker.py` as a local Python subprocess for each OCR, signed Aad
 or selfie check. The app calls only the Spring API on port 8080; document verification
 does not call `ai-service` or require port 8000.
 
-The Aadhaar upload runs OCR only and saves front/back OCR text in MongoDB. QR signature
-and photo checks run later during live selfie verification.
+The verifier is lawyer-only: only `LAWYER_FRESHER` and `LAWYER_EXPERIENCED` accounts may
+submit verification documents. Client accounts are rejected by the backend.
+
+The Aadhaar upload runs OCR and verifies the signed UIDAI QR. The document is `VERIFIED`
+only when a valid signed QR is found and the printed OCR fields match the QR data; a
+mismatch becomes `PENDING` manual review, and a missing/invalid QR fails the upload.
+Versioned V2/V3/V4 payloads and legacy 16-field payloads are supported. Masked Aadhaar
+cards that show only the last four digits are accepted and matched against the QR's last
+four digits. Live selfie verification reuses the signed QR photo.
 
 Install prerequisites once:
 

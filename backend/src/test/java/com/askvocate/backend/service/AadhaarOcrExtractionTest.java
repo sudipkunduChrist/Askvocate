@@ -165,6 +165,20 @@ class AadhaarOcrExtractionTest {
         assertFalse(unlabeled.extractedFields().containsKey("address"));
     }
 
+    @Test
+    void acceptsMaskedAadhaarWithOnlyLastFourVisible() {
+        for (String masked : List.of("XXXX XXXX 1234", "XXXX-XXXX-1234",
+                "xxxx xxxx 1234", "******** 1234")) {
+            var front = ocr.extract("Government of India\nName: Test Lawyer\nDOB: 01/02/1990\n"
+                            + "Male\n" + masked,
+                    DocumentType.AADHAAR, "front");
+            assertTrue(front.success(), front.error());
+            assertEquals("XXXX-XXXX-1234", front.maskedDocumentNumber());
+            assertNull(front.aadhaarNumber());
+            assertEquals("Test Lawyer", front.extractedFields().get("name"));
+        }
+    }
+
     private String validAadhaarNumber() {
         String prefix = "23456789012";
         for (int digit = 0; digit < 10; digit++) {

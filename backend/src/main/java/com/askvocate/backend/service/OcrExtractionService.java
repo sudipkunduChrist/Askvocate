@@ -35,6 +35,9 @@ public class OcrExtractionService {
     // ── Aadhaar patterns ────────────────────────────────────────────────
     private static final Pattern AADHAAR_NUMBER_PATTERN =
             Pattern.compile("\\b([2-9]\\d{3}(?:[\\s-]{0,2}\\d{4}){2})\\b");
+    /** Masked Aadhaar printed/PDF form: "XXXX XXXX 1234" (also * and - separators). */
+    private static final Pattern AADHAAR_MASKED_PATTERN =
+            Pattern.compile("(?i)(?:[x*•●]{4}[\\s-]*){2}(\\d{4})\\b");
     private static final Pattern AADHAAR_MARKER_PATTERN = Pattern.compile(
             "(?i)\\b(?:aadha{1,2}r|uidai|unique identification authority|government of india)\\b|आधार|भारत सरकार");
     private static final Pattern AADHAAR_DOB_PATTERN = Pattern.compile(
@@ -276,7 +279,12 @@ public class OcrExtractionService {
             }
         }
         if (fullNumber == null) fullNumber = firstNumber;
-        if (fullNumber != null) maskedNumber = maskAadhaar(fullNumber);
+        if (fullNumber != null) {
+            maskedNumber = maskAadhaar(fullNumber);
+        } else {
+            Matcher maskedMatcher = AADHAAR_MASKED_PATTERN.matcher(text);
+            if (maskedMatcher.find()) maskedNumber = "XXXX-XXXX-" + maskedMatcher.group(1);
+        }
         if (isBack) {
             String address = extractAadhaarAddress(text);
             if (address != null) {
@@ -300,7 +308,7 @@ public class OcrExtractionService {
                 && fields.containsKey("dob")
                 && fields.containsKey("gender");
         String error = success ? null : maskedNumber == null
-                ? "Could not extract the full Aadhaar number from the front."
+                ? "Could not extract the Aadhaar number or its masked last four digits from the front."
                 : !fields.containsKey("name") ? "Could not extract Aadhaar front name."
                 : !fields.containsKey("dob")
                     ? "Could not extract labeled Aadhaar date of birth from the front."

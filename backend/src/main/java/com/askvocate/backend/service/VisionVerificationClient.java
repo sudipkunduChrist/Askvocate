@@ -46,9 +46,17 @@ public class VisionVerificationClient {
             QrResult result = mapper.readValue(invoke(request), QrResult.class);
             return result != null ? result : QrResult.unavailable("QR verifier returned no result.");
         } catch (Exception error) {
-            log.warn("Backend Aadhaar QR verification unavailable: {}", error.getClass().getSimpleName());
-            return QrResult.unavailable("Aadhaar QR verifier is unavailable; check backend verification dependencies.");
+            log.warn("Backend Aadhaar QR verification unavailable: {}: {}",
+                    error.getClass().getSimpleName(), error.getMessage());
+            return QrResult.unavailable("Aadhaar QR verification failed: " + safeErrorMessage(error));
         }
+    }
+
+    private String safeErrorMessage(Exception error) {
+        String message = error.getMessage();
+        if (message == null || message.isBlank()) return "check backend verification dependencies.";
+        message = message.replaceAll("[\\r\\n]+", " ").trim();
+        return message.length() > 240 ? message.substring(0, 240) : message;
     }
 
     public Map<String, Object> localOcr(byte[] image) {
@@ -224,9 +232,10 @@ public class VisionVerificationClient {
     }
 
     public record QrResult(Boolean verified, Map<String, String> data, Boolean photoAvailable,
-                           String certificate, List<String> mismatchFields, Boolean printedMismatch, String reason) {
+                           String certificate, String rawText, List<String> mismatchFields,
+                           Boolean printedMismatch, String reason) {
         public static QrResult unavailable(String reason) {
-            return new QrResult(false, null, false, null, List.of(), null, reason);
+            return new QrResult(false, null, false, null, null, List.of(), null, reason);
         }
         public boolean matched() {
             return Boolean.TRUE.equals(verified) && Boolean.FALSE.equals(printedMismatch)

@@ -11,6 +11,7 @@ import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.web.server.ResponseStatusException;
 
 import java.util.List;
+import java.util.Map;
 import java.util.Optional;
 
 import static org.junit.jupiter.api.Assertions.*;
@@ -27,13 +28,12 @@ class MyDocumentsControllerTest {
     @Mock CloudinaryService cloudinary;
     @InjectMocks MyDocumentsController controller;
 
-    @Test void clientCatalogueContainsOnlyIdentityDocuments() {
+    @Test void clientCannotAccessVerificationCatalogue() {
         when(sessions.requireAccount("Bearer client")).thenReturn(new AppSessionService.Account("c1", "CLIENT"));
-        when(verifiedDocs.findByUserIdAndDocumentType(anyString(), any())).thenReturn(Optional.empty());
-        var items = controller.list("Bearer client");
-        assertEquals(List.of("AADHAAR", "PAN"), items.stream().map(MyDocumentsController.Item::type).toList());
-        assertThrows(ResponseStatusException.class, () -> controller.detail("Bearer client", "BAR_COUNCIL_ID"));
-        verify(verifiedDocs, never()).findByUserIdAndDocumentType("c1", DocumentType.BAR_COUNCIL_ID);
+        var error = assertThrows(ResponseStatusException.class, () -> controller.list("Bearer client"));
+        assertTrue(error.getReason().contains("only available for lawyer accounts"));
+        assertThrows(ResponseStatusException.class, () -> controller.detail("Bearer client", "AADHAAR"));
+        verifyNoInteractions(verifiedDocs);
     }
 
     @Test void verifiedDocumentDetailsAreScopedToSessionAccount() {
@@ -66,7 +66,7 @@ class MyDocumentsControllerTest {
     }
 
     @Test void fullAadhaarNumberIsOnlyInAuthenticatedDetail() {
-        when(sessions.requireAccount("Bearer client")).thenReturn(new AppSessionService.Account("owner", "CLIENT"));
+        when(sessions.requireAccount("Bearer lawyer")).thenReturn(new AppSessionService.Account("owner", "LAWYER_FRESHER"));
         UserDocument aadhaar = new UserDocument();
         aadhaar.setDocumentType(DocumentType.AADHAAR);
         aadhaar.setVerificationStatus(VerificationStatus.VERIFIED);
@@ -77,11 +77,37 @@ class MyDocumentsControllerTest {
         when(verifiedDocs.findByUserIdAndDocumentType("owner", DocumentType.PAN))
                 .thenReturn(Optional.empty());
 
-        var listed = controller.list("Bearer client").getFirst();
-        var detail = controller.detail("Bearer client", "AADHAAR").getBody();
+        var listed = controller.list("Bearer lawyer").getFirst();
+        var detail = controller.detail("Bearer lawyer", "AADHAAR").getBody();
 
         assertEquals("XXXX-XXXX-0123", listed.maskedNumber());
         assertNull(listed.aadhaarNumber());
         assertEquals("234567890123", detail.aadhaarNumber());
+    }
+
+    @Test void verifiedAadhaarDetailUsesSignedQrData() {
+        when(sessions.requireAccount("Bearer lawyer")).thenReturn(new AppSessionService.Account("owner", "LAWYER_FRESHER"));
+        UserDocument doc = new UserDocument();
+        doc.setDocumentType(DocumentType.AADHAAR);
+        doc.setVerificationStatus(VerificationStatus.VERIFIED);
+        doc.setMaskedDocumentNumber("XXXX-XXXX-1234");
+        doc.setExtractedData(Map.of("name", "OCR N@me", "dob", "01/02/1990", "gender", "FEMALE"));
+        QrData qr = new QrData();
+        qr.setName("QR Name");
+        qr.setDob("01-02-1990");
+        qr.setGender("M");
+        qr.setAddress("12 Road, Delhi");
+        qr.setPincode("110001");
+        qr.setAadhaarLast4("1234");
+        doc.setQrData(qr);
+        doc.setIsQrVerified(true);
+        when(verifiedDocs.findByUserIdAndDocumentType("owner", DocumentType.AADHAAR)).thenReturn(Optional.of(doc));
+
+        var item = controller.detail("Bearer lawyer", "AADHAAR").getBody();
+
+        assertEquals("QR Name", item.qrDetails().get("Name"));
+        assertEquals("01-02-1990", item.qrDetails().get("Date of Birth"));
+        assertEquals("FEMALE", item.qrDetails().get("Gender"));
+        assertEquals("OCR N@me", item.details().get("name"));
     }
 }

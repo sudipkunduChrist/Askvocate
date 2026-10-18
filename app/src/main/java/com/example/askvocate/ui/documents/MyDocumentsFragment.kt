@@ -390,14 +390,22 @@ class MyDocumentsFragment : Fragment() {
                 binding.documentsContent.addView(imageCard, marginParams(12))
             }
         }
-        if (doc.maskedNumber != null || doc.details.isNotEmpty() || doc.submittedAt != null) {
-            sectionTitle("Document details", "Information from your saved document")
+        val useQrDetails = doc.type == "AADHAAR" && doc.status == "VERIFIED" && doc.qrDetails.isNotEmpty()
+        val displayDetails = if (useQrDetails) doc.qrDetails else doc.details
+        if (doc.maskedNumber != null || displayDetails.isNotEmpty() || doc.submittedAt != null) {
+            sectionTitle("Document details",
+                if (useQrDetails) "Information from your signed Aadhaar QR"
+                else "Information from your saved document")
             val detailCard = card()
             doc.maskedNumber?.let {
-                if (doc.type == "AADHAAR" && doc.status == "VERIFIED") aadhaarNumberRow(detailCard, it)
+                val fullNumberAvailable = doc.aadhaarNumber?.let { number ->
+                    number.length == 12 && number.all(Char::isDigit)
+                } == true
+                if (doc.type == "AADHAAR" && doc.status == "VERIFIED" && fullNumberAvailable)
+                    aadhaarNumberRow(detailCard, it)
                 else detailRow(detailCard, "Number", it)
             }
-            doc.details.forEach { (key, value) ->
+            displayDetails.forEach { (key, value) ->
                 if (value.isNotBlank()) detailRow(detailCard,
                     key.replace(Regex("([a-z])([A-Z])"), "$1 $2"), value)
             }

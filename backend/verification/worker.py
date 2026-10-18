@@ -31,7 +31,7 @@ def run(request: dict) -> dict:
                 request["printedData"], qr.data, request["maskedDocumentNumber"])
             return {"verified": True, "data": qr.data, "photoAvailable": True,
                     "certificate": qr.certificate_name, "mismatchFields": mismatches,
-                    "printedMismatch": bool(mismatches)}
+                    "printedMismatch": bool(mismatches), "rawText": qr.raw_text}
         if operation == "selfie":
             qr = decode_signed_qr(image(request["qrImageBase64"]))
             frames = [image(frame) for frame in request["framesBase64"]]

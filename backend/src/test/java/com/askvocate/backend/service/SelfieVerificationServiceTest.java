@@ -62,7 +62,7 @@ class SelfieVerificationServiceTest {
         when(cloudinary.downloadReference(any())).thenReturn(new byte[]{2});
         when(vision.verifyAadhaarQr(any(), anyMap(), nullable(String.class))).thenReturn(
                 new VisionVerificationClient.QrResult(true, Map.of("name", "Test Lawyer"), true,
-                        "test.cer", List.of(), false, null));
+                        "test.cer", "4626", List.of(), false, null));
         when(vision.verifySelfie(any(), anyList(), eq("left"))).thenReturn(
                 new VisionVerificationClient.SelfieResult(0.8, 0.363, true, 0.9, true, null));
         when(cloudinary.uploadSelfie(any(), anyString()))
@@ -83,6 +83,8 @@ class SelfieVerificationServiceTest {
         aadhaar.setId("aadhaar-id");
         aadhaar.setDocumentType(DocumentType.AADHAAR);
         aadhaar.setVerificationStatus(VerificationStatus.VERIFIED);
+        aadhaar.setIsQrVerified(true);
+        aadhaar.setQrPrintedMismatch(false);
         aadhaar.setSubmissionToken("aadhaar-revision");
         aadhaar.setCloudinaryReferences(List.of(new CloudinaryRef("back-id",
                 "https://res.cloudinary.com/test/image", "back")));

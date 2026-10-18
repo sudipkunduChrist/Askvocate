@@ -183,6 +183,7 @@ class SignedQr:
     data: dict[str, str]
     photo: bytes
     certificate_name: str
+    raw_text: str = ""
 
 
 def _image(raw: bytes) -> np.ndarray:
@@ -234,6 +235,77 @@ def _decompress(decimal_text: str) -> bytes:
         raise VerificationError("Secure QR payload is not valid gzip data.") from exc
 
 
+def _split_qr_fields(signed: bytes, count: int) -> tuple[list[str], int]:
+    fields: list[str] = []
+    cursor = 0
+    for _ in range(count):
+        end = signed.find(b"\xff", cursor)
+        if end < 0:
+            raise VerificationError("Secure QR demographic fields are incomplete.")
+        fields.append(signed[cursor:end].decode("utf-8"))
+        cursor = end + 1
+    return fields, cursor
+
+
+def _qr_version(signed: bytes) -> str | None:
+    marker = signed[:2]
+    if marker in (b"V2", b"V3", b"V4"):
+        return marker.decode("ascii")
+    return None
+
+
+def _jpeg2000_end(signed: bytes, start: int) -> int:
+    end = signed.find(b"\xff\xd9", start)
+    return end + 2 if end >= 0 else len(signed)
+
+
+def _clean_flag(value: str) -> str:
+    return value.strip().strip("\x00﻿ ").strip()
+
+
+def _version_and_payload(signed: bytes) -> tuple[str | None, bytes]:
+    probe = signed.lstrip(b"\x00 \t\r\n")
+    marker = probe[:2]
+    if marker[:1] == b"V" and marker[1:2].isdigit():
+        return marker.decode("ascii"), probe
+    return None, probe
+
+
+def _first_field(payload: bytes) -> str:
+    head = payload.split(b"\xff", 1)[0]
+    return _clean_flag(head.decode("utf-8", "replace"))[:40]
+
+
+def _parse_versioned_qr(payload: bytes):
+    fields, photo_start = _split_qr_fields(payload, 18)
+    flag = _clean_flag(fields[1])
+    if flag not in ("0", "1", "2", "3"):
+        raise VerificationError(f"unsupported contact flag {flag!r}")
+    reference, name, dob, gender = fields[2:6]
+    address_fields = fields[6:17]
+    photo_end = _jpeg2000_end(payload, photo_start)
+    photo = payload[photo_start:photo_end]
+    address_parts = [address_fields[i].strip() for i in (0, 3, 8, 2, 4, 10, 9, 1, 7)]
+    pincode = address_fields[5].strip()
+    return reference, name, dob, gender, photo, address_parts, pincode
+
+
+def _parse_legacy_qr(payload: bytes):
+    fields, photo_start = _split_qr_fields(payload, 16)
+    flag = _clean_flag(fields[0])
+    if flag not in ("0", "1", "2", "3"):
+        raise VerificationError(f"unsupported contact flag {flag!r}")
+    reference, name, dob, gender = fields[1:5]
+    contact_bytes = (32 if flag in "13" else 0) + (32 if flag in "23" else 0)
+    photo_end = len(payload) - contact_bytes
+    if photo_end <= photo_start:
+        raise VerificationError("Secure QR photograph is missing.")
+    photo = payload[photo_start:photo_end]
+    address_parts = [fields[i].strip() for i in (5, 8, 13, 7, 9, 15, 14, 6, 12)]
+    pincode = fields[10].strip()
+    return reference, name, dob, gender, photo, address_parts, pincode
+
+
 def verify_qr_payload(decimal_text: str, certificates: tuple[Path, ...] = CERTIFICATES) -> SignedQr:
     payload = _decompress(decimal_text)
     if len(payload) < 300:
@@ -255,33 +327,34 @@ def verify_qr_payload(decimal_text: str, certificates: tuple[Path, ...] = CERTIF
     if matched_certificate is None:
         raise VerificationError("UIDAI Secure QR signature could not be verified with configured certificates.")
 
-    # UIDAI format: 16 fields including the contact flag, separated by 0xFF.
-    fields: list[str] = []
-    cursor = 0
-    for _ in range(16):
-        end = signed.find(b"\xff", cursor)
-        if end < 0:
-            raise VerificationError("Secure QR demographic fields are incomplete.")
-        fields.append(signed[cursor:end].decode("utf-8"))
-        cursor = end + 1
-    flag = fields[0]
-    if flag not in ("0", "1", "2", "3"):
-        raise VerificationError("Unsupported Secure QR contact-data flag.")
-    reference, name, dob, gender = fields[1:5]
+    version, parse_payload = _version_and_payload(signed)
+    # Try the layout implied by the version first, then the other layout. The signature is
+    # already verified, so retrying cannot invent data; it only tolerates payload variants.
+    layouts = (True, False) if version is not None else (False, True)
+    parsed = None
+    failures: list[str] = []
+    for versioned in layouts:
+        try:
+            parsed = (_parse_versioned_qr if versioned else _parse_legacy_qr)(parse_payload)
+            break
+        except VerificationError as exc:
+            failures.append(f"{'versioned' if versioned else 'legacy'} layout: {exc}")
+    if parsed is None:
+        first = _first_field(parse_payload)
+        raise VerificationError(
+            f"Unsupported Secure QR payload (version={version or 'none'}, first field={first!r}; "
+            + "; ".join(failures) + ")")
+    reference, name, dob, gender, photo, address_parts, pincode = parsed
+
     if len(reference) < 4 or not reference[:4].isdigit() or not name.strip() or not dob.strip():
         raise VerificationError("Secure QR identity fields are incomplete.")
-    contact_bytes = (32 if flag in "13" else 0) + (32 if flag in "23" else 0)
-    photo_end = len(signed) - contact_bytes
-    if photo_end <= cursor:
+    if not photo:
         raise VerificationError("Secure QR photograph is missing.")
-    photo = signed[cursor:photo_end]
     try:
         with Image.open(BytesIO(photo)) as image:
             image.verify()
     except Exception as exc:
         raise VerificationError("Secure QR photograph cannot be decoded.") from exc
-    address_parts = [fields[i].strip() for i in (5, 8, 13, 7, 9, 15, 14, 6, 12)]
-    pincode = fields[10].strip()
     data = {
         "aadhaarLast4": reference[:4],
         "name": name.strip(),
@@ -290,7 +363,7 @@ def verify_qr_payload(decimal_text: str, certificates: tuple[Path, ...] = CERTIF
         "address": ", ".join(part for part in address_parts if part),
         "pincode": pincode,
     }
-    return SignedQr(data, photo, matched_certificate)
+    return SignedQr(data, photo, matched_certificate, decimal_text)
 
 
 def decode_signed_qr(image_bytes: bytes) -> SignedQr:

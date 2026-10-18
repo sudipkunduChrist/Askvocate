@@ -26,7 +26,8 @@ data class MyDocument(
     val type: String, val title: String, val status: String, val note: String?,
     val maskedNumber: String?, val details: Map<String, String>, val submittedAt: String?,
     val verifiedAt: String?, val media: List<String>, val requiresBack: Boolean,
-    val uploadOnly: Boolean, val liveCapture: Boolean
+    val uploadOnly: Boolean, val liveCapture: Boolean, val aadhaarNumber: String? = null,
+    val qrDetails: Map<String, String> = emptyMap()
 ) {
     companion object {
         fun from(json: JSONObject): MyDocument {
@@ -34,12 +35,17 @@ data class MyDocument(
             val details = fields?.keys()?.asSequence()?.mapNotNull { key ->
                 fields.optionalText(key)?.let { key to it }
             }?.toMap() ?: emptyMap()
+            val qrFields = json.optJSONObject("qrDetails")
+            val qrDetails = qrFields?.keys()?.asSequence()?.mapNotNull { key ->
+                qrFields.optionalText(key)?.let { key to it }
+            }?.toMap() ?: emptyMap()
             val mediaArray = json.optJSONArray("media") ?: JSONArray()
             return MyDocument(json.getString("type"), json.getString("title"), json.getString("status"),
                 json.optionalText("note"), json.optionalText("maskedNumber"), details,
                 json.optionalText("submittedAt"), json.optionalText("verifiedAt"),
                 (0 until mediaArray.length()).map { mediaArray.getString(it) },
-                json.optBoolean("requiresBack"), json.optBoolean("uploadOnly"), json.optBoolean("liveCapture"))
+                json.optBoolean("requiresBack"), json.optBoolean("uploadOnly"), json.optBoolean("liveCapture"),
+                json.optionalText("aadhaarNumber"), qrDetails)
         }
     }
 }

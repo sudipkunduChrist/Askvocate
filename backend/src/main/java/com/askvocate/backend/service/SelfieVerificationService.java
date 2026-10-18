@@ -125,10 +125,12 @@ public class SelfieVerificationService {
     private UserDocument verifiedAadhaar(String userId) {
         return documentRepository.findByUserIdAndDocumentType(userId, DocumentType.AADHAAR)
                 .filter(doc -> doc.getVerificationStatus() == VerificationStatus.VERIFIED
+                        && Boolean.TRUE.equals(doc.getIsQrVerified())
+                        && !Boolean.TRUE.equals(doc.getQrPrintedMismatch())
                         && doc.getId() != null
                         && doc.getSubmissionToken() != null
                         && doc.getCloudinaryReferences() != null && !doc.getCloudinaryReferences().isEmpty())
                 .orElseThrow(() -> new DocumentVerificationException(
-                        "Aadhaar front and back OCR must be complete before selfie verification."));
+                        "Aadhaar front and back OCR and signed QR must be complete before selfie verification."));
     }
 }

@@ -18,9 +18,11 @@ import org.springframework.web.multipart.MultipartFile;
 import java.util.List;
 
 /**
- * REST controller for lawyer & user identity document verification.
+ * REST controller for lawyer identity document verification.
  * Supports Aadhaar, PAN Card, and Bar Council credentials (ID card, Enrollment Certificate, COP).
- * 
+ * Client accounts are rejected; verification is only available to LAWYER_FRESHER and
+ * LAWYER_EXPERIENCED accounts.
+ *
  * <p>Authentication uses the signed-in app session. An optional user ID must match its owner.
  */
 @RestController

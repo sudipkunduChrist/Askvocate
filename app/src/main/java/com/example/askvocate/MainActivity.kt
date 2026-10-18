@@ -29,7 +29,7 @@ import kotlinx.coroutines.launch
 class MainActivity : AppCompatActivity() {
 
     private lateinit var navController: NavController
-a
+
     private lateinit var drawerLayout: DrawerLayout
     private var isCheckingSession = false
 

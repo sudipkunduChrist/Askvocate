@@ -96,12 +96,36 @@ class SignedQrTests(unittest.TestCase):
         signature = self.key.sign(signed, padding.PKCS1v15(), hashes.SHA256())
         return str(int.from_bytes(gzip.compress(signed + signature), "big"))
 
+    def versioned_payload(self, version="V2", flag="0"):
+        fields = [
+            version, flag, "4626" + "17012024123456789", "Test Lawyer", "26-02-2006", "M",
+            "S/O: Example", "Gautam Buddha Nagar", "", "L-113", "Noida", "201304",
+            "Maharishi Nagar", "Uttar Pradesh", "Vivek Vihar", "", "Noida",
+            "" if flag in "01" else "XXXXXX6789",
+        ]
+        signed = b"\xff".join(field.encode() for field in fields) + b"\xff" + self.photo
+        if flag in "13":
+            signed += b"mxcxxxl@gxxxxxxxx"
+        signature = self.key.sign(signed, padding.PKCS1v15(), hashes.SHA256())
+        return str(int.from_bytes(gzip.compress(signed + signature), "big"))
+
+    def test_versioned_v2_v3_v4_payloads_are_supported(self):
+        for version, flag in (("V2", "0"), ("V3", "2"), ("V4", "3")):
+            with self.subTest(version=version, flag=flag):
+                result = verify_qr_payload(self.versioned_payload(version, flag), (self.cert_path,))
+                self.assertEqual("Test Lawyer", result.data["name"])
+                self.assertEqual("201304", result.data["pincode"])
+                self.assertEqual("4626", result.data["aadhaarLast4"])
+                self.assertEqual(self.photo, result.photo)
+
     def test_verified_qr_extracts_signed_fields_and_photo(self):
-        result = verify_qr_payload(self.payload(), (self.cert_path,))
+        payload = self.payload()
+        result = verify_qr_payload(payload, (self.cert_path,))
         self.assertEqual("Test Lawyer", result.data["name"])
         self.assertEqual("201304", result.data["pincode"])
         self.assertEqual("4626", result.data["aadhaarLast4"])
         self.assertEqual(self.photo, result.photo)
+        self.assertEqual(payload, result.raw_text)
 
     def test_wrong_signing_key_is_rejected(self):
         other = rsa.generate_private_key(public_exponent=65537, key_size=2048)

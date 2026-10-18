@@ -88,6 +88,18 @@ public class UserDocument {
     /** Data decoded from a signature-verified UIDAI QR, excluding the photograph. */
     @Setter
     private Map<String, String> qrDecodedData;
+    /** Readable, signature-verified data decoded from the Aadhaar Secure QR (see {@link QrData}). */
+    @Setter
+    @JsonIgnore
+    private QrData qrData;
+    /** Raw decimal payload exactly as scanned from the Aadhaar Secure QR. */
+    @Setter
+    @JsonIgnore
+    private String qrRawText;
+    /** JSON text of the demographic fields extracted from the signed Aadhaar Secure QR. */
+    @Setter
+    @JsonIgnore
+    private String qrText;
     @Setter
     private Boolean isQrVerified;
     @Setter
@@ -183,6 +195,9 @@ public class UserDocument {
     }
 
     public Map<String, String> getQrDecodedData() { return qrDecodedData; }
+    public QrData getQrData() { return qrData; }
+    public String getQrRawText() { return qrRawText; }
+    public String getQrText() { return qrText; }
     public Boolean getIsQrVerified() { return isQrVerified; }
     public String getSubmissionToken() { return submissionToken; }
     public String getQrImageSide() { return qrImageSide; }

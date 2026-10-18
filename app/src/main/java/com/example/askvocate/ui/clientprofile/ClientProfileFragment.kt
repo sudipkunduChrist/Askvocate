@@ -60,6 +60,9 @@ class ClientProfileFragment : Fragment() {
         loadUserData()
         setupAppVersion()
         setupClickListeners()
+        val role = SessionManager.getUserRole(requireContext())
+        binding.actionDocuments.isVisible = role.equals("LAWYER_FRESHER", ignoreCase = true) ||
+                role.equals("LAWYER_EXPERIENCED", ignoreCase = true)
         updateProfileCompletion()
     }
 

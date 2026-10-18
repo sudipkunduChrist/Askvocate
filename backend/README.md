@@ -1,6 +1,6 @@
 # Askvocate Backend
 
-Spring Boot REST API service for Askvocate — supporting User Authentication, Multi-Role Profiles (Client, Lawyer Fresher, Lawyer Experienced), and Document Verification.
+Spring Boot REST API service for Askvocate — supporting User Authentication, Multi-Role Profiles (Client, Lawyer Fresher, Lawyer Experienced), and lawyer-only Document Verification.
 
 ---
 
@@ -35,8 +35,10 @@ mvn clean spring-boot:run
 ```
 Base API URL: `http://localhost:8080/api`
 
-### Lawyer Aadhaar OCR and live selfie verification
+### Lawyer-only Aadhaar OCR and live selfie verification
 
+Document verification is available only to `LAWYER_FRESHER` and `LAWYER_EXPERIENCED`
+accounts. Client accounts are rejected on every verification and document endpoint.
 Document verification runs under the Spring backend. Install the local worker's free
 Python dependencies once with `python -m pip install -r verification/requirements.txt`
 from the `backend` directory, and install Tesseract OCR. On Windows the default
@@ -54,14 +56,19 @@ Before production rollout, reconcile that existing full-number/raw-image storage
 [UIDAI's offline-verification guidance](https://uidai.gov.in/images/Dos_and_Don_ts_for_Offline_Verification_Seeking_entities.pdf),
 which calls for retaining only the last four digits and redacting stored card copies.
 
-`POST /api/documents/verify` accepts Aadhaar `front` and `back`. Local Tesseract OCR
+`POST /api/documents/verify` (lawyer accounts only) accepts Aadhaar `front` and `back`. Local Tesseract OCR
 reads the English name, labeled date of birth, gender, and full printed number from the front;
 it reads only the English `Address` field from the back. Multiple local English-only
 Tesseract reads are compared for Aadhaar images. The selected OCR text is saved as
 `ocrText.front` and `ocrText.back` in the MongoDB `documents` record, including when
-field extraction fails. The Aadhaar document becomes `VERIFIED` when those fields
-are extracted; this OCR status does not establish that the card is authentic. This
-upload does not check the QR. PAN uses multiple English-only OCR reads too, and stores
+field extraction fails. The Aadhaar document becomes `VERIFIED` only when a signed UIDAI
+Secure QR is present and verifies, and the printed OCR fields match the QR data. A
+printed-field mismatch is stored as `PENDING` for manual review; a missing or invalid QR
+fails the upload and asks for a re-upload. OCR alone never establishes that a card is
+authentic. Versioned UIDAI Secure QR payloads (V2/V3/V4) and legacy 16-field payloads are
+both decoded. Masked Aadhaar cards/PDFs that show only the last four digits are accepted:
+the last four are matched against the signed QR, while the full 12-digit number stays
+unavailable because the QR does not contain it. PAN uses multiple English-only OCR reads too, and stores
 the selected raw text in `ocrText.front`; a missing card heading alone does not reject
 a PAN if its number and required labeled fields are readable. Bar Council verification
 retains its existing parsing and status rules.
@@ -139,7 +146,8 @@ All error responses return a standardized `200 OK` JSON envelope with `success: 
 ## 📄 Document Endpoints (`/api/documents`)
 
 The Android **My Documents** screen uses `Authorization: Bearer <appToken>` on
-`/api/my-documents`. `GET /api/my-documents` returns the role-specific catalog;
+`/api/my-documents`. The catalog and every document operation are lawyer-only; client
+accounts are rejected. `GET /api/my-documents` returns the lawyer verification catalog;
 `GET /api/my-documents/{type}` returns one document's status and details;
 `POST /api/my-documents/{type}` accepts multipart `front` and optional `back` images;
 `GET /api/my-documents/{type}/media/{side}` serves account-scoped images for

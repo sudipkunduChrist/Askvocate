@@ -23,16 +23,19 @@ import java.nio.charset.StandardCharsets;
 import javax.crypto.Mac;
 import javax.crypto.spec.SecretKeySpec;
 import java.util.*;
+import tools.jackson.databind.ObjectMapper;
 
 /**
- * Orchestrates document verification for lawyers and clients.
+ * Orchestrates document verification for lawyer accounts.
  * Supports Aadhaar, PAN card, and Bar Council credentials (ID card, Enrollment Certificate, COP).
+ * Only LAWYER_FRESHER and LAWYER_EXPERIENCED accounts may submit or view verification documents.
  * Automatically updates lawyer profile verification status and barCouncilId upon successful verification.
  */
 @Service
 public class DocumentVerificationService {
 
     private static final Logger log = LoggerFactory.getLogger(DocumentVerificationService.class);
+    private static final ObjectMapper JSON = new ObjectMapper();
 
     private final CloudinaryService cloudinaryService;
     private final OcrExtractionService ocrExtractionService;
@@ -150,12 +153,57 @@ public class DocumentVerificationService {
                     e, currentFile);
         }
 
-        // 5. Determine verification status
-        VerificationStatus status = extractionResult.success()
-                ? VerificationStatus.VERIFIED : VerificationStatus.FAILED;
+        // 4b. Read and signature-verify the Aadhaar Secure QR. For Aadhaar the signed QR is
+        // the trusted source; OCR alone cannot mark the document VERIFIED.
+        AadhaarQrScan qrScan = documentType == DocumentType.AADHAAR
+                ? readAadhaarQr(backImage, frontImage, extractionResult.extractedFields(),
+                        extractionResult.maskedDocumentNumber())
+                : null;
+        QrData qrData = qrScan == null ? null : qrScan.data();
+        boolean qrVerified = qrScan != null && qrScan.verified();
+        boolean qrMismatch = qrVerified && qrScan.printedMismatch();
+        boolean ocrSuccess = extractionResult.success();
 
-        // If verification failed, delete the uploaded image from Cloudinary immediately to avoid storing junk/invalid files
-        if (!extractionResult.success()) {
+        // 5. Determine verification status. Aadhaar requires a valid signed QR whose printed
+        // fields match the OCR read. A mismatch goes to manual review; a missing or invalid QR
+        // requires a re-upload.
+        VerificationStatus status;
+        if (documentType != DocumentType.AADHAAR) {
+            status = ocrSuccess ? VerificationStatus.VERIFIED : VerificationStatus.FAILED;
+        } else if (qrVerified && !qrMismatch && ocrSuccess) {
+            status = VerificationStatus.VERIFIED;
+        } else if (qrVerified) {
+            status = VerificationStatus.PENDING;
+        } else {
+            status = VerificationStatus.FAILED;
+        }
+
+        String aadhaarFailureReason = null;
+        String manualReviewReason = null;
+        if (documentType == DocumentType.AADHAAR) {
+            if (status == VerificationStatus.PENDING) {
+                List<String> mismatchFields = qrScan.mismatchFields();
+                manualReviewReason = qrMismatch
+                        ? "Printed Aadhaar fields do not match the signed QR: "
+                            + String.join(", ", mismatchFields.isEmpty()
+                                ? List.of("printed fields") : mismatchFields) + "."
+                        : "Signed Aadhaar QR verified, but the printed fields could not be read: "
+                            + Objects.toString(extractionResult.error(), "OCR extraction failed.");
+            } else if (status == VerificationStatus.FAILED) {
+                String qrReason = qrScan != null && qrScan.reason() != null && !qrScan.reason().isBlank()
+                        ? qrScan.reason()
+                        : "Aadhaar Secure QR could not be verified; upload a clear photo of the QR side.";
+                aadhaarFailureReason = ocrSuccess || extractionResult.error() == null
+                        ? qrReason : qrReason + " " + extractionResult.error();
+                if (failureFile == null && qrScan != null) {
+                    failureFile = "front".equals(qrScan.side())
+                            ? safeFileName(frontImage) : safeFileName(backImage);
+                }
+            }
+        }
+
+        // Failed verification uploads are discarded; PENDING keeps images for manual review.
+        if (status == VerificationStatus.FAILED) {
             log.info("Document verification failed; cleaning temporary Cloudinary assets for documentType={}", documentType);
             cleanupCloudinaryAssets(cloudinaryRefs);
             cloudinaryRefs = new ArrayList<>();
@@ -184,23 +232,30 @@ public class DocumentVerificationService {
                 ? extractionResult.panNumber() : null);
         userDocument.setCloudinaryReferences(cloudinaryRefs);
         userDocument.setOcrConfidence(extractionResult.confidence());
+        userDocument.setQrData(qrData);
+        userDocument.setQrRawText(qrData == null ? null : qrData.getRawText());
+        userDocument.setQrText(qrText(qrData));
         userDocument.setUpdatedAt(Instant.now());
         if (documentType == DocumentType.AADHAAR) {
-            userDocument.setIsQrVerified(null);
-            userDocument.setQrImageSide(null);
-            userDocument.setQrDecodedData(null);
-            userDocument.setQrPrintedMismatch(null);
-            userDocument.setQrMismatchFields(null);
-            userDocument.setRequiresManualReview(false);
-            userDocument.setManualReviewReason(null);
-            userDocument.setAutoApproved(false);
+            userDocument.setIsQrVerified(qrVerified);
+            userDocument.setQrImageSide(qrScan == null ? null : qrScan.side());
+            userDocument.setQrDecodedData(qrDecodedData(qrData));
+            userDocument.setQrPrintedMismatch(qrVerified ? qrMismatch : null);
+            userDocument.setQrMismatchFields(qrMismatch ? qrScan.mismatchFields() : null);
+            userDocument.setRequiresManualReview(status == VerificationStatus.PENDING);
+            userDocument.setManualReviewReason(manualReviewReason);
+            userDocument.setAutoApproved(status == VerificationStatus.VERIFIED);
             userDocument.setConfidenceScore(extractionResult.confidence());
         }
         userDocument.setVerifiedAt(status == VerificationStatus.VERIFIED ? Instant.now() : null);
 
-        if (!extractionResult.success()) {
-            userDocument.setFailureReason(extractionResult.error());
+        if (status == VerificationStatus.FAILED) {
+            userDocument.setFailureReason(documentType == DocumentType.AADHAAR
+                    ? aadhaarFailureReason : extractionResult.error());
             userDocument.setFailureFile(failureFile);
+        } else if (status == VerificationStatus.PENDING) {
+            userDocument.setFailureReason(manualReviewReason);
+            userDocument.setFailureFile(null);
         } else {
             userDocument.setFailureReason(null);
             userDocument.setFailureFile(null);
@@ -467,9 +522,6 @@ public class DocumentVerificationService {
                 : doc.getDocumentType() + " processed (" + percentage + "% complete). Missing: " + String.join(", ", remainingDocs) + ".";
 
         if (expOpt.isEmpty() && fresherOpt.isEmpty()) {
-            if (clientProfileRepository.existsById(userId)) {
-                return new LawyerUpdateResult(false, null, null, "Identity document processed.");
-            }
             throw new DocumentVerificationException("Invalid userID or lawyer role.");
         }
 
@@ -643,7 +695,9 @@ public class DocumentVerificationService {
 
     private boolean isVerifiedAadhaar(UserDocument document) {
         return document.getDocumentType() == DocumentType.AADHAAR
-                && document.getVerificationStatus() == VerificationStatus.VERIFIED;
+                && document.getVerificationStatus() == VerificationStatus.VERIFIED
+                && Boolean.TRUE.equals(document.getIsQrVerified())
+                && !Boolean.TRUE.equals(document.getQrPrintedMismatch());
     }
 
     private boolean hasVerifiedSelfie(String userId, UserDocument aadhaar) {
@@ -679,11 +733,6 @@ public class DocumentVerificationService {
                     "Document type is required. Supported types: AADHAAR, PAN, BAR_COUNCIL_ID, BAR_CERTIFICATE, CERTIFICATE_OF_PRACTICE.");
         }
 
-        if (clientProfileRepository.existsById(userId)
-                && documentType != DocumentType.AADHAAR && documentType != DocumentType.PAN) {
-            throw new DocumentVerificationException("Client accounts can verify Aadhaar and PAN only.");
-        }
-
         if (frontImage == null || frontImage.isEmpty()) {
             throw new DocumentVerificationException("Front image of the document is required.",
                     null, safeFileName(frontImage));
@@ -701,9 +750,80 @@ public class DocumentVerificationService {
     }
 
     private void validateDocumentOwner(String userId) {
-        if (userId != null && !userId.isBlank() && clientProfileRepository.existsById(userId)) return;
         validateExistingLawyer(userId);
     }
+
+    private AadhaarQrScan readAadhaarQr(MultipartFile backImage, MultipartFile frontImage,
+                                        Map<String, String> printed, String maskedNumber) {
+        AadhaarQrScan fromBack = backImage != null && !backImage.isEmpty()
+                ? decodeQr(backImage, "back", printed, maskedNumber) : null;
+        if (fromBack != null && fromBack.verified()) return fromBack;
+        AadhaarQrScan fromFront = decodeQr(frontImage, "front", printed, maskedNumber);
+        if (fromFront != null && fromFront.verified()) return fromFront;
+        return fromBack != null ? fromBack : fromFront;
+    }
+
+    private AadhaarQrScan decodeQr(MultipartFile image, String side,
+                                   Map<String, String> printed, String maskedNumber) {
+        if (image == null || image.isEmpty()) return null;
+        try {
+            VisionVerificationClient.QrResult qr = visionVerificationClient.verifyAadhaarQr(
+                    image.getBytes(), printed, maskedNumber == null ? "" : maskedNumber);
+            List<String> mismatches = qr == null || qr.mismatchFields() == null
+                    ? List.of() : List.copyOf(qr.mismatchFields());
+            if (qr == null || !Boolean.TRUE.equals(qr.verified()) || !Boolean.TRUE.equals(qr.photoAvailable())
+                    || qr.data() == null || qr.data().isEmpty()) {
+                String reason = qr == null || qr.reason() == null || qr.reason().isBlank()
+                        ? "Aadhaar Secure QR could not be verified." : qr.reason();
+                return new AadhaarQrScan(null, false, false, List.of(), side, reason);
+            }
+            QrData data = new QrData();
+            data.setAadhaarLast4(qr.data().get("aadhaarLast4"));
+            data.setName(qr.data().get("name"));
+            data.setDob(qr.data().get("dob"));
+            data.setGender(qr.data().get("gender"));
+            data.setAddress(qr.data().get("address"));
+            data.setPincode(qr.data().get("pincode"));
+            data.setImageSide(side);
+            data.setCertificate(qr.certificate());
+            data.setRawText(qr.rawText());
+            data.setScannedAt(Instant.now());
+            boolean mismatch = Boolean.TRUE.equals(qr.printedMismatch()) || !mismatches.isEmpty();
+            return new AadhaarQrScan(data, true, mismatch, mismatches, side, qr.reason());
+        } catch (Exception error) {
+            log.warn("Aadhaar QR scan failed for {} side: {}", side, error.getClass().getSimpleName());
+            return new AadhaarQrScan(null, false, false, List.of(), side,
+                    "Aadhaar Secure QR scan failed; upload a clear photo of the QR side.");
+        }
+    }
+
+    /** QR text is the readable demographic data extracted from the signed UIDAI QR. */
+    private String qrText(QrData data) {
+        Map<String, String> values = qrDecodedData(data);
+        if (values == null) return null;
+        try {
+            return JSON.writeValueAsString(values);
+        } catch (Exception error) {
+            log.warn("Could not serialize Aadhaar QR data: {}", error.getClass().getSimpleName());
+            return values.toString();
+        }
+    }
+
+    private Map<String, String> qrDecodedData(QrData data) {
+        if (data == null) return null;
+        Map<String, String> values = new LinkedHashMap<>();
+        values.put("aadhaarLast4", data.getAadhaarLast4());
+        values.put("name", data.getName());
+        values.put("dob", data.getDob());
+        values.put("gender", data.getGender());
+        values.put("address", data.getAddress());
+        values.put("pincode", data.getPincode());
+        values.values().removeIf(Objects::isNull);
+        return values;
+    }
+
+    private record AadhaarQrScan(QrData data, boolean verified, boolean printedMismatch,
+                                 List<String> mismatchFields, String side, String reason) {}
 
     // ── Mapping ─────────────────────────────────────────────────────────
 

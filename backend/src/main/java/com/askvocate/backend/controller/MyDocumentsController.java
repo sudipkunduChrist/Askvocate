@@ -43,10 +43,10 @@ public class MyDocumentsController {
     public record Item(String type, String title, String status, String note, String maskedNumber,
             Map<String, String> details, Instant submittedAt, Instant verifiedAt,
             List<String> media, boolean requiresBack, boolean uploadOnly, boolean liveCapture,
-            String aadhaarNumber) {}
+            String aadhaarNumber, Map<String, String> qrDetails) {}
 
     private List<String> types(String role) {
-        if ("CLIENT".equals(role)) return List.of("AADHAAR", "PAN");
+        if ("CLIENT".equals(role)) return List.of();
         return List.of("AADHAAR", "PAN", "BAR_COUNCIL_ID", "BAR_CERTIFICATE",
                 "CERTIFICATE_OF_PRACTICE", "DEGREE_CERTIFICATE", "AIBE_CERTIFICATE", "SELFIE");
     }
@@ -64,7 +64,14 @@ public class MyDocumentsController {
         };
     }
 
+    private void requireLawyer(AppSessionService.Account account) {
+        if ("CLIENT".equals(account.role()))
+            throw new ResponseStatusException(HttpStatus.FORBIDDEN,
+                    "Document verification is only available for lawyer accounts.");
+    }
+
     private void allow(AppSessionService.Account account, String type) {
+        requireLawyer(account);
         if (!types(account.role()).contains(type))
             throw new ResponseStatusException(HttpStatus.NOT_FOUND, "Document type unavailable for this account");
     }
@@ -72,6 +79,7 @@ public class MyDocumentsController {
     @GetMapping
     public List<Item> list(@RequestHeader("Authorization") String authorization) {
         var account = sessions.requireAccount(authorization);
+        requireLawyer(account);
         log.info("My documents list requested for role={}", account.role());
         List<Item> items = types(account.role()).stream().map(type -> item(account.userId(), type, false)).toList();
         log.info("My documents list returned: role={}, count={}", account.role(), items.size());
@@ -108,27 +116,27 @@ public class MyDocumentsController {
         if ("SELFIE".equals(type)) {
             var latest = selfies.findByUserIdOrderByCreatedAtDesc(userId).stream().findFirst();
             if (latest.isEmpty()) return new Item(type, title(type), "NOT_UPLOADED", "Complete the live camera check.",
-                    null, Map.of(), null, null, List.of(), false, false, true, null);
+                    null, Map.of(), null, null, List.of(), false, false, true, null, Map.of());
             var selfie = latest.get();
             String status = selfie.getVerificationStatus() == null ? "PENDING" : selfie.getVerificationStatus().name();
             List<String> media = selfie.getSelfieImageUrl() == null ? List.of() : List.of("selfie");
             return new Item(type, title(type), status,
                     "VERIFIED".equals(status) ? null : cleanNote(selfie.getFailureReason()), null, Map.of(),
-                    selfie.getCreatedAt(), selfie.getVerifiedAt(), media, false, false, true, null);
+                    selfie.getCreatedAt(), selfie.getVerifiedAt(), media, false, false, true, null, Map.of());
         }
         if ("DEGREE_CERTIFICATE".equals(type) || "AIBE_CERTIFICATE".equals(type)) {
             var latest = uploadedDocs.findByUserIdAndDocType(userId, DocType.valueOf(type));
             if (latest.isEmpty()) return new Item(type, title(type), "NOT_UPLOADED",
                     "Upload available. Automatic verification is not available yet.", null,
-                    Map.of(), null, null, List.of(), false, true, false, null);
+                    Map.of(), null, null, List.of(), false, true, false, null, Map.of());
             var doc = latest.get();
             return new Item(type, title(type), "UPLOADED", "Uploaded; verification is not available yet.",
                     null, Map.of(), Instant.ofEpochMilli(doc.getUploadedAt()), null,
-                    doc.getFileUrl() == null ? List.of() : List.of("front"), false, true, false, null);
+                    doc.getFileUrl() == null ? List.of() : List.of("front"), false, true, false, null, Map.of());
         }
         var found = verifiedDocs.findByUserIdAndDocumentType(userId, DocumentType.valueOf(type));
         if (found.isEmpty()) return new Item(type, title(type), "NOT_UPLOADED", null, null,
-                Map.of(), null, null, List.of(), "AADHAAR".equals(type), false, false, null);
+                Map.of(), null, null, List.of(), "AADHAAR".equals(type), false, false, null, Map.of());
         var doc = found.get();
         List<String> media = doc.getCloudinaryReferences() == null ? List.of() : doc.getCloudinaryReferences()
                 .stream().map(CloudinaryRef::getLabel).filter(Objects::nonNull).distinct().toList();
@@ -139,7 +147,27 @@ public class MyDocumentsController {
                 doc.getCreatedAt(), doc.getVerifiedAt(), media, "AADHAAR".equals(type), false, false,
                 includeAadhaarNumber && "AADHAAR".equals(type)
                         && doc.getVerificationStatus() == VerificationStatus.VERIFIED
-                        ? doc.getAadhaarNumber() : null);
+                        ? doc.getAadhaarNumber() : null,
+                qrDetails(doc));
+    }
+
+    /** Verified Aadhaar details are displayed from the signed QR, not noisy OCR text. */
+    private Map<String, String> qrDetails(UserDocument doc) {
+        QrData qr = doc.getQrData();
+        if (qr == null || doc.getVerificationStatus() != VerificationStatus.VERIFIED) return Map.of();
+        Map<String, String> values = new LinkedHashMap<>();
+        putIfPresent(values, "Name", qr.getName());
+        putIfPresent(values, "Date of Birth", qr.getDob());
+        // OCR already validates gender against the signed QR; its full words read better than M/F/T.
+        String gender = doc.getExtractedData() != null ? doc.getExtractedData().get("gender") : null;
+        putIfPresent(values, "Gender", gender != null && !gender.isBlank() ? gender : qr.getGender());
+        putIfPresent(values, "Address", qr.getAddress());
+        putIfPresent(values, "Pincode", qr.getPincode());
+        return values;
+    }
+
+    private void putIfPresent(Map<String, String> values, String key, String value) {
+        if (value != null && !value.isBlank()) values.put(key, value);
     }
 
     private String cleanNote(String note) {

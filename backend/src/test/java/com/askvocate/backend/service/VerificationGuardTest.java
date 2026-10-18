@@ -63,11 +63,15 @@ class VerificationGuardTest {
     }
 
     @Test
-    void clientIdCannotVerifyDocumentsOrBarNumber() {
+    void clientCannotVerifyAnyDocumentTypeOrBarNumber() {
         when(clients.existsById("client-id")).thenReturn(true);
-        var error = assertThrows(DocumentVerificationException.class,
-                () -> service.verifyDocument("client-id", DocumentType.PAN, front, null));
-        assertTrue(error.getMessage().contains("only available for"));
+        for (DocumentType type : List.of(DocumentType.PAN, DocumentType.AADHAAR,
+                DocumentType.BAR_COUNCIL_ID, DocumentType.BAR_CERTIFICATE,
+                DocumentType.CERTIFICATE_OF_PRACTICE)) {
+            var error = assertThrows(DocumentVerificationException.class,
+                    () -> service.verifyDocument("client-id", type, front, front));
+            assertTrue(error.getMessage().contains("only available for LAWYER_FRESHER and LAWYER_EXPERIENCED"));
+        }
         var request = new BarCouncilVerificationRequest();
         request.setUserId("client-id");
         request.setBarCouncilNumber("D/1234/2021");
@@ -201,7 +205,7 @@ class VerificationGuardTest {
     }
 
     @Test
-    void aadhaarOcrOnlyStoresFrontBackTextAndFieldsWithoutCallingQr() throws Exception {
+    void aadhaarStoresQrDataAlongsideOcrFields() throws Exception {
         var profile = new LawyerFresherProfile();
         profile.setId("fresher-id");
         profile.setName("Test Lawyer");
@@ -221,6 +225,11 @@ class VerificationGuardTest {
             stored.set(doc);
             return doc;
         });
+        when(vision.verifyAadhaarQr(any(), anyMap(), anyString())).thenReturn(
+                new VisionVerificationClient.QrResult(true, Map.of("name", "Test Lawyer",
+                        "dob", "01/02/1990", "gender", "M", "pincode", "201304",
+                        "address", "12 Test Road New Delhi", "aadhaarLast4", number.substring(8)),
+                        true, "uidai-test.cer", "4626", List.of(), false, null));
 
         var response = service.verifyDocument("fresher-id", DocumentType.AADHAAR, front, back);
 
@@ -236,11 +245,94 @@ class VerificationGuardTest {
                 stored.get().getOcrText().get("front"));
         assertEquals("Address: 12 Test Road\nNew Delhi", stored.get().getOcrText().get("back"));
         assertNull(response.getFile());
-        assertNull(response.getIsQrVerified());
-        verifyNoInteractions(vision);
+        assertEquals(Boolean.TRUE, response.getIsQrVerified());
+        assertNotNull(stored.get().getQrData());
+        assertEquals("Test Lawyer", stored.get().getQrData().getName());
+        assertEquals(number.substring(8), stored.get().getQrData().getAadhaarLast4());
+        assertEquals("4626", stored.get().getQrRawText());
+        assertNotNull(stored.get().getQrText());
+        assertTrue(stored.get().getQrText().contains("\"name\":\"Test Lawyer\""));
+        assertEquals("back", stored.get().getQrImageSide());
+        assertFalse(stored.get().getQrPrintedMismatch());
+        assertTrue(stored.get().getAutoApproved());
+        assertFalse(stored.get().getRequiresManualReview());
+        verify(vision, atLeastOnce()).verifyAadhaarQr(any(), anyMap(), anyString());
         assertEquals("XXXX-XXXX-" + number.substring(8), response.getMaskedDocumentNumber());
         when(documents.findById("doc-id")).thenReturn(Optional.of(stored.get()));
         assertNull(service.getDocumentById("fresher-id", "doc-id").getAadhaarNumber());
+    }
+
+    @Test
+    void aadhaarQrMismatchRequiresManualReview() throws Exception {
+        var profile = new LawyerFresherProfile();
+        profile.setId("fresher-id");
+        profile.setName("Test Lawyer");
+        when(freshers.findById("fresher-id")).thenReturn(Optional.of(profile));
+        String number = validAadhaarNumber();
+        var back = new MockMultipartFile("back", "aadhaar_back.jpg", "image/jpeg", new byte[]{1});
+        when(cloudinary.uploadWithOcr(eq(front), anyString(), eq("front")))
+                .thenReturn(new CloudinaryService.UploadResult(new com.askvocate.backend.model.CloudinaryRef(),
+                        Map.of("text", "Name: Test Lawyer\nDOB: 01/02/1990\nMale\n" + number)));
+        when(cloudinary.uploadWithOcr(eq(back), anyString(), eq("back")))
+                .thenReturn(new CloudinaryService.UploadResult(new com.askvocate.backend.model.CloudinaryRef(),
+                        Map.of("text", "Address: 12 Test Road\nNew Delhi")));
+        AtomicReference<com.askvocate.backend.model.UserDocument> stored = new AtomicReference<>();
+        when(documents.save(any())).thenAnswer(invocation -> {
+            com.askvocate.backend.model.UserDocument doc = invocation.getArgument(0);
+            doc.setId("doc-id");
+            stored.set(doc);
+            return doc;
+        });
+        when(vision.verifyAadhaarQr(any(), anyMap(), anyString())).thenReturn(
+                new VisionVerificationClient.QrResult(true, Map.of("name", "Tampered Name",
+                        "dob", "01/02/1990", "gender", "M", "pincode", "201304",
+                        "address", "12 Test Road New Delhi", "aadhaarLast4", number.substring(8)),
+                        true, "uidai-test.cer", "4626", List.of("name"), true, null));
+
+        var response = service.verifyDocument("fresher-id", DocumentType.AADHAAR, front, back);
+
+        assertEquals(com.askvocate.backend.model.VerificationStatus.PENDING, response.getVerificationStatus());
+        assertEquals(Boolean.TRUE, stored.get().getIsQrVerified());
+        assertEquals(Boolean.TRUE, stored.get().getQrPrintedMismatch());
+        assertEquals(List.of("name"), stored.get().getQrMismatchFields());
+        assertTrue(stored.get().getRequiresManualReview());
+        assertFalse(stored.get().getAutoApproved());
+        assertTrue(stored.get().getManualReviewReason().contains("name"));
+        assertNull(stored.get().getVerifiedAt());
+        assertNotNull(stored.get().getQrText());
+        assertEquals("Tampered Name", stored.get().getQrData().getName());
+    }
+
+    @Test
+    void aadhaarWithoutSignedQrFailsVerification() throws Exception {
+        var profile = new LawyerFresherProfile();
+        profile.setId("fresher-id");
+        when(freshers.findById("fresher-id")).thenReturn(Optional.of(profile));
+        String number = validAadhaarNumber();
+        var back = new MockMultipartFile("back", "aadhaar_back.jpg", "image/jpeg", new byte[]{1});
+        when(cloudinary.uploadWithOcr(eq(front), anyString(), eq("front")))
+                .thenReturn(new CloudinaryService.UploadResult(new com.askvocate.backend.model.CloudinaryRef(),
+                        Map.of("text", "Name: Test Lawyer\nDOB: 01/02/1990\nMale\n" + number)));
+        when(cloudinary.uploadWithOcr(eq(back), anyString(), eq("back")))
+                .thenReturn(new CloudinaryService.UploadResult(new com.askvocate.backend.model.CloudinaryRef(),
+                        Map.of("text", "Address: 12 Test Road\nNew Delhi")));
+        AtomicReference<com.askvocate.backend.model.UserDocument> stored = new AtomicReference<>();
+        when(documents.save(any())).thenAnswer(invocation -> {
+            stored.set(invocation.getArgument(0));
+            return invocation.getArgument(0);
+        });
+        when(vision.verifyAadhaarQr(any(), anyMap(), anyString())).thenReturn(
+                VisionVerificationClient.QrResult.unavailable("No readable Aadhaar Secure QR code was found."));
+
+        var response = service.verifyDocument("fresher-id", DocumentType.AADHAAR, front, back);
+
+        assertEquals(com.askvocate.backend.model.VerificationStatus.FAILED, response.getVerificationStatus());
+        assertTrue(response.getFailureReason().contains("Secure QR"));
+        assertEquals("aadhaar_back.jpg", response.getFile());
+        assertFalse(stored.get().getIsQrVerified());
+        assertNull(stored.get().getQrData());
+        assertNull(stored.get().getQrText());
+        assertTrue(stored.get().getCloudinaryReferences().isEmpty());
     }
 
     @Test
@@ -273,7 +365,11 @@ class VerificationGuardTest {
         assertEquals(frontText, stored.get().getOcrText().get("front"));
         assertEquals(backText, stored.get().getOcrText().get("back"));
         assertTrue(response.getFailureReason().contains("date of birth"));
-        verifyNoInteractions(vision);
+        verify(vision, atLeastOnce()).verifyAadhaarQr(any(), anyMap(), anyString());
+        assertNull(stored.get().getQrData());
+        assertNull(stored.get().getQrRawText());
+        assertNull(stored.get().getQrText());
+        assertFalse(stored.get().getIsQrVerified());
     }
 
     @Test

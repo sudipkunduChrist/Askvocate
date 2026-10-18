@@ -23,8 +23,13 @@ public class DocumentController {
     private AppSessionService sessions;
 
     private void requireOwner(String authorization, String userId) {
-        if (!sessions.requireAccount(authorization).userId().equals(userId)) {
+        AppSessionService.Account account = sessions.requireAccount(authorization);
+        if (!account.userId().equals(userId)) {
             throw new org.springframework.web.server.ResponseStatusException(HttpStatus.FORBIDDEN, "Document account mismatch");
+        }
+        if (!"LAWYER_FRESHER".equals(account.role()) && !"LAWYER_EXPERIENCED".equals(account.role())) {
+            throw new org.springframework.web.server.ResponseStatusException(HttpStatus.FORBIDDEN,
+                    "Document uploads and verification are only available for lawyer accounts.");
         }
     }
 
