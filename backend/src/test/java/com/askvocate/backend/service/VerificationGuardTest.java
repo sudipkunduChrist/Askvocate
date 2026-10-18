@@ -229,7 +229,10 @@ class VerificationGuardTest {
                 new VisionVerificationClient.QrResult(true, Map.of("name", "Test Lawyer",
                         "dob", "01/02/1990", "gender", "M", "pincode", "201304",
                         "address", "12 Test Road New Delhi", "aadhaarLast4", number.substring(8)),
-                        true, "uidai-test.cer", "4626", List.of(), false, null));
+                        true, "uidai-test.cer", "4626", List.of(), false, null, "V2", "AQID"));
+        when(cloudinary.uploadBytes(any(), anyString(), eq("qr"))).thenReturn(
+                new com.askvocate.backend.model.CloudinaryRef("qr-photo-id",
+                        "https://res.cloudinary.com/test/qr.jpg", "qr"));
 
         var response = service.verifyDocument("fresher-id", DocumentType.AADHAAR, front, back);
 
@@ -252,6 +255,9 @@ class VerificationGuardTest {
         assertEquals("4626", stored.get().getQrRawText());
         assertNotNull(stored.get().getQrText());
         assertTrue(stored.get().getQrText().contains("\"name\":\"Test Lawyer\""));
+        assertEquals("V2", stored.get().getQrData().getVersion());
+        assertEquals("qr-photo-id", stored.get().getQrData().getPhotoPublicId());
+        assertEquals("https://res.cloudinary.com/test/qr.jpg", stored.get().getQrData().getPhotoUrl());
         assertEquals("back", stored.get().getQrImageSide());
         assertFalse(stored.get().getQrPrintedMismatch());
         assertTrue(stored.get().getAutoApproved());
@@ -287,7 +293,7 @@ class VerificationGuardTest {
                 new VisionVerificationClient.QrResult(true, Map.of("name", "Tampered Name",
                         "dob", "01/02/1990", "gender", "M", "pincode", "201304",
                         "address", "12 Test Road New Delhi", "aadhaarLast4", number.substring(8)),
-                        true, "uidai-test.cer", "4626", List.of("name"), true, null));
+                        true, "uidai-test.cer", "4626", List.of("name"), true, null, "V2", null));
 
         var response = service.verifyDocument("fresher-id", DocumentType.AADHAAR, front, back);
 
@@ -373,7 +379,7 @@ class VerificationGuardTest {
     }
 
     @Test
-    void successfulPanStoresFullNumberButOnlyUploadResponseRevealsIt() throws Exception {
+    void panWithoutVerifiedAadhaarWaitsForManualReview() throws Exception {
         var profile = new LawyerFresherProfile();
         profile.setId("fresher-id");
         profile.setName("Test Lawyer");
@@ -392,13 +398,155 @@ class VerificationGuardTest {
 
         var response = service.verifyDocument("fresher-id", DocumentType.PAN, front, null);
 
+        assertEquals(com.askvocate.backend.model.VerificationStatus.PENDING, response.getVerificationStatus());
         assertEquals("AAAPL1234C", stored.get().getPanNumber());
-        assertTrue(stored.get().getOcrText().get("front").contains("Father's Name: Test Father"));
-        assertEquals("AAAPL1234C", response.getPanNumber());
+        assertNotNull(stored.get().getPanNumberHash());
+        assertTrue(stored.get().getRequiresManualReview());
+        assertTrue(stored.get().getManualReviewReason().contains("Verified Aadhaar QR"));
+        assertNull(stored.get().getCrossDocumentMismatchFields());
+        assertNull(response.getPanNumber());
         assertEquals("XXXXXX234C", response.getMaskedDocumentNumber());
-        assertEquals("PENDING", response.getLawyerVerificationStatus());
-        when(documents.findById("pan-id")).thenReturn(Optional.of(stored.get()));
-        assertNull(service.getDocumentById("fresher-id", "pan-id").getPanNumber());
+    }
+
+    @Test
+    void panMatchingSignedAadhaarQrIsVerified() throws Exception {
+        var profile = new LawyerFresherProfile();
+        profile.setId("fresher-id");
+        profile.setName("Test Lawyer");
+        when(freshers.findById("fresher-id")).thenReturn(Optional.of(profile));
+        when(documents.findByUserIdAndDocumentType("fresher-id", DocumentType.AADHAAR))
+                .thenReturn(Optional.of(verifiedAadhaarWithQr("Test Lawyer", "01-02-1990")));
+        when(cloudinary.uploadWithOcr(eq(front), anyString(), eq("front")))
+                .thenReturn(new CloudinaryService.UploadResult(new com.askvocate.backend.model.CloudinaryRef(),
+                        Map.of("text", "PAN Card\nAAAPL1234C\nName: Test Lawyer\n"
+                                + "Father's Name: Test Father\nDOB: 01/02/1990")));
+        AtomicReference<com.askvocate.backend.model.UserDocument> stored = new AtomicReference<>();
+        when(documents.save(any())).thenAnswer(invocation -> {
+            com.askvocate.backend.model.UserDocument doc = invocation.getArgument(0);
+            doc.setId("pan-id");
+            stored.set(doc);
+            return doc;
+        });
+
+        var response = service.verifyDocument("fresher-id", DocumentType.PAN, front, null);
+
+        assertEquals(com.askvocate.backend.model.VerificationStatus.VERIFIED, response.getVerificationStatus());
+        assertEquals("AAAPL1234C", response.getPanNumber());
+        assertTrue(stored.get().getAutoApproved());
+        assertFalse(stored.get().getRequiresManualReview());
+        assertNull(stored.get().getCrossDocumentMismatchFields());
+    }
+
+    @Test
+    void panMismatchingSignedAadhaarQrRequiresManualReview() throws Exception {
+        var profile = new LawyerFresherProfile();
+        profile.setId("fresher-id");
+        profile.setName("Test Lawyer");
+        when(freshers.findById("fresher-id")).thenReturn(Optional.of(profile));
+        when(documents.findByUserIdAndDocumentType("fresher-id", DocumentType.AADHAAR))
+                .thenReturn(Optional.of(verifiedAadhaarWithQr("Different Lawyer", "02-02-1990")));
+        when(cloudinary.uploadWithOcr(eq(front), anyString(), eq("front")))
+                .thenReturn(new CloudinaryService.UploadResult(new com.askvocate.backend.model.CloudinaryRef(),
+                        Map.of("text", "PAN Card\nAAAPL1234C\nName: Test Lawyer\n"
+                                + "Father's Name: Test Father\nDOB: 01/02/1990")));
+        AtomicReference<com.askvocate.backend.model.UserDocument> stored = new AtomicReference<>();
+        when(documents.save(any())).thenAnswer(invocation -> {
+            com.askvocate.backend.model.UserDocument doc = invocation.getArgument(0);
+            doc.setId("pan-id");
+            stored.set(doc);
+            return doc;
+        });
+
+        var response = service.verifyDocument("fresher-id", DocumentType.PAN, front, null);
+
+        assertEquals(com.askvocate.backend.model.VerificationStatus.PENDING, response.getVerificationStatus());
+        assertTrue(stored.get().getRequiresManualReview());
+        assertEquals(List.of("name", "dob"), stored.get().getCrossDocumentMismatchFields());
+        assertTrue(stored.get().getManualReviewReason().contains("do not match"));
+        assertNull(response.getPanNumber());
+    }
+
+    @Test
+    void duplicatePanRequiresManualReview() throws Exception {
+        var profile = new LawyerFresherProfile();
+        profile.setId("fresher-id");
+        when(freshers.findById("fresher-id")).thenReturn(Optional.of(profile));
+        var other = new com.askvocate.backend.model.UserDocument();
+        other.setUserId("other-user");
+        when(documents.findByPanNumberHash(anyString())).thenReturn(Optional.of(other));
+        when(cloudinary.uploadWithOcr(eq(front), anyString(), eq("front")))
+                .thenReturn(new CloudinaryService.UploadResult(new com.askvocate.backend.model.CloudinaryRef(),
+                        Map.of("text", "PAN Card\nAAAPL1234C\nName: Test Lawyer\n"
+                                + "Father's Name: Test Father\nDOB: 01/02/1990")));
+        AtomicReference<com.askvocate.backend.model.UserDocument> stored = new AtomicReference<>();
+        when(documents.save(any())).thenAnswer(invocation -> {
+            com.askvocate.backend.model.UserDocument doc = invocation.getArgument(0);
+            doc.setId("pan-id");
+            stored.set(doc);
+            return doc;
+        });
+
+        var response = service.verifyDocument("fresher-id", DocumentType.PAN, front, null);
+
+        assertEquals(com.askvocate.backend.model.VerificationStatus.PENDING, response.getVerificationStatus());
+        assertTrue(stored.get().getRequiresManualReview());
+        assertTrue(stored.get().getManualReviewReason().contains("another account"));
+    }
+
+    @Test
+    void panIsAutoVerifiedWhenAadhaarQrIsVerifiedLater() throws Exception {
+        var profile = new LawyerFresherProfile();
+        profile.setId("fresher-id");
+        profile.setName("Test Lawyer");
+        when(freshers.findById("fresher-id")).thenReturn(Optional.of(profile));
+        String number = validAadhaarNumber();
+        var aadhaarFront = new MockMultipartFile("front", "aadhaar_front.jpg", "image/jpeg", new byte[]{2});
+        var back = new MockMultipartFile("back", "aadhaar_back.jpg", "image/jpeg", new byte[]{1});
+
+        AtomicReference<com.askvocate.backend.model.UserDocument> panStored = new AtomicReference<>();
+        AtomicReference<com.askvocate.backend.model.UserDocument> aadhaarStored = new AtomicReference<>();
+        when(documents.save(any())).thenAnswer(invocation -> {
+            com.askvocate.backend.model.UserDocument doc = invocation.getArgument(0);
+            if (doc.getDocumentType() == DocumentType.PAN) {
+                doc.setId("pan-id");
+                panStored.set(doc);
+            } else {
+                doc.setId("aadhaar-id");
+                aadhaarStored.set(doc);
+            }
+            return doc;
+        });
+        when(documents.findByUserIdAndDocumentType("fresher-id", DocumentType.PAN))
+                .thenAnswer(invocation -> Optional.ofNullable(panStored.get()));
+        when(documents.findByUserIdAndDocumentType("fresher-id", DocumentType.AADHAAR))
+                .thenAnswer(invocation -> Optional.ofNullable(aadhaarStored.get()));
+        when(cloudinary.uploadWithOcr(eq(front), anyString(), eq("front")))
+                .thenReturn(new CloudinaryService.UploadResult(new com.askvocate.backend.model.CloudinaryRef(),
+                        Map.of("text", "PAN Card\nAAAPL1234C\nName: Test Lawyer\n"
+                                + "Father's Name: Test Father\nDOB: 01/02/1990")));
+        when(cloudinary.uploadWithOcr(eq(aadhaarFront), anyString(), eq("front")))
+                .thenReturn(new CloudinaryService.UploadResult(new com.askvocate.backend.model.CloudinaryRef(),
+                        Map.of("text", "Name: Test Lawyer\nDOB: 01/02/1990\nMale\n" + number)));
+        when(cloudinary.uploadWithOcr(eq(back), anyString(), eq("back")))
+                .thenReturn(new CloudinaryService.UploadResult(new com.askvocate.backend.model.CloudinaryRef(),
+                        Map.of("text", "Address: 12 Test Road\nNew Delhi")));
+        when(vision.verifyAadhaarQr(any(), anyMap(), anyString())).thenReturn(
+                new VisionVerificationClient.QrResult(true, Map.of("name", "Test Lawyer",
+                        "dob", "01-02-1990", "gender", "M", "pincode", "201304",
+                        "address", "12 Test Road New Delhi", "aadhaarLast4", number.substring(8)),
+                        true, "uidai-test.cer", "4626", List.of(), false, null, "V2", null));
+
+        var panResponse = service.verifyDocument("fresher-id", DocumentType.PAN, front, null);
+        assertEquals(com.askvocate.backend.model.VerificationStatus.PENDING, panResponse.getVerificationStatus());
+
+        var aadhaarResponse = service.verifyDocument("fresher-id", DocumentType.AADHAAR, aadhaarFront, back);
+
+        assertEquals(com.askvocate.backend.model.VerificationStatus.VERIFIED,
+                aadhaarResponse.getVerificationStatus());
+        assertEquals(com.askvocate.backend.model.VerificationStatus.VERIFIED,
+                panStored.get().getVerificationStatus());
+        assertTrue(panStored.get().getAutoApproved());
+        assertNotNull(panStored.get().getVerifiedAt());
     }
 
     @Test
@@ -455,6 +603,78 @@ class VerificationGuardTest {
 
         assertEquals("pan_back.jpg", error.getFile());
         verifyNoInteractions(cloudinary, documents);
+    }
+
+    @Test
+    void adminCanApprovePendingPan() {
+        var profile = new LawyerFresherProfile();
+        profile.setId("fresher-id");
+        when(freshers.findById("fresher-id")).thenReturn(Optional.of(profile));
+        var pan = new com.askvocate.backend.model.UserDocument();
+        pan.setId("pan-id");
+        pan.setUserId("fresher-id");
+        pan.setDocumentType(DocumentType.PAN);
+        pan.setVerificationStatus(com.askvocate.backend.model.VerificationStatus.PENDING);
+        pan.setRequiresManualReview(true);
+        pan.setManualReviewReason("Waiting for review.");
+        when(documents.findById("pan-id")).thenReturn(Optional.of(pan));
+        when(documents.save(any())).thenAnswer(invocation -> invocation.getArgument(0));
+
+        var saved = service.approveDocument("pan-id", "admin", "Checked against portal.");
+
+        assertEquals(com.askvocate.backend.model.VerificationStatus.VERIFIED, saved.getVerificationStatus());
+        assertEquals("APPROVED", saved.getReviewDecision());
+        assertEquals("admin", saved.getReviewedBy());
+        assertNotNull(saved.getVerifiedAt());
+        assertFalse(saved.getRequiresManualReview());
+    }
+
+    @Test
+    void adminCanRejectPendingPan() {
+        var profile = new LawyerFresherProfile();
+        profile.setId("fresher-id");
+        when(freshers.findById("fresher-id")).thenReturn(Optional.of(profile));
+        var pan = new com.askvocate.backend.model.UserDocument();
+        pan.setId("pan-id");
+        pan.setUserId("fresher-id");
+        pan.setDocumentType(DocumentType.PAN);
+        pan.setVerificationStatus(com.askvocate.backend.model.VerificationStatus.PENDING);
+        pan.setRequiresManualReview(true);
+        when(documents.findById("pan-id")).thenReturn(Optional.of(pan));
+        when(documents.save(any())).thenAnswer(invocation -> invocation.getArgument(0));
+
+        var saved = service.rejectDocument("pan-id", "admin", "PAN image is blurry.");
+
+        assertEquals(com.askvocate.backend.model.VerificationStatus.REJECTED, saved.getVerificationStatus());
+        assertEquals("REJECTED", saved.getReviewDecision());
+        assertTrue(saved.getFailureReason().contains("blurry"));
+        assertNull(saved.getVerifiedAt());
+    }
+
+    @Test
+    void panQueueCannotApproveAadhaarDocuments() {
+        var aadhaar = new com.askvocate.backend.model.UserDocument();
+        aadhaar.setId("aadhaar-id");
+        aadhaar.setDocumentType(DocumentType.AADHAAR);
+        aadhaar.setRequiresManualReview(true);
+        when(documents.findById("aadhaar-id")).thenReturn(Optional.of(aadhaar));
+
+        assertThrows(DocumentVerificationException.class,
+                () -> service.approveDocument("aadhaar-id", "admin", null));
+    }
+
+    private com.askvocate.backend.model.UserDocument verifiedAadhaarWithQr(String name, String dob) {
+        var aadhaar = new com.askvocate.backend.model.UserDocument();
+        aadhaar.setUserId("fresher-id");
+        aadhaar.setDocumentType(DocumentType.AADHAAR);
+        aadhaar.setVerificationStatus(com.askvocate.backend.model.VerificationStatus.VERIFIED);
+        aadhaar.setIsQrVerified(true);
+        aadhaar.setQrPrintedMismatch(false);
+        var qr = new com.askvocate.backend.model.QrData();
+        qr.setName(name);
+        qr.setDob(dob);
+        aadhaar.setQrData(qr);
+        return aadhaar;
     }
 
     private String validAadhaarNumber() {

@@ -29,6 +29,20 @@
                 android:layout_height="match_parent"
                 android:paddingHorizontal="@dimen/spacing_lg">
 
+                <TextView
+                    android:id="@+id/tv_toolbar_heading"
+                    android:layout_width="0dp"
+                    android:layout_height="wrap_content"
+                    android:text="Workspace"
+                    android:textColor="@color/navy_dark"
+                    android:textSize="18sp"
+                    android:textStyle="bold"
+                    android:visibility="gone"
+                    app:layout_constraintBottom_toBottomOf="parent"
+                    app:layout_constraintEnd_toStartOf="@id/btn_notifications"
+                    app:layout_constraintStart_toStartOf="parent"
+                    app:layout_constraintTop_toTopOf="parent" />
+
                 <FrameLayout
                     android:id="@+id/btn_notifications"
                     android:layout_width="44dp"
@@ -78,6 +92,7 @@
 
             <!-- Hero Section -->
             <com.google.android.material.card.MaterialCardView
+                android:id="@+id/home_hero_card"
                 style="@style/Widget.Askvocate.Card"
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
@@ -94,6 +109,21 @@
                     android:padding="@dimen/spacing_xl">
 
                     <TextView
+                        android:id="@+id/tv_lawyer_eyebrow"
+                        android:layout_width="wrap_content"
+                        android:layout_height="wrap_content"
+                        android:background="@drawable/bg_lawyer_eyebrow"
+                        android:paddingHorizontal="12dp"
+                        android:paddingVertical="6dp"
+                        android:text="YOUR PRACTICE"
+                        android:textColor="@color/amber_light"
+                        android:textSize="11sp"
+                        android:textStyle="bold"
+                        android:visibility="gone"
+                        app:layout_constraintStart_toStartOf="parent"
+                        app:layout_constraintTop_toTopOf="parent" />
+
+                    <TextView
                         android:id="@+id/tv_hero_title"
                         android:layout_width="0dp"
                         android:layout_height="wrap_content"
@@ -103,7 +133,7 @@
                         android:textColor="@color/white"
                         app:layout_constraintEnd_toEndOf="parent"
                         app:layout_constraintStart_toStartOf="parent"
-                        app:layout_constraintTop_toTopOf="parent"
+                        app:layout_constraintTop_toBottomOf="@id/tv_lawyer_eyebrow"
                         tools:text="Good to see you, Sudip" />
 
                     <TextView
@@ -131,6 +161,13 @@
 
                 </androidx.constraintlayout.widget.ConstraintLayout>
             </com.google.android.material.card.MaterialCardView>
+
+            <include
+                android:id="@+id/lawyer_workspace"
+                layout="@layout/view_lawyer_workspace"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:visibility="gone" />
 
             <!-- Search Experience -->
             <LinearLayout
@@ -421,6 +458,7 @@
 
             <!-- Legal Insights -->
             <TextView
+                android:id="@+id/knowledge_hub_title"
                 android:layout_width="wrap_content"
                 android:layout_height="wrap_content"
                 android:layout_marginHorizontal="@dimen/spacing_lg"

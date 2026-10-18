@@ -68,7 +68,20 @@ fails the upload and asks for a re-upload. OCR alone never establishes that a ca
 authentic. Versioned UIDAI Secure QR payloads (V2/V3/V4) and legacy 16-field payloads are
 both decoded. Masked Aadhaar cards/PDFs that show only the last four digits are accepted:
 the last four are matched against the signed QR, while the full 12-digit number stays
-unavailable because the QR does not contain it. PAN uses multiple English-only OCR reads too, and stores
+unavailable because the QR does not contain it. When the signed QR verifies, its demographic
+data, version, certificate, raw payload, and embedded photo are stored once on the document
+(`qrData`); the photo is converted to JPEG and its Cloudinary URL is saved as
+`qrData.photoUrl`.
+
+PAN verification is free and local: OCR + format/type checks are compared with the signed
+Aadhaar QR name and date of birth. A match auto-verifies PAN; a mismatch, a duplicate PAN,
+or a PAN submitted before Aadhaar is verified becomes `PENDING` for admin review. Manual
+review uses a password login (`POST /api/admin/login`), then
+`GET /api/admin/verification/documents/pending?type=PAN`,
+`POST /api/admin/verification/documents/{id}/approve`, and
+`POST /api/admin/verification/documents/{id}/reject`. Set `ADMIN_PASSWORD` in production;
+the default is `askvocate-admin`. Set `AADHAAR_HASH_KEY` to enable keyed Aadhaar/PAN
+duplicate detection. PAN uses multiple English-only OCR reads too, and stores
 the selected raw text in `ocrText.front`; a missing card heading alone does not reject
 a PAN if its number and required labeled fields are readable. Bar Council verification
 retains its existing parsing and status rules.

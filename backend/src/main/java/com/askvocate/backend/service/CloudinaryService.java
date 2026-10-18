@@ -35,6 +35,11 @@ public class CloudinaryService {
         return new CloudinaryRef((String) result.get("public_id"), (String) result.get("secure_url"), "selfie");
     }
 
+    public CloudinaryRef uploadBytes(byte[] bytes, String folder, String tag) throws IOException {
+        Map<?, ?> result = cloudinary.uploader().upload(bytes, ObjectUtils.asMap("folder", folder, "tags", tag));
+        return new CloudinaryRef((String) result.get("public_id"), (String) result.get("secure_url"), tag);
+    }
+
     public byte[] downloadReference(CloudinaryRef ref) throws IOException {
         try {
             URI uri = URI.create(ref.getSecureUrl());

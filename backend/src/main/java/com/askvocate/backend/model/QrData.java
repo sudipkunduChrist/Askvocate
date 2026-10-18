@@ -22,6 +22,12 @@ public class QrData {
     private String imageSide;
     /** Name of the UIDAI certificate that validated the signature. */
     private String certificate;
+    /** UIDAI Secure QR payload version, e.g. {@code "V2"}. */
+    private String version;
+    /** Cloudinary URL of the photo embedded in the signed QR, stored once during verification. */
+    private String photoUrl;
+    /** Cloudinary public ID of the QR photo, used for cleanup/replacement. */
+    private String photoPublicId;
     /** Raw decimal payload read from the QR, exactly as the scanner returned it. */
     private String rawText;
     private Instant scannedAt;
@@ -45,6 +51,12 @@ public class QrData {
     public void setImageSide(String imageSide) { this.imageSide = imageSide; }
     public String getCertificate() { return certificate; }
     public void setCertificate(String certificate) { this.certificate = certificate; }
+    public String getVersion() { return version; }
+    public void setVersion(String version) { this.version = version; }
+    public String getPhotoUrl() { return photoUrl; }
+    public void setPhotoUrl(String photoUrl) { this.photoUrl = photoUrl; }
+    public String getPhotoPublicId() { return photoPublicId; }
+    public void setPhotoPublicId(String photoPublicId) { this.photoPublicId = photoPublicId; }
     public String getRawText() { return rawText; }
     public void setRawText(String rawText) { this.rawText = rawText; }
     public Instant getScannedAt() { return scannedAt; }

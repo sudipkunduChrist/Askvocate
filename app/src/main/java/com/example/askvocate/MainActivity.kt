@@ -50,9 +50,16 @@ class MainActivity : AppCompatActivity() {
         val centerNavSlot: View = findViewById(R.id.center_nav_slot)
 
         fun updateRoleNavigation() {
-            val isClient = com.example.askvocate.util.SessionManager
-                .getUserRole(this)
-                .equals("CLIENT", ignoreCase = true)
+            val role = com.example.askvocate.util.SessionManager.getUserRole(this)
+            val isClient = role.equals("CLIENT", ignoreCase = true)
+            val isLawyer = role.startsWith("LAWYER", ignoreCase = true)
+            findViewById<TextView>(R.id.label_cases).text =
+                if (isLawyer) getString(R.string.lawyer_schedule_tab) else getString(R.string.tab_cases)
+            findViewById<ImageView>(R.id.icon_cases).apply {
+                setImageResource(if (isLawyer) R.drawable.ic_onboard_lawyer_schedule else R.drawable.ic_case_work)
+                contentDescription = if (isLawyer) getString(R.string.lawyer_schedule_tab)
+                    else getString(R.string.tab_cases)
+            }
             fabAsk.visibility = if (isClient) View.VISIBLE else View.GONE
             centerNavSlot.visibility = if (isClient) View.VISIBLE else View.GONE
             navView.menu.findItem(R.id.nav_find_lawyers)?.isVisible = isClient

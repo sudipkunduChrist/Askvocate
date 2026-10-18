@@ -12,7 +12,9 @@ only when a valid signed QR is found and the printed OCR fields match the QR dat
 mismatch becomes `PENDING` manual review, and a missing/invalid QR fails the upload.
 Versioned V2/V3/V4 payloads and legacy 16-field payloads are supported. Masked Aadhaar
 cards that show only the last four digits are accepted and matched against the QR's last
-four digits. Live selfie verification reuses the signed QR photo.
+four digits. The worker also returns the QR-embedded photo as JPEG base64; Spring uploads
+it once during Aadhaar verification and stores the Cloudinary URL in `qrData.photoUrl`.
+Live selfie verification reuses the signed QR photo.
 
 Install prerequisites once:
 

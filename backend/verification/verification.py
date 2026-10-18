@@ -184,6 +184,7 @@ class SignedQr:
     photo: bytes
     certificate_name: str
     raw_text: str = ""
+    version: str = ""
 
 
 def _image(raw: bytes) -> np.ndarray:
@@ -363,7 +364,7 @@ def verify_qr_payload(decimal_text: str, certificates: tuple[Path, ...] = CERTIF
         "address": ", ".join(part for part in address_parts if part),
         "pincode": pincode,
     }
-    return SignedQr(data, photo, matched_certificate, decimal_text)
+    return SignedQr(data, photo, matched_certificate, decimal_text, version or "")
 
 
 def decode_signed_qr(image_bytes: bytes) -> SignedQr:

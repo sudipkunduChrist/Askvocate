@@ -6,6 +6,9 @@ import base64
 import binascii
 import json
 import sys
+from io import BytesIO
+
+from PIL import Image
 
 MAX_REQUEST_BYTES = 44 * 1024 * 1024
 
@@ -29,7 +32,12 @@ def run(request: dict) -> dict:
             qr = decode_signed_qr(image(request["imageBase64"]))
             mismatches = compare_printed_with_qr(
                 request["printedData"], qr.data, request["maskedDocumentNumber"])
+            with Image.open(BytesIO(qr.photo)) as photo:
+                converted = BytesIO()
+                photo.convert("RGB").save(converted, format="JPEG", quality=90)
+                photo_base64 = base64.b64encode(converted.getvalue()).decode("ascii")
             return {"verified": True, "data": qr.data, "photoAvailable": True,
+                    "photoBase64": photo_base64, "version": qr.version,
                     "certificate": qr.certificate_name, "mismatchFields": mismatches,
                     "printedMismatch": bool(mismatches), "rawText": qr.raw_text}
         if operation == "selfie":

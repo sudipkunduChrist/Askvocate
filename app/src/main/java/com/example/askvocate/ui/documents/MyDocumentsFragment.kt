@@ -30,6 +30,7 @@ import androidx.lifecycle.lifecycleScope
 import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.ViewModel
 import androidx.navigation.fragment.findNavController
+import coil.load
 import com.example.askvocate.R
 import com.example.askvocate.databinding.FragmentMyDocumentsBinding
 import com.example.askvocate.ui.verification.LiveSelfieActivity
@@ -386,7 +387,7 @@ class MyDocumentsFragment : Fragment() {
                     LinearLayout.LayoutParams(0, ViewGroup.LayoutParams.WRAP_CONTENT, 1f))
                 actions.addView(actionButton("Download", false) { startDownload(doc.type, side) },
                     LinearLayout.LayoutParams(0, ViewGroup.LayoutParams.WRAP_CONTENT, 1f).apply { marginStart = dp(8) })
-                imageCard.addView(actions, marginParams(8, false))
+                imageCard.addView(actions, marginParams(8))
                 binding.documentsContent.addView(imageCard, marginParams(12))
             }
         }
@@ -413,6 +414,16 @@ class MyDocumentsFragment : Fragment() {
             doc.verifiedAt?.let { detailRow(detailCard, "Verified", date(it)) }
             binding.documentsContent.addView(detailCard, marginParams(12))
         }
+        if (useQrDetails && !doc.qrPhotoUrl.isNullOrBlank()) {
+            sectionTitle("Aadhaar QR photo", "Photo embedded in your signed Aadhaar QR")
+            val photoCard = card()
+            photoCard.addView(ImageView(requireContext()).apply {
+                contentDescription = "Aadhaar QR photo"
+                scaleType = ImageView.ScaleType.CENTER_CROP
+                load(doc.qrPhotoUrl) { crossfade(true) }
+            }, LinearLayout.LayoutParams(-1, dp(180)))
+            binding.documentsContent.addView(photoCard, marginParams(12))
+        }
         if (doc.liveCapture) {
             if (doc.status != "VERIFIED") addAction(binding.documentsContent, "Start live selfie verification", true) {
                 runCatching { startActivity(Intent(requireContext(), LiveSelfieActivity::class.java)) }
@@ -421,7 +432,7 @@ class MyDocumentsFragment : Fragment() {
             revealContent()
             return
         }
-        if (doc.status != "VERIFIED") {
+        if (doc.status != "VERIFIED" && doc.status != "PENDING") {
             sectionTitle(if (doc.uploadOnly) "Upload image" else "Upload and verify",
                 "Use a clear, well-lit photo with every corner visible")
             uploadError?.let { error ->

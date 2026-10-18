@@ -62,7 +62,7 @@ class SelfieVerificationServiceTest {
         when(cloudinary.downloadReference(any())).thenReturn(new byte[]{2});
         when(vision.verifyAadhaarQr(any(), anyMap(), nullable(String.class))).thenReturn(
                 new VisionVerificationClient.QrResult(true, Map.of("name", "Test Lawyer"), true,
-                        "test.cer", "4626", List.of(), false, null));
+                        "test.cer", "4626", List.of(), false, null, null, null));
         when(vision.verifySelfie(any(), anyList(), eq("left"))).thenReturn(
                 new VisionVerificationClient.SelfieResult(0.8, 0.363, true, 0.9, true, null));
         when(cloudinary.uploadSelfie(any(), anyString()))

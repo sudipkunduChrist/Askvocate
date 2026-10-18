@@ -233,9 +233,10 @@ public class VisionVerificationClient {
 
     public record QrResult(Boolean verified, Map<String, String> data, Boolean photoAvailable,
                            String certificate, String rawText, List<String> mismatchFields,
-                           Boolean printedMismatch, String reason) {
+                           Boolean printedMismatch, String reason, String version,
+                           String photoBase64) {
         public static QrResult unavailable(String reason) {
-            return new QrResult(false, null, false, null, null, List.of(), null, reason);
+            return new QrResult(false, null, false, null, null, List.of(), null, reason, null, null);
         }
         public boolean matched() {
             return Boolean.TRUE.equals(verified) && Boolean.FALSE.equals(printedMismatch)

@@ -56,8 +56,7 @@ class HomeFragment : Fragment() {
     }
 
     private fun configureRoleSpecificUi() {
-        val isClient = SessionManager.getUserRole(requireContext())
-            .equals("CLIENT", ignoreCase = true)
+        val isClient = !isLawyerRole()
 
         binding.btnFindLawyerHero.isVisible = isClient
         binding.searchContainer.isVisible = isClient
@@ -67,10 +66,30 @@ class HomeFragment : Fragment() {
         binding.topLawyersHeader.isVisible = isClient
         binding.rvTopLawyers.isVisible = isClient
         binding.assistantCard.isVisible = isClient
-        binding.quickActionsGrid.columnCount = if (isClient) 2 else 1
+        binding.quickActionsGrid.isVisible = isClient
+        binding.tvToolbarHeading.isVisible = !isClient
+        binding.tvLawyerEyebrow.isVisible = !isClient
+        binding.root.findViewById<View>(R.id.lawyer_workspace).isVisible = !isClient
         if (!isClient) {
-            binding.quickActionsGrid.removeView(binding.actionFindLawyer)
             binding.tvHeroSubtitle.setText(R.string.lawyer_hero_subtitle)
+            binding.btnFindLawyerHero.setText(R.string.lawyer_view_appointments)
+            binding.btnFindLawyerHero.isVisible = true
+            binding.btnFindLawyerHero.setOnClickListener {
+                findNavController().navigate(R.id.nav_appointments)
+            }
+            binding.knowledgeHubTitle.setText(R.string.lawyer_insights_title)
+            binding.root.findViewById<View>(R.id.lawyer_action_appointments).setOnClickListener {
+                findNavController().navigate(R.id.nav_appointments)
+            }
+            binding.root.findViewById<View>(R.id.lawyer_action_messages).setOnClickListener {
+                findNavController().navigate(R.id.nav_chat_list)
+            }
+            binding.root.findViewById<View>(R.id.lawyer_action_profile).setOnClickListener {
+                findNavController().navigate(R.id.nav_client_profile)
+            }
+            binding.root.findViewById<View>(R.id.lawyer_action_insights).setOnClickListener {
+                binding.nestedScrollView.smoothScrollTo(0, binding.knowledgeHubTitle.top)
+            }
         }
     }
 
@@ -183,7 +202,7 @@ class HomeFragment : Fragment() {
         }
 
         viewModel.upcomingAppointments.observe(viewLifecycleOwner) { appointments ->
-            binding.upcomingConsultationsContainer.isVisible = appointments.isNotEmpty()
+            binding.upcomingConsultationsContainer.isVisible = !isLawyerRole() && appointments.isNotEmpty()
             (binding.rvAppointments.adapter as? AppointmentAdapter)?.submitList(appointments)
         }
 
@@ -191,6 +210,9 @@ class HomeFragment : Fragment() {
             (binding.rvKnowledgeHub.adapter as? KnowledgeHubAdapter)?.submitList(items)
         }
     }
+
+    private fun isLawyerRole(): Boolean = SessionManager.getUserRole(requireContext())
+        .startsWith("LAWYER", ignoreCase = true)
 
     override fun onDestroyView() {
         super.onDestroyView()

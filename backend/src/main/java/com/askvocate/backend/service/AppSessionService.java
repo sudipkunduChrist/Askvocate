@@ -49,6 +49,14 @@ public class AppSessionService {
         return account.userId();
     }
 
+    public Account requireAdmin(String authorization) {
+        Account account = requireAccount(authorization);
+        if (!"ADMIN".equals(account.role())) {
+            throw new ResponseStatusException(HttpStatus.FORBIDDEN, "Admin account required");
+        }
+        return account;
+    }
+
     public record Account(String userId, String role) {}
 
     public Account requireAccount(String authorization) {
@@ -64,7 +72,7 @@ public class AppSessionService {
         if (session == null) throw new ResponseStatusException(HttpStatus.UNAUTHORIZED, "Session expired. Sign in again.");
         String role = session.getString("role");
         if (!("CLIENT".equals(role) || "LAWYER_FRESHER".equals(role)
-                || "LAWYER_EXPERIENCED".equals(role))) {
+                || "LAWYER_EXPERIENCED".equals(role) || "ADMIN".equals(role))) {
             throw new ResponseStatusException(HttpStatus.FORBIDDEN, "Account type is not supported");
         }
         return new Account(session.getString("userId"), role);

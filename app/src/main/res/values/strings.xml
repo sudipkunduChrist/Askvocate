@@ -30,6 +30,9 @@
     <string name="legal_assistance_simplified">Legal guidance,\nmade simpler.</string>
     <string name="hero_subtitle">Find the right advocate or get preliminary information about your legal concern.</string>
     <string name="lawyer_hero_subtitle">Manage your practice, appointments, and client conversations in one place.</string>
+    <string name="lawyer_view_appointments">View appointments</string>
+    <string name="lawyer_insights_title">Ideas and insights</string>
+    <string name="lawyer_schedule_tab">Schedule</string>
     <string name="search_placeholder">Search advocates, legal areas, or services...</string>
     <string name="find_lawyer">Find an Advocate</string>
     <string name="ask_ai">AI Assistant</string>

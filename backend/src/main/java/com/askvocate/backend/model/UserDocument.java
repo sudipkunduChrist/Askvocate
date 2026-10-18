@@ -77,6 +77,27 @@ public class UserDocument {
     @JsonIgnore
     private String panNumber;
 
+    /** Keyed digest of the full PAN for duplicate detection. */
+    @Setter
+    @JsonIgnore
+    @Indexed
+    private String panNumberHash;
+
+    /** PAN fields that did not match the signed Aadhaar QR (e.g. {@code name}, {@code dob}). */
+    @Setter
+    private List<String> crossDocumentMismatchFields;
+
+    /** Admin account that reviewed this document. */
+    @Setter
+    private String reviewedBy;
+    @Setter
+    private Instant reviewedAt;
+    /** {@code APPROVED} or {@code REJECTED}. */
+    @Setter
+    private String reviewDecision;
+    @Setter
+    private String reviewNotes;
+
     /** References to the uploaded images on Cloudinary. */
     @Setter
     private List<CloudinaryRef> cloudinaryReferences = new ArrayList<>();
@@ -185,6 +206,13 @@ public class UserDocument {
     public String getPanNumber() {
         return panNumber;
     }
+
+    public String getPanNumberHash() { return panNumberHash; }
+    public List<String> getCrossDocumentMismatchFields() { return crossDocumentMismatchFields; }
+    public String getReviewedBy() { return reviewedBy; }
+    public Instant getReviewedAt() { return reviewedAt; }
+    public String getReviewDecision() { return reviewDecision; }
+    public String getReviewNotes() { return reviewNotes; }
 
     public List<CloudinaryRef> getCloudinaryReferences() {
         return cloudinaryReferences;

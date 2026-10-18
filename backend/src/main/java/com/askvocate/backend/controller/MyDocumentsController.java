@@ -43,7 +43,7 @@ public class MyDocumentsController {
     public record Item(String type, String title, String status, String note, String maskedNumber,
             Map<String, String> details, Instant submittedAt, Instant verifiedAt,
             List<String> media, boolean requiresBack, boolean uploadOnly, boolean liveCapture,
-            String aadhaarNumber, Map<String, String> qrDetails) {}
+            String aadhaarNumber, Map<String, String> qrDetails, String qrPhotoUrl) {}
 
     private List<String> types(String role) {
         if ("CLIENT".equals(role)) return List.of();
@@ -65,7 +65,7 @@ public class MyDocumentsController {
     }
 
     private void requireLawyer(AppSessionService.Account account) {
-        if ("CLIENT".equals(account.role()))
+        if (!"LAWYER_FRESHER".equals(account.role()) && !"LAWYER_EXPERIENCED".equals(account.role()))
             throw new ResponseStatusException(HttpStatus.FORBIDDEN,
                     "Document verification is only available for lawyer accounts.");
     }
@@ -116,27 +116,27 @@ public class MyDocumentsController {
         if ("SELFIE".equals(type)) {
             var latest = selfies.findByUserIdOrderByCreatedAtDesc(userId).stream().findFirst();
             if (latest.isEmpty()) return new Item(type, title(type), "NOT_UPLOADED", "Complete the live camera check.",
-                    null, Map.of(), null, null, List.of(), false, false, true, null, Map.of());
+                    null, Map.of(), null, null, List.of(), false, false, true, null, Map.of(), null);
             var selfie = latest.get();
             String status = selfie.getVerificationStatus() == null ? "PENDING" : selfie.getVerificationStatus().name();
             List<String> media = selfie.getSelfieImageUrl() == null ? List.of() : List.of("selfie");
             return new Item(type, title(type), status,
                     "VERIFIED".equals(status) ? null : cleanNote(selfie.getFailureReason()), null, Map.of(),
-                    selfie.getCreatedAt(), selfie.getVerifiedAt(), media, false, false, true, null, Map.of());
+                    selfie.getCreatedAt(), selfie.getVerifiedAt(), media, false, false, true, null, Map.of(), null);
         }
         if ("DEGREE_CERTIFICATE".equals(type) || "AIBE_CERTIFICATE".equals(type)) {
             var latest = uploadedDocs.findByUserIdAndDocType(userId, DocType.valueOf(type));
             if (latest.isEmpty()) return new Item(type, title(type), "NOT_UPLOADED",
                     "Upload available. Automatic verification is not available yet.", null,
-                    Map.of(), null, null, List.of(), false, true, false, null, Map.of());
+                    Map.of(), null, null, List.of(), false, true, false, null, Map.of(), null);
             var doc = latest.get();
             return new Item(type, title(type), "UPLOADED", "Uploaded; verification is not available yet.",
                     null, Map.of(), Instant.ofEpochMilli(doc.getUploadedAt()), null,
-                    doc.getFileUrl() == null ? List.of() : List.of("front"), false, true, false, null, Map.of());
+                    doc.getFileUrl() == null ? List.of() : List.of("front"), false, true, false, null, Map.of(), null);
         }
         var found = verifiedDocs.findByUserIdAndDocumentType(userId, DocumentType.valueOf(type));
         if (found.isEmpty()) return new Item(type, title(type), "NOT_UPLOADED", null, null,
-                Map.of(), null, null, List.of(), "AADHAAR".equals(type), false, false, null, Map.of());
+                Map.of(), null, null, List.of(), "AADHAAR".equals(type), false, false, null, Map.of(), null);
         var doc = found.get();
         List<String> media = doc.getCloudinaryReferences() == null ? List.of() : doc.getCloudinaryReferences()
                 .stream().map(CloudinaryRef::getLabel).filter(Objects::nonNull).distinct().toList();
@@ -148,7 +148,11 @@ public class MyDocumentsController {
                 includeAadhaarNumber && "AADHAAR".equals(type)
                         && doc.getVerificationStatus() == VerificationStatus.VERIFIED
                         ? doc.getAadhaarNumber() : null,
-                qrDetails(doc));
+                qrDetails(doc), qrPhotoUrl(doc));
+    }
+
+    private String qrPhotoUrl(UserDocument doc) {
+        return doc.getQrData() == null ? null : doc.getQrData().getPhotoUrl();
     }
 
     /** Verified Aadhaar details are displayed from the signed QR, not noisy OCR text. */

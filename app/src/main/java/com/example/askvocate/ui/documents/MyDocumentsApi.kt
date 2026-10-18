@@ -27,7 +27,7 @@ data class MyDocument(
     val maskedNumber: String?, val details: Map<String, String>, val submittedAt: String?,
     val verifiedAt: String?, val media: List<String>, val requiresBack: Boolean,
     val uploadOnly: Boolean, val liveCapture: Boolean, val aadhaarNumber: String? = null,
-    val qrDetails: Map<String, String> = emptyMap()
+    val qrDetails: Map<String, String> = emptyMap(), val qrPhotoUrl: String? = null
 ) {
     companion object {
         fun from(json: JSONObject): MyDocument {
@@ -45,7 +45,7 @@ data class MyDocument(
                 json.optionalText("submittedAt"), json.optionalText("verifiedAt"),
                 (0 until mediaArray.length()).map { mediaArray.getString(it) },
                 json.optBoolean("requiresBack"), json.optBoolean("uploadOnly"), json.optBoolean("liveCapture"),
-                json.optionalText("aadhaarNumber"), qrDetails)
+                json.optionalText("aadhaarNumber"), qrDetails, json.optionalText("qrPhotoUrl"))
         }
     }
 }
