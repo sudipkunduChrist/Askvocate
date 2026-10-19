@@ -3,10 +3,92 @@ package com.askvocate.backend.service;
 import com.askvocate.backend.model.DocumentType;
 import org.junit.jupiter.api.Test;
 
+import java.util.List;
+
 import static org.junit.jupiter.api.Assertions.*;
 
 class PanOcrExtractionTest {
     private final OcrExtractionService ocr = new OcrExtractionService();
+
+    @Test
+    void readsOcrConfusedDobLabelsAndSpacedDates() {
+        for (String label : List.of("DOB", "D.O.B", "D O B", "D0B", "Birth Date")) {
+            var result = ocr.extract("PAN Card\nAAAPL1234C\nName: Test Lawyer\n"
+                            + "Father's Name: Test Father\n" + label + ": 01 / 02 / 1990",
+                    DocumentType.PAN, "front");
+            assertTrue(result.success(), label + ": " + result.error());
+            assertEquals("01/02/1990", result.extractedFields().get("dob"), label);
+        }
+    }
+
+    @Test
+    void readsDobWhenBirthLabelHasOcrNoise() {
+        for (String label : List.of("Date of Blrth", "ate of Birth", "B1rth Date")) {
+            var result = ocr.extract("PAN Card\nAAAPL1234C\nName: Test Lawyer\n"
+                            + "Father's Name: Test Father\n" + label + ": 01/02/1990",
+                    DocumentType.PAN, "front");
+            assertTrue(result.success(), label + ": " + result.error());
+            assertEquals("01/02/1990", result.extractedFields().get("dob"), label);
+        }
+    }
+
+    @Test
+    void readsDobValueOnFollowingLine() {
+        var result = ocr.extract("PAN Card\nAAAPL1234C\nName: Test Lawyer\n"
+                        + "Father's Name: Test Father\nDOB\n01/02/1990",
+                DocumentType.PAN, "front");
+
+        assertTrue(result.success(), result.error());
+        assertEquals("01/02/1990", result.extractedFields().get("dob"));
+    }
+
+    @Test
+    void triesAllOcrCandidatesAndPicksTheCompleteRead() {
+        var raw = java.util.Map.<String, Object>of(
+                "ocrText", "Name: Test Lawyer\nFather's Name: Test Father",
+                "candidates", List.of(
+                        "Name: Test Lawyer\nFather's Name: Test Father",
+                        "PAN Card\nAAAPL1234C\nName: Test Lawyer\n"
+                                + "Father's Name: Test Father\nDOB: 01/02/1990"),
+                "confidence", 0.8);
+
+        var result = ocr.extract(raw, DocumentType.PAN, "front");
+
+        assertTrue(result.success(), result.error());
+        assertEquals("AAAPL1234C", result.panNumber());
+        assertEquals("01/02/1990", result.extractedFields().get("dob"));
+    }
+
+    @Test
+    void rejectsGarbledPanFatherName() {
+        var result = ocr.extract("PAN Card\nAAAPL1234C\nName: SHIVANG BAJAJ\n"
+                        + "Father's Name: ar Bt arte\nDOB: 01/02/1990",
+                DocumentType.PAN, "front");
+
+        assertFalse(result.success());
+        assertFalse(result.extractedFields().containsKey("fatherName"));
+    }
+
+    @Test
+    void acceptsInitialBasedFatherName() {
+        var result = ocr.extract("PAN Card\nAAAPL1234C\nName: SHIVANG BAJAJ\n"
+                        + "Father's Name: R K Sharma\nDOB: 01/02/1990",
+                DocumentType.PAN, "front");
+
+        assertTrue(result.success(), result.error());
+        assertEquals("R K Sharma", result.extractedFields().get("fatherName"));
+    }
+
+    @Test
+    void rejectsUnknownPanHolderTypeAsInvalid() {
+        var result = ocr.extract("PAN Card\nABCDE1234F\nName: Rahul Kumar\n"
+                        + "Father's Name: Suresh Kumar\nDOB: 15/08/1994",
+                DocumentType.PAN, "front");
+
+        assertFalse(result.success());
+        assertTrue(result.error().toLowerCase().contains("invalid"));
+        assertFalse(result.error().contains("Only an individual"));
+    }
 
     @Test
     void extractsLabeledPanFieldsAndFullNumber() {

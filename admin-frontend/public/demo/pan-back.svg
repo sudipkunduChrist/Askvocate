@@ -1,0 +1,60 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 900 560" width="900" height="560" role="img" aria-label="Sample PAN card back">
+  <defs>
+    <filter id="paper-grain-back">
+      <feTurbulence type="fractalNoise" baseFrequency="0.9" numOctaves="2" stitchTiles="stitch" />
+      <feColorMatrix type="saturate" values="0" />
+    </filter>
+    <linearGradient id="band-back" x1="0" y1="0" x2="1" y2="0">
+      <stop offset="0" stop-color="#16293f" />
+      <stop offset="0.65" stop-color="#24425f" />
+      <stop offset="1" stop-color="#1a3049" />
+    </linearGradient>
+    <pattern id="qr-cells" width="14" height="14" patternUnits="userSpaceOnUse">
+      <rect width="7" height="7" fill="#1b2a3d" />
+      <rect x="8" y="8" width="4" height="4" fill="#1b2a3d" />
+      <rect x="8" y="0" width="2" height="2" fill="#1b2a3d" />
+      <rect x="0" y="8" width="2" height="2" fill="#1b2a3d" />
+    </pattern>
+    <pattern id="barcode" width="6" height="80" patternUnits="userSpaceOnUse">
+      <rect width="2" height="80" fill="#24384f" />
+      <rect x="3" width="1" height="80" fill="#24384f" />
+    </pattern>
+  </defs>
+
+  <rect width="900" height="560" fill="#ded5c2" />
+  <rect width="900" height="560" filter="url(#paper-grain-back)" opacity="0.07" />
+
+  <g transform="rotate(0.7 450 280)">
+    <rect x="42" y="42" width="816" height="476" rx="20" fill="#faf5e9" stroke="#c2b79f" stroke-width="2" />
+    <path d="M42 62a20 20 0 0 1 20-20h776a20 20 0 0 1 20 20v44H42V62Z" fill="url(#band-back)" />
+    <text x="72" y="82" font-family="Georgia, 'Times New Roman', serif" font-size="16" letter-spacing="3" fill="#f5ecd7">INCOME TAX DEPARTMENT · SAMPLE</text>
+
+    <text x="72" y="140" font-family="Arial, sans-serif" font-size="11" letter-spacing="2.4" fill="#6d6454">ADDRESS</text>
+    <text x="72" y="170" font-family="Georgia, serif" font-size="22" fill="#1b2a3d">14, Palm Grove Road</text>
+    <text x="72" y="200" font-family="Georgia, serif" font-size="22" fill="#1b2a3d">Bandra West, Mumbai</text>
+    <text x="72" y="230" font-family="Georgia, serif" font-size="22" fill="#1b2a3d">Maharashtra · 400050</text>
+
+    <text x="72" y="294" font-family="Arial, sans-serif" font-size="11" letter-spacing="2.4" fill="#6d6454">LINKED AADHAAR</text>
+    <text x="72" y="322" font-family="'IBM Plex Mono', Consolas, monospace" font-size="20" fill="#1b2a3d">XXXX XXXX 4210</text>
+
+    <text x="72" y="382" font-family="Arial, sans-serif" font-size="11" letter-spacing="2.4" fill="#6d6454">DOCUMENT REFERENCE</text>
+    <rect x="72" y="396" width="264" height="52" fill="url(#barcode)" />
+    <text x="72" y="466" font-family="'IBM Plex Mono', Consolas, monospace" font-size="12" letter-spacing="2" fill="#6d6454">DEMO·PAN·0001·4821</text>
+
+    <g transform="translate(650 128)">
+      <rect width="170" height="170" fill="#f4eedf" stroke="#c2b79f" stroke-width="1.5" />
+      <rect x="12" y="12" width="146" height="146" fill="url(#qr-cells)" />
+      <rect x="12" y="12" width="42" height="42" fill="#f4eedf" stroke="#1b2a3d" stroke-width="8" />
+      <rect x="116" y="12" width="42" height="42" fill="#f4eedf" stroke="#1b2a3d" stroke-width="8" />
+      <rect x="12" y="116" width="42" height="42" fill="#f4eedf" stroke="#1b2a3d" stroke-width="8" />
+      <text x="85" y="192" text-anchor="middle" font-family="Arial, sans-serif" font-size="9" letter-spacing="1.8" fill="#8a8070">SAMPLE QR</text>
+    </g>
+
+    <text x="650" y="356" font-family="Arial, sans-serif" font-size="10" letter-spacing="1.4" fill="#8a8070">SAMPLE DOCUMENT</text>
+    <text x="650" y="374" font-family="Arial, sans-serif" font-size="10" letter-spacing="1.4" fill="#a09682">PREVIEW ONLY</text>
+
+    <g opacity="0.08" transform="rotate(-16 450 280)">
+      <text x="450" y="300" text-anchor="middle" font-family="Arial, sans-serif" font-size="108" font-weight="700" letter-spacing="18" fill="#8a2f25">DEMO</text>
+    </g>
+  </g>
+</svg>

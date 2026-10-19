@@ -43,7 +43,8 @@ public class MyDocumentsController {
     public record Item(String type, String title, String status, String note, String maskedNumber,
             Map<String, String> details, Instant submittedAt, Instant verifiedAt,
             List<String> media, boolean requiresBack, boolean uploadOnly, boolean liveCapture,
-            String aadhaarNumber, Map<String, String> qrDetails, String qrPhotoUrl) {}
+            String aadhaarNumber, String panNumber,
+            Map<String, String> qrDetails, String qrPhotoUrl) {}
 
     private List<String> types(String role) {
         if ("CLIENT".equals(role)) return List.of();
@@ -99,44 +100,81 @@ public class MyDocumentsController {
             @PathVariable String type) {
         var account = sessions.requireAccount(authorization);
         allow(account, type);
-        if (!"AADHAAR".equals(type))
-            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Number reveal is only available for Aadhaar");
-        var document = verifiedDocs.findByUserIdAndDocumentType(account.userId(), DocumentType.AADHAAR)
-                .filter(doc -> doc.getVerificationStatus() == VerificationStatus.VERIFIED)
-                .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Verified Aadhaar not found"));
-        String number = document.getAadhaarNumber();
-        if (number == null || number.isBlank())
-            throw new ResponseStatusException(HttpStatus.NOT_FOUND, "Aadhaar number is unavailable");
-        log.info("Aadhaar number reveal requested for verified account document");
-        return ResponseEntity.ok().cacheControl(CacheControl.noStore())
-                .body(Map.of("aadhaarNumber", number));
+        if ("AADHAAR".equals(type)) {
+            var document = verifiedDocs.findByUserIdAndDocumentType(account.userId(), DocumentType.AADHAAR)
+                    .filter(doc -> doc.getVerificationStatus() == VerificationStatus.VERIFIED)
+                    .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Verified Aadhaar not found"));
+            String number = document.getAadhaarNumber();
+            if (number == null || number.isBlank())
+                throw new ResponseStatusException(HttpStatus.NOT_FOUND, "Aadhaar number is unavailable");
+            log.info("Aadhaar number reveal requested for verified account document");
+            return ResponseEntity.ok().cacheControl(CacheControl.noStore())
+                    .body(Map.of("aadhaarNumber", number));
+        }
+        if ("PAN".equals(type)) {
+            var document = verifiedDocs.findByUserIdAndDocumentType(account.userId(), DocumentType.PAN)
+                    .filter(doc -> doc.getVerificationStatus() == VerificationStatus.VERIFIED)
+                    .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Verified PAN not found"));
+            String number = document.getPanNumber();
+            if (number == null || number.isBlank())
+                throw new ResponseStatusException(HttpStatus.NOT_FOUND, "PAN number is unavailable");
+            log.info("PAN number reveal requested for verified account document");
+            return ResponseEntity.ok().cacheControl(CacheControl.noStore())
+                    .body(Map.of("panNumber", number));
+        }
+        throw new ResponseStatusException(HttpStatus.BAD_REQUEST,
+                "Number reveal is only available for Aadhaar and PAN");
     }
 
-    private Item item(String userId, String type, boolean includeAadhaarNumber) {
+    @PostMapping(value = "/PAN/qr", consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
+    public Item scanPanQr(@RequestHeader("Authorization") String authorization,
+            @RequestPart("image") MultipartFile image) {
+        var account = sessions.requireAccount(authorization);
+        allow(account, "PAN");
+        checkImage(image);
+        verifier.scanPanQr(account.userId(), image);
+        return item(account.userId(), "PAN", true);
+    }
+
+    public record PanQrTextRequest(String qrText) {}
+
+    @PostMapping(value = "/PAN/qr-text", consumes = MediaType.APPLICATION_JSON_VALUE)
+    public Item scanPanQrText(@RequestHeader("Authorization") String authorization,
+            @RequestBody PanQrTextRequest request) {
+        var account = sessions.requireAccount(authorization);
+        allow(account, "PAN");
+        if (request == null || request.qrText() == null || request.qrText().isBlank()) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "The scanned PAN QR is empty.");
+        }
+        verifier.scanPanQrText(account.userId(), request.qrText().trim());
+        return item(account.userId(), "PAN", true);
+    }
+
+    private Item item(String userId, String type, boolean includeSensitiveNumbers) {
         if ("SELFIE".equals(type)) {
             var latest = selfies.findByUserIdOrderByCreatedAtDesc(userId).stream().findFirst();
             if (latest.isEmpty()) return new Item(type, title(type), "NOT_UPLOADED", "Complete the live camera check.",
-                    null, Map.of(), null, null, List.of(), false, false, true, null, Map.of(), null);
+                    null, Map.of(), null, null, List.of(), false, false, true, null, null, Map.of(), null);
             var selfie = latest.get();
             String status = selfie.getVerificationStatus() == null ? "PENDING" : selfie.getVerificationStatus().name();
             List<String> media = selfie.getSelfieImageUrl() == null ? List.of() : List.of("selfie");
             return new Item(type, title(type), status,
                     "VERIFIED".equals(status) ? null : cleanNote(selfie.getFailureReason()), null, Map.of(),
-                    selfie.getCreatedAt(), selfie.getVerifiedAt(), media, false, false, true, null, Map.of(), null);
+                    selfie.getCreatedAt(), selfie.getVerifiedAt(), media, false, false, true, null, null, Map.of(), null);
         }
         if ("DEGREE_CERTIFICATE".equals(type) || "AIBE_CERTIFICATE".equals(type)) {
             var latest = uploadedDocs.findByUserIdAndDocType(userId, DocType.valueOf(type));
             if (latest.isEmpty()) return new Item(type, title(type), "NOT_UPLOADED",
                     "Upload available. Automatic verification is not available yet.", null,
-                    Map.of(), null, null, List.of(), false, true, false, null, Map.of(), null);
+                    Map.of(), null, null, List.of(), false, true, false, null, null, Map.of(), null);
             var doc = latest.get();
             return new Item(type, title(type), "UPLOADED", "Uploaded; verification is not available yet.",
                     null, Map.of(), Instant.ofEpochMilli(doc.getUploadedAt()), null,
-                    doc.getFileUrl() == null ? List.of() : List.of("front"), false, true, false, null, Map.of(), null);
+                    doc.getFileUrl() == null ? List.of() : List.of("front"), false, true, false, null, null, Map.of(), null);
         }
         var found = verifiedDocs.findByUserIdAndDocumentType(userId, DocumentType.valueOf(type));
         if (found.isEmpty()) return new Item(type, title(type), "NOT_UPLOADED", null, null,
-                Map.of(), null, null, List.of(), "AADHAAR".equals(type), false, false, null, Map.of(), null);
+                Map.of(), null, null, List.of(), "AADHAAR".equals(type), false, false, null, null, Map.of(), null);
         var doc = found.get();
         List<String> media = doc.getCloudinaryReferences() == null ? List.of() : doc.getCloudinaryReferences()
                 .stream().map(CloudinaryRef::getLabel).filter(Objects::nonNull).distinct().toList();
@@ -145,9 +183,12 @@ public class MyDocumentsController {
         return new Item(type, title(type), doc.getVerificationStatus().name(), note,
                 doc.getMaskedDocumentNumber(), doc.getExtractedData() == null ? Map.of() : doc.getExtractedData(),
                 doc.getCreatedAt(), doc.getVerifiedAt(), media, "AADHAAR".equals(type), false, false,
-                includeAadhaarNumber && "AADHAAR".equals(type)
+                includeSensitiveNumbers && "AADHAAR".equals(type)
                         && doc.getVerificationStatus() == VerificationStatus.VERIFIED
                         ? doc.getAadhaarNumber() : null,
+                includeSensitiveNumbers && "PAN".equals(type)
+                        && doc.getVerificationStatus() == VerificationStatus.VERIFIED
+                        ? doc.getPanNumber() : null,
                 qrDetails(doc), qrPhotoUrl(doc));
     }
 

@@ -6,6 +6,7 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.stereotype.Service;
 
+import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
@@ -67,6 +68,8 @@ public class OcrExtractionService {
     // ── PAN patterns ────────────────────────────────────────────────────
     private static final Pattern PAN_NUMBER_PATTERN =
             Pattern.compile("(?i)\\b([A-Z]{5}[ \\t-]?\\d{4}[ \\t-]?[A-Z])\\b");
+    /** Valid non-individual PAN holder-type characters: company, HUF, firm, AOP, trust, BOI, local authority, AJP, government. */
+    private static final String OTHER_PAN_HOLDER_TYPES = "CHFATBLJG";
     private static final Pattern PAN_MARKER_PATTERN = Pattern.compile(
             "(?i)\\b(?:permanent account number|income tax department|pan card)\\b|आयकर विभाग|स्थायी लेखा संख्या|पैन कार्ड");
     private static final Pattern PAN_NAME_LABEL_PATTERN = Pattern.compile(
@@ -74,7 +77,7 @@ public class OcrExtractionService {
     private static final Pattern PAN_FATHER_LABEL_PATTERN = Pattern.compile(
             "(?i)^[ \\t]*(?:Father'?s?[ \\t]+Name|पिता का नाम)[ \\t]*[:：/-]?[ \\t]*(.*)$");
     private static final Pattern PAN_DOB_LABEL_PATTERN = Pattern.compile(
-            "(?i)^[ \\t]*(?:Date[ \\t]+of[ \\t]+Birth|DOB|जन्म तिथि)[ \\t]*[:：/-]?[ \\t]*(.*)$");
+            "(?i)^[ \\t]*(?:D[.\\s]?[O0][.\\s]?B\\.?|Date[ \\t]*of[ \\t]*B[i1l]rth|Birth[ \\t]*Date|जन्म[ \\t]*तिथि)[ \\t]*[:：/-]?[ \\t]*(.*)$");
     private static final Pattern FATHER_NAME_PATTERN =
             Pattern.compile("(?:Father'?s?\\s*Name|पिता का नाम)\\s*[:/]?\\s*(.+)", Pattern.CASE_INSENSITIVE);
 
@@ -116,23 +119,79 @@ public class OcrExtractionService {
      * Extracts identity fields from raw OCR data for the given document type and side (front/back).
      */
     public ExtractionResult extract(Object rawOcrData, DocumentType documentType, String side) {
-        String ocrText = extractTextFromOcrResponse(rawOcrData);
+        List<String> texts = extractTextCandidates(rawOcrData);
         double confidence = extractConfidenceFromOcrResponse(rawOcrData);
 
-        if (ocrText == null || ocrText.isBlank()) {
+        if (texts.isEmpty()) {
             log.warn("Local OCR produced no text for {} ({})", documentType, side);
             return new ExtractionResult(false, Map.of(), null, 0.0,
                     "No readable OCR text was returned. Upload a clear document image.");
         }
 
-        log.info("OCR extraction starting for documentType={}, side={}, textLength={}, confidence={}",
-                documentType, side, ocrText.length(), confidence);
+        log.info("OCR extraction starting for documentType={}, side={}, candidates={}, confidence={}",
+                documentType, side, texts.size(), confidence);
 
+        ExtractionResult best = null;
+        double bestScore = Double.NEGATIVE_INFINITY;
+        for (String text : texts) {
+            if (log.isDebugEnabled()) {
+                log.debug("OCR candidate for {} {}: {}", documentType, side, text);
+            }
+            ExtractionResult candidate = parseText(text, documentType, side, confidence);
+            double score = extractionScore(candidate, documentType);
+            if (score > bestScore) {
+                best = candidate;
+                bestScore = score;
+            }
+        }
+        if (best != null) {
+            log.info("OCR extraction chosen for documentType={}, side={}, success={}, fields={}, error={}",
+                    documentType, side, best.success(), best.extractedFields().keySet(), best.error());
+        }
+        return best;
+    }
+
+    /** The worker returns several Tesseract reads; try all of them before choosing fields. */
+    public List<String> extractTextCandidates(Object rawOcrData) {
+        List<String> texts = new ArrayList<>();
+        if (rawOcrData instanceof Map<?, ?> map && map.get("candidates") instanceof List<?> candidates) {
+            for (Object item : candidates) {
+                if (item instanceof String text && !text.isBlank() && !texts.contains(text)) {
+                    texts.add(text);
+                }
+            }
+        }
+        String primary = extractTextFromOcrResponse(rawOcrData);
+        if (primary != null && !primary.isBlank() && !texts.contains(primary)) {
+            texts.add(0, primary);
+        }
+        return texts;
+    }
+
+    private ExtractionResult parseText(String ocrText, DocumentType documentType, String side, double confidence) {
         return switch (documentType) {
             case AADHAAR -> parseAadhaar(ocrText, confidence, side);
             case PAN -> parsePan(ocrText, confidence);
             case BAR_COUNCIL_ID, BAR_CERTIFICATE, CERTIFICATE_OF_PRACTICE -> parseBarCouncil(ocrText, confidence);
         };
+    }
+
+    private double extractionScore(ExtractionResult result, DocumentType documentType) {
+        if (result == null) return Double.NEGATIVE_INFINITY;
+        double score = result.success() ? 100 : 0;
+        score += result.extractedFields().size();
+        if (result.maskedDocumentNumber() != null) score += 10;
+        if (documentType == DocumentType.PAN) {
+            if (result.extractedFields().containsKey("name")) score += 5;
+            if (result.extractedFields().containsKey("fatherName")) score += 5;
+            if (result.extractedFields().containsKey("dob")) score += 10;
+        } else if (documentType == DocumentType.AADHAAR) {
+            if (result.extractedFields().containsKey("name")) score += 5;
+            if (result.extractedFields().containsKey("dob")) score += 5;
+            if (result.extractedFields().containsKey("gender")) score += 5;
+            if (result.extractedFields().containsKey("address")) score += 5;
+        }
+        return score;
     }
 
     /**
@@ -419,9 +478,12 @@ public class OcrExtractionService {
                     "Could not extract a valid PAN number from the card.");
         }
         String rawPan = panMatcher.group(1).replaceAll("[ \\t-]", "").toUpperCase();
-        if (rawPan.charAt(3) != 'P') {
-            return new ExtractionResult(false, Map.of(), null, confidence,
-                    "Only an individual PAN card can verify a lawyer profile.");
+        char holderType = rawPan.charAt(3);
+        if (holderType != 'P') {
+            String error = OTHER_PAN_HOLDER_TYPES.indexOf(holderType) >= 0
+                    ? "Only an individual PAN card can verify a lawyer profile."
+                    : "Invalid PAN number: the fourth character is not a valid PAN holder type.";
+            return new ExtractionResult(false, Map.of(), null, confidence, error);
         }
         fields.put("panType", "Individual");
         String[] lines = text.split("\\R");
@@ -444,10 +506,15 @@ public class OcrExtractionService {
             }
         }
         String dateText = readPanLabeledValue(lines, PAN_DOB_LABEL_PATTERN);
-        if (name != null) fields.put("name", normalizeName(name));
-        if (fatherName != null) fields.put("fatherName", normalizeName(fatherName));
+        if (dateText == null) dateText = readPanDateNearBirthLabel(lines);
+        if (name != null && isPlausibleName(name)) fields.put("name", normalizeName(name));
+        if (fatherName != null && isPlausibleName(fatherName)) {
+            fields.put("fatherName", normalizeName(fatherName));
+        }
         if (dateText != null) {
-            Matcher dobMatcher = DOB_PATTERN.matcher(dateText);
+            // OCR often puts spaces around separators: "01 / 02 / 1990".
+            String normalizedDate = dateText.replaceAll("\\s*([/.\\-])\\s*", "$1");
+            Matcher dobMatcher = DOB_PATTERN.matcher(normalizedDate);
             if (dobMatcher.find()) fields.put("dob", dobMatcher.group(1));
         }
 
@@ -470,7 +537,7 @@ public class OcrExtractionService {
             if (!label.matches()) continue;
             String value = stripRepeatedPanLabel(label.group(1), labelPattern);
             if (isPanFieldValue(value)) return value;
-            for (int j = i + 1; j < lines.length && j <= i + 3; j++) {
+            for (int j = i + 1; j < lines.length && j <= i + 5; j++) {
                 value = stripRepeatedPanLabel(lines[j], labelPattern);
                 if (value.isEmpty()) continue;
                 if (isPanLabel(value)) break;
@@ -478,6 +545,27 @@ public class OcrExtractionService {
             }
         }
         return null;
+    }
+
+    /** Catches a DOB line whose label is surrounded by OCR noise. */
+    private String readPanDateNearBirthLabel(String[] lines) {
+        Pattern noise = Pattern.compile(
+                "(?i).*(?:D[.\\s]?[O0][.\\s]?B\\.?|B[i1l]rth|जन्म[\\s]*तिथि).*");
+        for (int i = 0; i < lines.length; i++) {
+            if (!noise.matcher(lines[i]).matches()) continue;
+            String found = firstDate(lines[i]);
+            if (found != null) return found;
+            for (int j = i + 1; j < lines.length && j <= i + 3; j++) {
+                found = firstDate(lines[j]);
+                if (found != null) return found;
+            }
+        }
+        return null;
+    }
+
+    private String firstDate(String line) {
+        Matcher matcher = DOB_PATTERN.matcher(line.replaceAll("\\s*([/.\\-])\\s*", "$1"));
+        return matcher.find() ? matcher.group(1) : null;
     }
 
     /** The printed cardholder name is commonly the line immediately above Father's Name. */
@@ -524,6 +612,26 @@ public class OcrExtractionService {
                 && !isPanLabel(value) && !PAN_MARKER_PATTERN.matcher(value).find()
                 && !PAN_NUMBER_PATTERN.matcher(value).find()
                 && !value.matches("(?i).*\\b(?:name|date|birth|income|tax|department|govt|government|signature|permanent|account|number|india|pan)\\b.*");
+    }
+
+    /** Reject OCR garbage like "ar Bt arte" while allowing initials and single names. */
+    private boolean isPlausibleName(String value) {
+        if (value == null) return false;
+        String cleaned = value.trim();
+        if (cleaned.length() < 3) return false;
+        String[] tokens = cleaned.split("\\s+");
+        // PAN cards print English names in uppercase; title case is also acceptable.
+        for (String token : tokens) {
+            if (!token.matches("[A-Z][A-Za-z.'-]*")) return false;
+        }
+        if (tokens.length == 1) return tokens[0].length() >= 3;
+        long suspicious = 0;
+        for (String token : tokens) {
+            if (token.length() <= 2 && !(token.length() == 1 && Character.isUpperCase(token.charAt(0)))) {
+                suspicious++;
+            }
+        }
+        return suspicious * 2 <= tokens.length;
     }
 
     private String stripRepeatedPanLabel(String raw, Pattern labelPattern) {

@@ -22,7 +22,8 @@ def image(value: str) -> bytes:
 
 def run(request: dict) -> dict:
     from verification import (VerificationError, compare_printed_with_qr,
-                              decode_signed_qr, local_ocr, match_live_selfie)
+                              decode_pan_qr, decode_pan_qr_from_scanned, decode_signed_qr,
+                              local_ocr, match_live_selfie)
 
     operation = request.get("operation")
     try:
@@ -40,6 +41,20 @@ def run(request: dict) -> dict:
                     "photoBase64": photo_base64, "version": qr.version,
                     "certificate": qr.certificate_name, "mismatchFields": mismatches,
                     "printedMismatch": bool(mismatches), "rawText": qr.raw_text}
+        if operation == "panQr":
+            qr = decode_pan_qr(image(request["imageBase64"]))
+            photo_base64 = base64.b64encode(qr.photo).decode("ascii") if qr.photo else ""
+            return {"verified": bool(qr.signature_verified), "data": qr.data,
+                    "photoAvailable": bool(qr.photo), "photoBase64": photo_base64,
+                    "version": qr.version, "signatureVerified": bool(qr.signature_verified),
+                    "rawText": qr.raw_text}
+        if operation == "panQrText":
+            qr = decode_pan_qr_from_scanned(request["qrText"].strip())
+            photo_base64 = base64.b64encode(qr.photo).decode("ascii") if qr.photo else ""
+            return {"verified": bool(qr.signature_verified), "data": qr.data,
+                    "photoAvailable": bool(qr.photo), "photoBase64": photo_base64,
+                    "version": qr.version, "signatureVerified": bool(qr.signature_verified),
+                    "rawText": qr.raw_text}
         if operation == "selfie":
             qr = decode_signed_qr(image(request["qrImageBase64"]))
             frames = [image(frame) for frame in request["framesBase64"]]
@@ -49,7 +64,7 @@ def run(request: dict) -> dict:
         reason = str(exc) if isinstance(exc, VerificationError) else "Invalid verification request."
         if operation == "ocr":
             return {"ocrText": "", "confidence": 0.0, "reason": reason}
-        if operation == "aadhaarQr":
+        if operation in ("aadhaarQr", "panQr", "panQrText"):
             return {"verified": False, "reason": reason}
         return {"matched": False, "livenessPassed": False, "reason": reason}
 

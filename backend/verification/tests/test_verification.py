@@ -1,19 +1,96 @@
 import gzip
 from io import BytesIO
 from pathlib import Path
+import base64
 import uuid
 import unittest
+import zlib
 from unittest.mock import patch
 from datetime import datetime, timedelta, timezone
 
 import numpy as np
 from cryptography import x509
 from cryptography.hazmat.primitives import hashes, serialization
-from cryptography.hazmat.primitives.asymmetric import padding, rsa
+from cryptography.hazmat.primitives.asymmetric import ec, padding, rsa
+from cryptography.hazmat.primitives.asymmetric.utils import decode_dss_signature
+from cryptography.hazmat.primitives.serialization import Encoding, PublicFormat
 from cryptography.x509.oid import NameOID
 from PIL import Image
 
-from verification import VerificationError, _address_read_quality, _front_read_quality, _pan_read_quality, compare_printed_with_qr, local_ocr, verify_qr_payload, match_live_selfie
+import verification
+from verification import VerificationError, _address_read_quality, _front_read_quality, _pan_read_quality, compare_printed_with_qr, decode_pan_qr_from_scanned, local_ocr, verify_qr_payload, match_live_selfie
+
+
+class PanQrTests(unittest.TestCase):
+    def setUp(self):
+        self.key = ec.generate_private_key(ec.SECP384R1())
+
+    def key_struct(self, point):
+        oid = b"1.3.132.0.34"
+        return (b"\x03\x01" + b"\x00\x03" + b"ECC" + b"\x55\x00\x00\x00\x01"
+                + len(oid).to_bytes(2, "big") + oid
+                + (2 + len(point)).to_bytes(2, "big") + b"\x04\x61" + point)
+
+    def pack(self, data):
+        bits = []
+        for byte in data:
+            for index in range(8):
+                bits.append((byte >> index) & 1)
+        while len(bits) % 13:
+            bits.append(0)
+        chunks = []
+        for index in range(0, len(bits), 13):
+            value = sum(bits[index + offset] << offset for offset in range(13))
+            chunks.append(f"{value:04d}")
+        return "".join(chunks)
+
+    def payload(self, values, tamper=False):
+        elements = bytearray()
+        for value in values:
+            encoded = value.encode()
+            elements += b"\x08\x02" + bytes([len(encoded)]) + encoded
+        blob = b"\x03\x02" + zlib.compress(bytes(elements))
+        metadata = 0xC5 if len(blob) < 256 else 0xCD
+        length = len(blob).to_bytes(2, "big") if len(blob) >= 256 else bytes([len(blob)])
+        block = bytes([metadata]) + length + blob
+        message = (bytes([3, 0]) + (0x1E).to_bytes(4, "big") + bytes([0])
+                   + (1).to_bytes(2, "big") + bytes([1]) + block + bytes([0]))
+        der = self.key.sign(message, ec.ECDSA(hashes.SHA384()))
+        r, s = decode_dss_signature(der)
+        signature = r.to_bytes(48, "big") + s.to_bytes(48, "big")
+        if tamper:
+            signature = bytes([signature[0] ^ 1]) + signature[1:]
+        outer = message + b"\x01" + b"\x00" + b"\x00\x00" + len(signature).to_bytes(2, "big") + signature
+        point = self.key.public_key().public_bytes(Encoding.X962, PublicFormat.UncompressedPoint)
+        patch.object(verification, "PAN_ECC_KEY_1",
+                     base64.b64encode(self.key_struct(point)).decode()).start()
+        self.addCleanup(patch.stopall)
+        return self.pack(outer)
+
+    def test_individual_pan_qr_decodes_and_verifies(self):
+        result = decode_pan_qr_from_scanned(self.payload([
+            "ABCPK1234L", "JOHN DOE", "RICHARD DOE", "01/01/1990"]))
+
+        self.assertTrue(result.signature_verified)
+        self.assertEqual("ABCPK1234L", result.data["pan"])
+        self.assertEqual("JOHN DOE", result.data["name"])
+        self.assertEqual("RICHARD DOE", result.data["fatherName"])
+        self.assertEqual("01/01/1990", result.data["dob"])
+        self.assertEqual("Individual", result.data["panType"])
+
+    def test_company_pan_qr_has_organization_layout(self):
+        result = decode_pan_qr_from_scanned(self.payload([
+            "ABCPK1234L", "ACME WIDGETS PRIVATE LIMITED", "15/08/1947"]))
+
+        self.assertTrue(result.signature_verified)
+        self.assertEqual("Organization", result.data["panType"])
+        self.assertEqual("15/08/1947", result.data["dateOfIncorporation"])
+
+    def test_tampered_signature_is_not_trusted(self):
+        result = decode_pan_qr_from_scanned(self.payload([
+            "ABCPK1234L", "JOHN DOE", "RICHARD DOE", "01/01/1990"], tamper=True))
+
+        self.assertFalse(result.signature_verified)
 
 
 class AddressOcrSelectionTests(unittest.TestCase):
@@ -61,11 +138,18 @@ class AddressOcrSelectionTests(unittest.TestCase):
         self.assertGreater(_pan_read_quality(complete), _pan_read_quality(weak))
         image = np.full((300, 500, 3), 255, dtype=np.uint8)
         with patch("verification._image", return_value=image), \
-                patch("verification.pytesseract.image_to_string", side_effect=[weak, complete, weak]) as ocr, \
+                patch("verification.pytesseract.image_to_string",
+                      side_effect=[weak, complete, weak, weak, weak]) as ocr, \
                 patch("verification.pytesseract.image_to_data", return_value={"conf": [40, 80]}):
             result = local_ocr(b"example", "pan")
         self.assertEqual(complete, result["ocrText"])
+        self.assertIn(complete, result["candidates"])
         self.assertTrue(all(call.kwargs["lang"] == "eng" for call in ocr.call_args_list))
+
+    def test_pan_quality_prefers_pass_with_labeled_dob(self):
+        weak = "AAAPL1234C\nName: Test Lawyer\nFather's Name: Test Father"
+        complete = weak + "\nD.O.B: 01 / 02 / 1990"
+        self.assertGreater(_pan_read_quality(complete), _pan_read_quality(weak))
 
 
 class SignedQrTests(unittest.TestCase):

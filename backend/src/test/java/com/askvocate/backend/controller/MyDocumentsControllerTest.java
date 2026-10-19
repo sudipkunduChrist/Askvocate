@@ -85,6 +85,26 @@ class MyDocumentsControllerTest {
         assertEquals("234567890123", detail.aadhaarNumber());
     }
 
+    @Test void verifiedPanDetailIncludesFullPanNumber() {
+        when(sessions.requireAccount("Bearer lawyer")).thenReturn(new AppSessionService.Account("owner", "LAWYER_FRESHER"));
+        UserDocument pan = new UserDocument();
+        pan.setDocumentType(DocumentType.PAN);
+        pan.setVerificationStatus(VerificationStatus.VERIFIED);
+        pan.setMaskedDocumentNumber("XXXXXX234C");
+        pan.setPanNumber("AAAPL1234C");
+        when(verifiedDocs.findByUserIdAndDocumentType(anyString(), any())).thenReturn(Optional.empty());
+        when(verifiedDocs.findByUserIdAndDocumentType("owner", DocumentType.PAN)).thenReturn(Optional.of(pan));
+
+        var listed = controller.list("Bearer lawyer").stream()
+                .filter(item -> item.type().equals("PAN")).findFirst().orElseThrow();
+        var detail = controller.detail("Bearer lawyer", "PAN").getBody();
+        var revealed = controller.revealNumber("Bearer lawyer", "PAN").getBody();
+
+        assertNull(listed.panNumber());
+        assertEquals("AAAPL1234C", detail.panNumber());
+        assertEquals("AAAPL1234C", revealed.get("panNumber"));
+    }
+
     @Test void verifiedAadhaarDetailUsesSignedQrData() {
         when(sessions.requireAccount("Bearer lawyer")).thenReturn(new AppSessionService.Account("owner", "LAWYER_FRESHER"));
         UserDocument doc = new UserDocument();

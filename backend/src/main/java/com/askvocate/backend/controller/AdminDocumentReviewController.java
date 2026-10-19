@@ -30,11 +30,12 @@ public class AdminDocumentReviewController {
     public record AdminDocumentResponse(
             String id, String userId, DocumentType documentType,
             VerificationStatus verificationStatus, String maskedDocumentNumber, String panNumber,
-            Map<String, String> extractedData, Map<String, String> ocrText,
+            Map<String, String> extractedData,
             List<String> crossDocumentMismatchFields, Boolean requiresManualReview,
             String manualReviewReason, String failureReason, String reviewedBy,
             Instant reviewedAt, String reviewDecision, String reviewNotes,
             List<CloudinaryRef> images, Map<String, String> aadhaarQrData,
+            Map<String, String> panQrData, Boolean isPanQrVerified, String panQrPhotoUrl,
             Instant submittedAt, Instant verifiedAt) {}
 
     @GetMapping("/pending")
@@ -92,13 +93,13 @@ public class AdminDocumentReviewController {
                 doc.getId(), doc.getUserId(), doc.getDocumentType(), doc.getVerificationStatus(),
                 doc.getMaskedDocumentNumber(), doc.getPanNumber(),
                 doc.getExtractedData() == null ? Map.of() : doc.getExtractedData(),
-                doc.getOcrText() == null ? Map.of() : doc.getOcrText(),
                 doc.getCrossDocumentMismatchFields(),
                 Boolean.TRUE.equals(doc.getRequiresManualReview()),
                 doc.getManualReviewReason(), doc.getFailureReason(),
                 doc.getReviewedBy(), doc.getReviewedAt(), doc.getReviewDecision(), doc.getReviewNotes(),
                 doc.getCloudinaryReferences() == null ? List.of() : doc.getCloudinaryReferences(),
-                qr, doc.getCreatedAt(), doc.getVerifiedAt());
+                qr, doc.getPanQrData(), Boolean.TRUE.equals(doc.getIsPanQrVerified()),
+                doc.getPanQrPhotoUrl(), doc.getCreatedAt(), doc.getVerifiedAt());
     }
 
     private void putIfPresent(Map<String, String> values, String key, String value) {

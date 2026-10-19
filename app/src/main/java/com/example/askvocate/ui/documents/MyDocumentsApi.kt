@@ -11,11 +11,14 @@ import com.example.askvocate.util.SessionManager
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 import org.json.JSONArray
+import org.json.JSONException
 import org.json.JSONObject
 import java.net.HttpURLConnection
+import java.net.SocketTimeoutException
 import java.net.URL
 import java.io.File
 import java.io.FileOutputStream
+import java.io.IOException
 import java.util.UUID
 
 private fun JSONObject.optionalText(key: String): String? =
@@ -27,6 +30,7 @@ data class MyDocument(
     val maskedNumber: String?, val details: Map<String, String>, val submittedAt: String?,
     val verifiedAt: String?, val media: List<String>, val requiresBack: Boolean,
     val uploadOnly: Boolean, val liveCapture: Boolean, val aadhaarNumber: String? = null,
+    val panNumber: String? = null,
     val qrDetails: Map<String, String> = emptyMap(), val qrPhotoUrl: String? = null
 ) {
     companion object {
@@ -45,7 +49,8 @@ data class MyDocument(
                 json.optionalText("submittedAt"), json.optionalText("verifiedAt"),
                 (0 until mediaArray.length()).map { mediaArray.getString(it) },
                 json.optBoolean("requiresBack"), json.optBoolean("uploadOnly"), json.optBoolean("liveCapture"),
-                json.optionalText("aadhaarNumber"), qrDetails, json.optionalText("qrPhotoUrl"))
+                json.optionalText("aadhaarNumber"), json.optionalText("panNumber"),
+                qrDetails, json.optionalText("qrPhotoUrl"))
         }
     }
 }
@@ -58,35 +63,52 @@ class MyDocumentsApi(private val context: Context) {
     private fun connection(path: String, method: String = "GET"): HttpURLConnection {
         val token = SessionManager.getAppToken(context)
         if (token.isBlank()) throw IllegalStateException("Please sign in again to access your documents.")
-        return (URL("${ApiConfig.BASE_URL}/api/my-documents$path").openConnection() as HttpURLConnection).apply {
-            requestMethod = method
-            connectTimeout = 15_000
-            readTimeout = 45_000
-            setRequestProperty("Authorization", "Bearer $token")
-            setRequestProperty("Accept", "application/json")
+        return try {
+            (URL("${ApiConfig.BASE_URL}/api/my-documents$path").openConnection() as HttpURLConnection).apply {
+                requestMethod = method
+                connectTimeout = 15_000
+                readTimeout = 45_000
+                setRequestProperty("Authorization", "Bearer $token")
+                setRequestProperty("Accept", "application/json")
+            }
+        } catch (error: IOException) {
+            throw IllegalStateException("Could not reach the server. Check your connection and try again.")
         }
     }
 
     private fun response(conn: HttpURLConnection): String {
-        val code = conn.responseCode
-        val body = (if (code in 200..299) conn.inputStream else conn.errorStream)
-            ?.bufferedReader()?.use { it.readText() }.orEmpty()
-        if (code !in 200..299) {
-            val message = runCatching {
-                JSONObject(body).let { it.optionalText("message") ?: it.optionalText("detail") }
-            }.getOrNull() ?: "Request failed ($code). Please try again."
-            throw IllegalStateException(message)
-        }
-        if (body.trimStart().startsWith("{")) {
-            val json = runCatching { JSONObject(body) }.getOrNull()
-            if (json?.optBoolean("success", true) == false) {
-                throw IllegalStateException(
-                    json.optionalText("error") ?: json.optionalText("message")
-                        ?: "The document request could not be completed."
-                )
+        try {
+            val code = conn.responseCode
+            val body = (if (code in 200..299) conn.inputStream else conn.errorStream)
+                ?.bufferedReader()?.use { it.readText() }.orEmpty()
+            if (code !in 200..299) {
+                val message = runCatching {
+                    JSONObject(body).let { it.optionalText("message") ?: it.optionalText("detail") }
+                }.getOrNull() ?: when {
+                    code == 401 || code == 403 -> "Your session expired. Please sign in again."
+                    code in 500..599 -> "The server could not complete the request. Please try again."
+                    else -> "Request failed ($code). Please try again."
+                }
+                throw IllegalStateException(message)
             }
+            if (body.isBlank()) {
+                throw IllegalStateException("The server returned an empty response. Please try again.")
+            }
+            if (body.trimStart().startsWith("{")) {
+                val json = runCatching { JSONObject(body) }.getOrNull()
+                if (json?.optBoolean("success", true) == false) {
+                    throw IllegalStateException(
+                        json.optionalText("error") ?: json.optionalText("message")
+                            ?: "The document request could not be completed."
+                    )
+                }
+            }
+            return body
+        } catch (error: SocketTimeoutException) {
+            throw IllegalStateException("The server took too long to respond. Please try again.")
+        } catch (error: IOException) {
+            throw IllegalStateException("Could not reach the server. Check your connection and try again.")
         }
-        return body
     }
 
     suspend fun list(): List<MyDocument> = withContext(Dispatchers.IO) {
@@ -94,12 +116,18 @@ class MyDocumentsApi(private val context: Context) {
         try {
             val array = JSONArray(response(conn))
             (0 until array.length()).map { MyDocument.from(array.getJSONObject(it)) }
+        } catch (error: JSONException) {
+            throw IllegalStateException("The server returned an unexpected response. Please try again.")
         } finally { conn.disconnect() }
     }
 
     suspend fun detail(type: String): MyDocument = withContext(Dispatchers.IO) {
         val conn = connection("/$type")
-        try { MyDocument.from(JSONObject(response(conn))) } finally { conn.disconnect() }
+        try {
+            MyDocument.from(JSONObject(response(conn)))
+        } catch (error: JSONException) {
+            throw IllegalStateException("The server returned an unexpected response. Please try again.")
+        } finally { conn.disconnect() }
     }
 
     suspend fun revealAadhaarNumber(): String = withContext(Dispatchers.IO) {
@@ -109,6 +137,33 @@ class MyDocumentsApi(private val context: Context) {
                 ?.takeIf { it.length == 12 && it.all(Char::isDigit) }
                 ?: throw IllegalStateException("The verified Aadhaar number is unavailable.")
         } finally { conn.disconnect() }
+    }
+
+    suspend fun revealPanNumber(): String = withContext(Dispatchers.IO) {
+        val conn = connection("/PAN")
+        try {
+            JSONObject(response(conn)).optionalText("panNumber")
+                ?.takeIf { it.matches(Regex("[A-Z]{5}[0-9]{4}[A-Z]")) }
+                ?: throw IllegalStateException("The verified PAN number is unavailable.")
+        } finally { conn.disconnect() }
+    }
+
+    suspend fun scanPanQrText(qrText: String): MyDocument = withContext(Dispatchers.IO) {
+        val conn = connection("/PAN/qr-text", "POST")
+        try {
+            conn.doOutput = true
+            conn.setRequestProperty("Content-Type", "application/json; charset=utf-8")
+            conn.outputStream.bufferedWriter(Charsets.UTF_8).use { writer ->
+                writer.write(JSONObject().put("qrText", qrText).toString())
+            }
+            MyDocument.from(JSONObject(response(conn)))
+        } catch (error: IOException) {
+            throw IllegalStateException("Could not verify the PAN QR. Check your connection and try again.")
+        } catch (error: JSONException) {
+            throw IllegalStateException("The server returned an unexpected response. Please try again.")
+        } finally {
+            conn.disconnect()
+        }
     }
 
     suspend fun media(type: String, side: String): ByteArray = withContext(Dispatchers.IO) {
@@ -129,6 +184,8 @@ class MyDocumentsApi(private val context: Context) {
                 throw IllegalStateException(message)
             }
             body
+        } catch (error: IOException) {
+            throw IllegalStateException("Could not load the document image. Check your connection and try again.")
         } finally { conn.disconnect() }
     }
 
@@ -161,6 +218,10 @@ class MyDocumentsApi(private val context: Context) {
                 out.write("--$boundary--\r\n".toByteArray())
             }
             MyDocument.from(JSONObject(response(conn)))
+        } catch (error: IOException) {
+            throw IllegalStateException("Could not upload the document. Check your connection and try again.")
+        } catch (error: JSONException) {
+            throw IllegalStateException("The server returned an unexpected response. Please try again.")
         } finally {
             conn.disconnect()
             frontFile.delete()

@@ -12,6 +12,7 @@ import android.view.Gravity
 import android.view.LayoutInflater
 import android.view.View
 import android.view.ViewGroup
+import android.view.animation.DecelerateInterpolator
 import android.widget.FrameLayout
 import android.widget.ImageView
 import android.widget.ImageButton
@@ -38,6 +39,8 @@ import com.example.askvocate.util.applyStatusBarInset
 import com.google.android.material.dialog.MaterialAlertDialogBuilder
 import com.google.android.material.button.MaterialButton
 import com.google.android.material.progressindicator.LinearProgressIndicator
+import com.journeyapps.barcodescanner.ScanContract
+import com.journeyapps.barcodescanner.ScanOptions
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
@@ -66,14 +69,20 @@ class MyDocumentsFragment : Fragment() {
         get() = documentState.cameraUri
         set(value) { documentState.cameraUri = value }
     private var downloadBytes: ByteArray? = null
-    private var uploadError: String? = null
     private var aadhaarNumberVisible = false
     private var revealedAadhaarNumber: String? = null
     private var aadhaarValueView: TextView? = null
     private var aadhaarRevealButton: ImageButton? = null
+    private var panNumberVisible = false
+    private var revealedPanNumber: String? = null
+    private var panValueView: TextView? = null
+    private var panRevealButton: ImageButton? = null
     private var busy = false
     private var loadingAnimator: ValueAnimator? = null
     private var loadingStage: Job? = null
+    private var skeletonAnimator: ValueAnimator? = null
+    private var submitProgressAnimator: ValueAnimator? = null
+    private var checkStatusButton: MaterialButton? = null
 
     private val chooseImage = registerForActivityResult(ActivityResultContracts.GetContent()) { uri ->
         if (uri != null) runCatching { selectedImage(uri) }
@@ -104,6 +113,15 @@ class MyDocumentsFragment : Fragment() {
             setBusy(false)
         }
     }
+    private val liveQrScanner = registerForActivityResult(ScanContract()) { result ->
+        val contents = result.contents?.trim()
+        if (contents.isNullOrEmpty()) return@registerForActivityResult
+        if (!contents.all(Char::isDigit) || contents.length % 4 != 0) {
+            message("That QR is not the signed Enhanced PAN QR.")
+            return@registerForActivityResult
+        }
+        scanPanQrText(contents)
+    }
 
     override fun onCreateView(inflater: LayoutInflater, container: ViewGroup?, savedInstanceState: Bundle?): View {
         _binding = FragmentMyDocumentsBinding.inflate(inflater, container, false)
@@ -125,7 +143,6 @@ class MyDocumentsFragment : Fragment() {
             back = state.getString("back_uri")?.let(Uri::parse) ?: back
             cameraUri = state.getString("camera_uri")?.let(Uri::parse) ?: cameraUri
             pickingBack = state.getBoolean("picking_back", pickingBack)
-            uploadError = state.getString("upload_error")
         }
         val cached = documentState.documents
         if (cached == null) refresh(showInitialOverlay = true)
@@ -139,16 +156,17 @@ class MyDocumentsFragment : Fragment() {
         outState.putString("back_uri", back?.toString())
         outState.putString("camera_uri", cameraUri?.toString())
         outState.putBoolean("picking_back", pickingBack)
-        outState.putString("upload_error", uploadError)
     }
 
     private fun goBack() {
         if (busy) return
         if (selectedType != null) {
-            selectedType = null; selected = null; front = null; back = null; uploadError = null
+            selectedType = null; selected = null; front = null; back = null
             aadhaarNumberVisible = false; revealedAadhaarNumber = null
+            panNumberVisible = false; revealedPanNumber = null
             documentState.clearCapturedFiles()
             documentState.documents?.let(::renderList)
+            binding.documentsScroll.post { binding.documentsScroll.smoothScrollTo(0, 0) }
         } else findNavController().navigateUp()
     }
 
@@ -156,7 +174,11 @@ class MyDocumentsFragment : Fragment() {
         busy = value
         val current = _binding ?: return
         current.documentsLoadingOverlay.isVisible = value
+        current.documentsInlineProgress.isVisible = false
         if (value) {
+            stopSkeletons()
+            current.documentsProgress.isIndeterminate = true
+            current.documentsProgress.progress = 0
             current.documentsLoadingTitle.text = title
             current.documentsLoadingDetail.text = detail
             current.documentsLoadingOverlay.alpha = 0f
@@ -178,8 +200,99 @@ class MyDocumentsFragment : Fragment() {
             loadingStage = null
             loadingAnimator?.cancel()
             loadingAnimator = null
+            submitProgressAnimator?.cancel()
+            submitProgressAnimator = null
+            current.documentsProgress.isIndeterminate = true
+            current.documentsProgress.progress = 0
             current.documentsLoadingIcon.scaleX = 1f
             current.documentsLoadingIcon.scaleY = 1f
+        }
+    }
+
+    private fun renderSkeletons() {
+        stopSkeletons()
+        val content = binding.documentsContent
+        content.removeAllViews()
+        content.addView(card().apply {
+            addView(skeletonBlock(-1, 12, 8))
+            addView(skeletonBlock(-1, 20, 8, 12))
+            addView(skeletonBlock(160, 12, 8, 10))
+        }, marginParams(0))
+        content.addView(label("Your documents", 18f, R.color.navy_primary, true), marginParams(24))
+        repeat(3) {
+            val row = LinearLayout(requireContext()).apply {
+                orientation = LinearLayout.HORIZONTAL
+                gravity = Gravity.CENTER_VERTICAL
+            }
+            row.addView(skeletonBlock(48, 48, 14))
+            val lines = LinearLayout(requireContext()).apply { orientation = LinearLayout.VERTICAL }
+            lines.addView(skeletonBlock(170, 14, 6))
+            lines.addView(skeletonBlock(110, 10, 5, 8))
+            row.addView(lines, LinearLayout.LayoutParams(0, ViewGroup.LayoutParams.WRAP_CONTENT, 1f)
+                .apply { marginStart = dp(14) })
+            content.addView(card().apply { addView(row) }, marginParams(12))
+        }
+        if (ValueAnimator.areAnimatorsEnabled()) {
+            content.alpha = 0.55f
+            skeletonAnimator = ValueAnimator.ofFloat(0.45f, 0.9f).apply {
+                duration = 850
+                repeatCount = ValueAnimator.INFINITE
+                repeatMode = ValueAnimator.REVERSE
+                addUpdateListener {
+                    if (_binding != null) binding.documentsContent.alpha = it.animatedValue as Float
+                }
+                start()
+            }
+        }
+    }
+
+    private fun stopSkeletons() {
+        skeletonAnimator?.cancel()
+        skeletonAnimator = null
+        if (_binding != null) binding.documentsContent.alpha = 1f
+    }
+
+    private fun skeletonBlock(widthDp: Int, heightDp: Int, radiusDp: Int, topDp: Int = 0) =
+        View(requireContext()).apply {
+            background = GradientDrawable().apply {
+                cornerRadius = dp(radiusDp).toFloat()
+                setColor(color(R.color.doc_navy_soft))
+            }
+            layoutParams = if (widthDp > 0)
+                LinearLayout.LayoutParams(dp(widthDp), dp(heightDp)).apply { topMargin = dp(topDp) }
+            else
+                LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, dp(heightDp))
+                    .apply { topMargin = dp(topDp) }
+        }
+
+    private fun animateIn(view: View, index: Int) {
+        if (!ValueAnimator.areAnimatorsEnabled()) return
+        view.alpha = 0f
+        view.translationY = dp(10).toFloat()
+        view.animate()
+            .alpha(1f)
+            .translationY(0f)
+            .setStartDelay((index * 45L).coerceAtMost(320L))
+            .setDuration(240)
+            .start()
+    }
+
+    private fun startSubmitProgress() {
+        val bar = _binding?.documentsProgress ?: return
+        bar.isIndeterminate = false
+        bar.progress = 0
+        submitProgressAnimator?.cancel()
+        if (!ValueAnimator.areAnimatorsEnabled()) {
+            bar.progress = 45
+            return
+        }
+        submitProgressAnimator = ValueAnimator.ofInt(0, 90).apply {
+            duration = 9000
+            interpolator = DecelerateInterpolator()
+            addUpdateListener {
+                if (_binding != null) bar.progress = it.animatedValue as Int
+            }
+            start()
         }
     }
 
@@ -200,11 +313,15 @@ class MyDocumentsFragment : Fragment() {
         val type = selectedType
         if (showInitialOverlay) {
             binding.documentsContent.removeAllViews()
-            setBusy(true, "Loading documents", "Getting your latest document status…")
-        } else {
-            busy = true
-            binding.documentsRefresh.isVisible = false
-            binding.documentsRefreshProgress.isVisible = true
+            renderSkeletons()
+        }
+        busy = true
+        binding.documentsRefresh.isVisible = false
+        binding.documentsRefreshProgress.isVisible = true
+        binding.documentsInlineProgress.isVisible = true
+        checkStatusButton?.apply {
+            isEnabled = false
+            text = "Checking…"
         }
         viewLifecycleOwner.lifecycleScope.launch {
             runCatching {
@@ -219,7 +336,6 @@ class MyDocumentsFragment : Fragment() {
                         if (it.type == type) doc else it
                     }
                     if (_binding != null && selectedType == type) {
-                        uploadError = null
                         renderDetail(doc)
                         if ((doc.status == "FAILED" || doc.status == "REJECTED") &&
                             (previous?.status != doc.status || previous.note != doc.note)) {
@@ -229,25 +345,32 @@ class MyDocumentsFragment : Fragment() {
                 }
             }.onFailure {
                 if (_binding != null) {
-                    val error = it.message ?: "Could not load documents."
-                    if (showInitialOverlay && documentState.documents == null) showError(error)
-                    else message(error)
+                    if (showInitialOverlay) binding.documentsContent.removeAllViews()
+                    message(it.message ?: "Could not load documents.")
                 }
             }
             if (_binding != null) {
-                if (showInitialOverlay) setBusy(false) else {
-                    busy = false
-                    binding.documentsRefreshProgress.isVisible = false
-                    binding.documentsRefresh.isVisible = true
+                stopSkeletons()
+                busy = false
+                binding.documentsInlineProgress.isVisible = false
+                binding.documentsRefreshProgress.isVisible = false
+                binding.documentsRefresh.isVisible = true
+                checkStatusButton?.apply {
+                    isEnabled = true
+                    text = "Check verification status"
                 }
             }
         }
     }
 
     private fun renderList(docs: List<MyDocument>) {
+        stopSkeletons()
         binding.documentsContent.removeAllViews()
         aadhaarValueView = null
         aadhaarRevealButton = null
+        panValueView = null
+        panRevealButton = null
+        checkStatusButton = null
         binding.documentsTitle.text = "My Documents"
         binding.documentsSubtitle.text = "Your secure document vault"
         val verified = docs.count { it.status == "VERIFIED" }
@@ -259,7 +382,7 @@ class MyDocumentsFragment : Fragment() {
         }
         binding.documentsContent.addView(hero, marginParams(0))
         sectionTitle("Your documents", "View, upload and track verification")
-        docs.forEach { doc ->
+        docs.forEachIndexed { index, doc ->
             val row = LinearLayout(requireContext()).apply {
                 orientation = LinearLayout.HORIZONTAL
                 gravity = Gravity.CENTER_VERTICAL
@@ -286,21 +409,27 @@ class MyDocumentsFragment : Fragment() {
                 isClickable = true
                 isFocusable = true
                 setOnClickListener {
-                    selectedType = doc.type; selected = doc; front = null; back = null; uploadError = null
+                    selectedType = doc.type; selected = doc; front = null; back = null
                     aadhaarNumberVisible = false; revealedAadhaarNumber = null
+                    panNumberVisible = false; revealedPanNumber = null
                     binding.documentsScroll.scrollTo(0, 0)
                     renderDetail(doc)
                 }
             }
             binding.documentsContent.addView(item, marginParams(12))
+            animateIn(item, index)
         }
         revealContent()
     }
 
     private fun renderDetail(doc: MyDocument) {
+        stopSkeletons()
         binding.documentsContent.removeAllViews()
         aadhaarValueView = null
         aadhaarRevealButton = null
+        panValueView = null
+        panRevealButton = null
+        checkStatusButton = null
         selected = doc
         binding.documentsTitle.text = doc.title
         binding.documentsSubtitle.text = "Status, images and details"
@@ -337,7 +466,11 @@ class MyDocumentsFragment : Fragment() {
         }
         statusCard.tag = "document_status_error"
         binding.documentsContent.addView(statusCard, marginParams(0))
-        if (doc.status == "PENDING") addAction(binding.documentsContent, "Check verification status", false) { refresh() }
+        if (doc.status == "PENDING") {
+            val check = actionButton("Check verification status", false) { refresh() }
+            checkStatusButton = check
+            binding.documentsContent.addView(check, marginParams(12))
+        }
         if (doc.uploadOnly) {
             val note = card(R.color.doc_navy_soft).apply {
                 addView(label("Stored securely", 15f, R.color.navy_primary, true))
@@ -402,9 +535,14 @@ class MyDocumentsFragment : Fragment() {
                 val fullNumberAvailable = doc.aadhaarNumber?.let { number ->
                     number.length == 12 && number.all(Char::isDigit)
                 } == true
-                if (doc.type == "AADHAAR" && doc.status == "VERIFIED" && fullNumberAvailable)
-                    aadhaarNumberRow(detailCard, it)
-                else detailRow(detailCard, "Number", it)
+                val fullPanAvailable = doc.panNumber?.matches(Regex("[A-Z]{5}[0-9]{4}[A-Z]")) == true
+                when {
+                    doc.type == "AADHAAR" && doc.status == "VERIFIED" && fullNumberAvailable ->
+                        aadhaarNumberRow(detailCard, it)
+                    doc.type == "PAN" && doc.status == "VERIFIED" && fullPanAvailable ->
+                        panNumberRow(detailCard, it)
+                    else -> detailRow(detailCard, "Number", it)
+                }
             }
             displayDetails.forEach { (key, value) ->
                 if (value.isNotBlank()) detailRow(detailCard,
@@ -424,6 +562,15 @@ class MyDocumentsFragment : Fragment() {
             }, LinearLayout.LayoutParams(-1, dp(180)))
             binding.documentsContent.addView(photoCard, marginParams(12))
         }
+        if (doc.type == "PAN") {
+            sectionTitle("PAN QR", "Use this if the card text is difficult to read")
+            val qrCard = card()
+            qrCard.addView(label("Scan only the QR code", 16f, R.color.text_primary, true))
+            qrCard.addView(label("Open the live scanner and point the camera at the QR code on the PAN card.",
+                13f, R.color.text_secondary), marginParams(6, false))
+            addAction(qrCard, "Open live QR scanner", true) { launchLiveQrScanner() }
+            binding.documentsContent.addView(qrCard, marginParams(12))
+        }
         if (doc.liveCapture) {
             if (doc.status != "VERIFIED") addAction(binding.documentsContent, "Start live selfie verification", true) {
                 runCatching { startActivity(Intent(requireContext(), LiveSelfieActivity::class.java)) }
@@ -435,12 +582,6 @@ class MyDocumentsFragment : Fragment() {
         if (doc.status != "VERIFIED" && doc.status != "PENDING") {
             sectionTitle(if (doc.uploadOnly) "Upload image" else "Upload and verify",
                 "Use a clear, well-lit photo with every corner visible")
-            uploadError?.let { error ->
-                val errorCard = errorCard("Check document photos", error).apply {
-                    tag = "document_upload_error"
-                }
-                binding.documentsContent.addView(errorCard, marginParams(12))
-            }
             val uploadCard = card()
             uploadCard.addView(label("Document photos", 16f, R.color.text_primary, true))
             uploadCard.addView(label(getString(R.string.document_upload_limits), 13f,
@@ -454,8 +595,8 @@ class MyDocumentsFragment : Fragment() {
             }
             addAction(uploadCard, if (doc.uploadOnly) "Upload document" else "Submit for verification", true) {
                 val first = front
-                if (first == null) { showUploadError(doc, "Choose the front image first."); return@addAction }
-                if (doc.requiresBack && back == null) { showUploadError(doc, "Choose the back image too."); return@addAction }
+                if (first == null) { message("Choose the front image first."); return@addAction }
+                if (doc.requiresBack && back == null) { message("Choose the back image too."); return@addAction }
                 submit(doc.type, first, back)
             }
             binding.documentsContent.addView(uploadCard, marginParams(12))
@@ -557,6 +698,7 @@ class MyDocumentsFragment : Fragment() {
                     renderDetail(selected ?: return@setOnClickListener)
                 } else {
                     isEnabled = false
+                    setBusy(true, "Revealing Aadhaar number", "Fetching your verified number…")
                     viewLifecycleOwner.lifecycleScope.launch {
                         runCatching { api.revealAadhaarNumber() }
                             .onSuccess { number ->
@@ -566,6 +708,7 @@ class MyDocumentsFragment : Fragment() {
                                     aadhaarNumberVisible = true
                                     renderDetail(selected ?: return@onSuccess)
                                 }
+                                if (_binding != null) setBusy(false)
                             }
                             .onFailure {
                                 isEnabled = true
@@ -573,12 +716,74 @@ class MyDocumentsFragment : Fragment() {
                                     viewLifecycleOwner.lifecycle.currentState.isAtLeast(Lifecycle.State.STARTED)) {
                                     message(it.message ?: "Could not reveal Aadhaar number.")
                                 }
+                                if (_binding != null) setBusy(false)
                             }
                     }
                 }
             }
         }
         aadhaarRevealButton = revealButton
+        row.addView(revealButton, LinearLayout.LayoutParams(dp(44), dp(44)))
+        container.addView(row, marginParams(12))
+    }
+
+    private fun panNumberRow(container: LinearLayout, maskedNumber: String) {
+        val row = LinearLayout(requireContext()).apply {
+            orientation = LinearLayout.HORIZONTAL
+            gravity = Gravity.CENTER_VERTICAL
+        }
+        val value = if (panNumberVisible) revealedPanNumber ?: maskedNumber else maskedNumber
+        val valueView = label(value, 14f, R.color.text_primary)
+        panValueView = valueView
+        row.addView(LinearLayout(requireContext()).apply {
+            orientation = LinearLayout.VERTICAL
+            addView(label("PAN number", 12f, R.color.text_secondary, true))
+            addView(valueView, marginParams(3, false))
+        }, LinearLayout.LayoutParams(0, ViewGroup.LayoutParams.WRAP_CONTENT, 1f))
+        val revealButton = ImageButton(requireContext()).apply {
+            setImageResource(if (panNumberVisible) R.drawable.ic_visibility_off else R.drawable.ic_visibility)
+            imageTintList = ColorStateList.valueOf(color(R.color.navy_primary))
+            background = GradientDrawable().apply {
+                shape = GradientDrawable.OVAL
+                setColor(color(R.color.doc_navy_soft))
+            }
+            contentDescription = if (panNumberVisible) "Hide PAN number" else "Show PAN number"
+            setPadding(dp(10), dp(10), dp(10), dp(10))
+            setOnClickListener {
+                if (panNumberVisible) {
+                    panNumberVisible = false
+                    revealedPanNumber = null
+                    renderDetail(selected ?: return@setOnClickListener)
+                } else if (revealedPanNumber != null) {
+                    panNumberVisible = true
+                    renderDetail(selected ?: return@setOnClickListener)
+                } else {
+                    isEnabled = false
+                    setBusy(true, "Revealing PAN number", "Fetching your verified PAN…")
+                    viewLifecycleOwner.lifecycleScope.launch {
+                        runCatching { api.revealPanNumber() }
+                            .onSuccess { number ->
+                                if (_binding != null && selectedType == "PAN" &&
+                                    viewLifecycleOwner.lifecycle.currentState.isAtLeast(Lifecycle.State.STARTED)) {
+                                    revealedPanNumber = number
+                                    panNumberVisible = true
+                                    renderDetail(selected ?: return@onSuccess)
+                                }
+                                if (_binding != null) setBusy(false)
+                            }
+                            .onFailure {
+                                isEnabled = true
+                                if (_binding != null &&
+                                    viewLifecycleOwner.lifecycle.currentState.isAtLeast(Lifecycle.State.STARTED)) {
+                                    message(it.message ?: "Could not reveal PAN number.")
+                                }
+                                if (_binding != null) setBusy(false)
+                            }
+                    }
+                }
+            }
+        }
+        panRevealButton = revealButton
         row.addView(revealButton, LinearLayout.LayoutParams(dp(44), dp(44)))
         container.addView(row, marginParams(12))
     }
@@ -645,8 +850,56 @@ class MyDocumentsFragment : Fragment() {
         takePhoto.launch(cameraUri!!)
     }
 
+    private fun launchLiveQrScanner() {
+        val options = ScanOptions()
+            .setDesiredBarcodeFormats(ScanOptions.QR_CODE)
+            .setPrompt("Align the PAN QR inside the frame")
+            .setBeepEnabled(false)
+            .setOrientationLocked(true)
+            .setBarcodeImageEnabled(false)
+            .setCaptureActivity(PortraitCaptureActivity::class.java)
+        liveQrScanner.launch(options)
+    }
+
+    private fun scanPanQrText(qrText: String) {
+        setBusy(true, "Verifying PAN QR", "Decoding the signed PAN QR…")
+        viewLifecycleOwner.lifecycleScope.launch {
+            var scannedDoc: MyDocument? = null
+            val scanError = runCatching { api.scanPanQrText(qrText) }
+                .onSuccess { scannedDoc = it }
+                .exceptionOrNull()?.message
+            // The backend may already have saved the QR data even if the scan response
+            // failed. Re-read the authoritative detail so the UI never stays stale.
+            runCatching { api.detail("PAN") }
+                .onSuccess { doc -> applyPanDocument(doc) }
+                .onFailure {
+                    val fallback = scannedDoc
+                    if (fallback != null) applyPanDocument(fallback)
+                    else if (_binding != null) {
+                        message(scanError ?: it.message ?: "Could not verify the PAN QR.")
+                    }
+                }
+            if (_binding != null) setBusy(false)
+        }
+    }
+
+    private fun applyPanDocument(doc: MyDocument) {
+        documentState.documents = documentState.documents?.map {
+            if (it.type == "PAN") doc else it
+        }
+        selectedType = "PAN"
+        selected = doc
+        front = null
+        back = null
+        if (_binding == null) return
+        renderDetail(doc)
+        when (doc.status) {
+            "VERIFIED" -> message("PAN verified successfully.", ToastType.SUCCESS)
+            "FAILED", "REJECTED" -> scrollToStatusError()
+        }
+    }
+
     private fun selectedImage(uri: Uri) {
-        uploadError = null
         if (pickingBack) back = uri else front = uri
         selected?.let(::renderSelection)
     }
@@ -655,15 +908,9 @@ class MyDocumentsFragment : Fragment() {
         renderDetail(doc)
     }
 
-    private fun showUploadError(doc: MyDocument, error: String) {
-        uploadError = error
-        renderDetail(doc)
-        scrollToTaggedError("document_upload_error")
-    }
-
     private fun submit(type: String, first: Uri, second: Uri?) {
-        uploadError = null
         setBusy(true, "Submitting document", "Preparing your image for secure upload…")
+        startSubmitProgress()
         loadingStage = viewLifecycleOwner.lifecycleScope.launch {
             delay(1300)
             if (busy && _binding != null)
@@ -675,14 +922,12 @@ class MyDocumentsFragment : Fragment() {
         viewLifecycleOwner.lifecycleScope.launch {
             runCatching { api.upload(type, first, second) }
                 .onSuccess {
-                    uploadError = null
                     documentState.documents = documentState.documents?.map { existing ->
                         if (existing.type == type) it else existing
                     }
                     front = null; back = null; documentState.clearCapturedFiles(); renderDetail(it)
                     if (it.status == "FAILED" || it.status == "REJECTED") {
                         scrollToStatusError()
-                        message(it.note ?: "Verification failed. Check the image and try again.", showInline = false)
                     } else if (it.status == "VERIFIED") {
                         message("${it.title} verified successfully.", ToastType.SUCCESS)
                     } else if (it.uploadOnly) {
@@ -690,11 +935,7 @@ class MyDocumentsFragment : Fragment() {
                     }
                 }
                 .onFailure {
-                    uploadError = it.message ?: "Upload failed. Please try again."
-                    if (_binding != null) selected?.let {
-                        renderDetail(it)
-                        scrollToTaggedError("document_upload_error")
-                    }
+                    if (_binding != null) message(it.message ?: "Upload failed. Please try again.")
                 }
             setBusy(false)
         }
@@ -734,25 +975,6 @@ class MyDocumentsFragment : Fragment() {
         }
     }
 
-    private fun renderError(text: String) {
-        binding.documentsContent.removeAllViews()
-        val errorCard = errorCard("Something went wrong", text)
-        binding.documentsContent.addView(errorCard, marginParams(0))
-        addAction(binding.documentsContent, "Try again", true) { refresh() }
-        scrollToError(errorCard)
-    }
-
-    private fun showError(text: String) {
-        if (_binding == null) return
-        renderError(text)
-        Toast.makeText(requireContext(), text, Toast.LENGTH_LONG, ToastType.ERROR).show()
-    }
-
-    private fun errorCard(title: String, text: String) = card(R.color.doc_error_soft).apply {
-        addView(label(title, 16f, R.color.error_red, true))
-        addView(label(text, 14f, R.color.text_primary), marginParams(6, false))
-    }
-
     private fun scrollToError(target: View) {
         binding.documentsScroll.post {
             if (_binding != null && target.parent != null) {
@@ -767,22 +989,12 @@ class MyDocumentsFragment : Fragment() {
 
     private fun scrollToStatusError() = scrollToTaggedError("document_status_error")
 
-    private fun showInlineError(text: String) {
-        val current = _binding ?: return
-        val content = current.documentsContent
-        content.findViewWithTag<View>("document_error")?.let(content::removeView)
-        val errorCard = errorCard("Something went wrong", text).apply { tag = "document_error" }
-        content.addView(errorCard, 0, marginParams(0).apply { bottomMargin = dp(14) })
-        scrollToError(errorCard)
-    }
-
     private fun marginParams(top: Int, fullWidth: Boolean = true) = LinearLayout.LayoutParams(
         if (fullWidth) ViewGroup.LayoutParams.MATCH_PARENT else ViewGroup.LayoutParams.WRAP_CONTENT,
         ViewGroup.LayoutParams.WRAP_CONTENT
     ).apply { topMargin = (top * resources.displayMetrics.density).toInt() }
 
-    private fun message(text: String, type: ToastType = ToastType.ERROR, showInline: Boolean = true) {
-        if (type == ToastType.ERROR && showInline) showInlineError(text)
+    private fun message(text: String, type: ToastType = ToastType.ERROR) {
         if (isAdded) Toast.makeText(requireContext(), text, Toast.LENGTH_LONG, type).show()
     }
 
@@ -795,16 +1007,28 @@ class MyDocumentsFragment : Fragment() {
             setImageResource(R.drawable.ic_visibility)
             contentDescription = "Show Aadhaar number"
         }
+        panNumberVisible = false
+        revealedPanNumber = null
+        selected?.maskedNumber?.let { panValueView?.text = it }
+        panRevealButton?.apply {
+            isEnabled = true
+            setImageResource(R.drawable.ic_visibility)
+            contentDescription = "Show PAN number"
+        }
         super.onStop()
     }
 
     override fun onDestroyView() {
         loadingStage?.cancel()
         loadingAnimator?.cancel()
+        skeletonAnimator?.cancel()
+        submitProgressAnimator?.cancel()
         super.onDestroyView()
         _binding = null
         aadhaarValueView = null
         aadhaarRevealButton = null
+        panValueView = null
+        panRevealButton = null
     }
 }
 

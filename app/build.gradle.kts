@@ -121,6 +121,9 @@ dependencies {
     implementation(libs.androidx.camera.lifecycle)
     implementation(libs.androidx.camera.view)
 
+    // Live QR scanner
+    implementation("com.journeyapps:zxing-android-embedded:4.3.0")
+
     // Testing
     testImplementation(libs.junit)
     androidTestImplementation(libs.androidx.junit)

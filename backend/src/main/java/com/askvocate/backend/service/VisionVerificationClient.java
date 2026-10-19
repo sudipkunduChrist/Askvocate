@@ -59,6 +59,34 @@ public class VisionVerificationClient {
         return message.length() > 240 ? message.substring(0, 240) : message;
     }
 
+    public PanQrResult verifyPanQr(byte[] image) {
+        try {
+            Map<String, Object> request = new LinkedHashMap<>();
+            request.put("operation", "panQr");
+            request.put("imageBase64", Base64.getEncoder().encodeToString(image));
+            PanQrResult result = mapper.readValue(invoke(request), PanQrResult.class);
+            return result != null ? result : PanQrResult.unavailable("PAN QR verifier returned no result.");
+        } catch (Exception error) {
+            log.warn("Backend PAN QR verification unavailable: {}: {}",
+                    error.getClass().getSimpleName(), error.getMessage());
+            return PanQrResult.unavailable("PAN QR verification failed: " + safeErrorMessage(error));
+        }
+    }
+
+    public PanQrResult verifyPanQrText(String qrText) {
+        try {
+            Map<String, Object> request = new LinkedHashMap<>();
+            request.put("operation", "panQrText");
+            request.put("qrText", qrText);
+            PanQrResult result = mapper.readValue(invoke(request), PanQrResult.class);
+            return result != null ? result : PanQrResult.unavailable("PAN QR verifier returned no result.");
+        } catch (Exception error) {
+            log.warn("Backend PAN QR text verification unavailable: {}: {}",
+                    error.getClass().getSimpleName(), error.getMessage());
+            return PanQrResult.unavailable("PAN QR verification failed: " + safeErrorMessage(error));
+        }
+    }
+
     public Map<String, Object> localOcr(byte[] image) {
         return localOcr(image, "");
     }
@@ -242,6 +270,14 @@ public class VisionVerificationClient {
             return Boolean.TRUE.equals(verified) && Boolean.FALSE.equals(printedMismatch)
                     && data != null && Boolean.TRUE.equals(photoAvailable)
                     && mismatchFields != null && mismatchFields.isEmpty();
+        }
+    }
+
+    public record PanQrResult(Boolean verified, Map<String, String> data, Boolean photoAvailable,
+                              String photoBase64, Integer version, Boolean signatureVerified,
+                              String rawText, String reason) {
+        public static PanQrResult unavailable(String reason) {
+            return new PanQrResult(false, null, false, null, null, false, null, reason);
         }
     }
 

@@ -49,11 +49,6 @@ public class UserDocument {
     @Setter
     private Map<String, String> extractedData = new HashMap<>();
 
-    /** Raw OCR output from Aadhaar/PAN images, retained for extraction review. */
-    @Setter
-    @JsonIgnore
-    private Map<String, String> ocrText = new HashMap<>();
-
     /**
      * Masked document number for display purposes.
      * 
@@ -82,6 +77,23 @@ public class UserDocument {
     @JsonIgnore
     @Indexed
     private String panNumberHash;
+
+    /** Signed PII decoded from the PAN Enhanced Secure QR. */
+    @Setter
+    @JsonIgnore
+    private Map<String, String> panQrData;
+    @Setter
+    @JsonIgnore
+    private String panQrRawText;
+    @Setter
+    private Boolean isPanQrVerified;
+    @Setter
+    private String panQrPhotoUrl;
+    @Setter
+    @JsonIgnore
+    private String panQrPhotoPublicId;
+    @Setter
+    private Integer panQrVersion;
 
     /** PAN fields that did not match the signed Aadhaar QR (e.g. {@code name}, {@code dob}). */
     @Setter
@@ -189,10 +201,6 @@ public class UserDocument {
         return extractedData;
     }
 
-    public Map<String, String> getOcrText() {
-        return ocrText;
-    }
-
     public String getMaskedDocumentNumber() {
         return maskedDocumentNumber;
     }
@@ -208,6 +216,12 @@ public class UserDocument {
     }
 
     public String getPanNumberHash() { return panNumberHash; }
+    public Map<String, String> getPanQrData() { return panQrData; }
+    public String getPanQrRawText() { return panQrRawText; }
+    public Boolean getIsPanQrVerified() { return isPanQrVerified; }
+    public String getPanQrPhotoUrl() { return panQrPhotoUrl; }
+    public String getPanQrPhotoPublicId() { return panQrPhotoPublicId; }
+    public Integer getPanQrVersion() { return panQrVersion; }
     public List<String> getCrossDocumentMismatchFields() { return crossDocumentMismatchFields; }
     public String getReviewedBy() { return reviewedBy; }
     public Instant getReviewedAt() { return reviewedAt; }

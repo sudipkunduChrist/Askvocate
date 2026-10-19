@@ -10,6 +10,7 @@ from dataclasses import dataclass
 from datetime import datetime, timezone
 from io import BytesIO
 from pathlib import Path
+import base64
 import os
 import re
 import unicodedata
@@ -20,7 +21,8 @@ import numpy as np
 from cryptography import x509
 from cryptography.exceptions import InvalidSignature
 from cryptography.hazmat.primitives import hashes
-from cryptography.hazmat.primitives.asymmetric import padding
+from cryptography.hazmat.primitives.asymmetric import ec, padding
+from cryptography.hazmat.primitives.asymmetric.utils import encode_dss_signature
 from PIL import Image
 import pytesseract
 from pytesseract import Output
@@ -37,6 +39,70 @@ FACE_THRESHOLD = 0.363  # OpenCV Zoo SFace cosine baseline; calibrate on real QR
 MAX_IMAGE_BYTES = 10 * 1024 * 1024
 MAX_QR_BYTES = 128 * 1024
 TESSDATA = ROOT / "tessdata"
+
+
+def _card_crop(image):
+    """Find the largest card-shaped quadrilateral and perspective-warp it."""
+    gray = cv2.cvtColor(image, cv2.COLOR_BGR2GRAY)
+    blur = cv2.GaussianBlur(gray, (5, 5), 0)
+    edges = cv2.Canny(blur, 50, 150)
+    contours, _ = cv2.findContours(edges, cv2.RETR_LIST, cv2.CHAIN_APPROX_SIMPLE)
+    height, width = gray.shape
+    best = None
+    best_area = 0.0
+    for contour in contours:
+        perimeter = cv2.arcLength(contour, True)
+        approx = cv2.approxPolyDP(contour, 0.02 * perimeter, True)
+        if len(approx) != 4:
+            continue
+        area = cv2.contourArea(approx)
+        if area < 0.15 * width * height:
+            continue
+        rect = cv2.minAreaRect(approx)
+        rw, rh = rect[1]
+        if rw == 0 or rh == 0:
+            continue
+        ratio = max(rw, rh) / min(rw, rh)
+        if not 1.3 <= ratio <= 1.9:
+            continue
+        if area > best_area:
+            best_area = area
+            best = approx
+    if best is None:
+        return None
+    points = best.reshape(4, 2).astype("float32")
+    sums = points.sum(axis=1)
+    diffs = np.diff(points, axis=1).reshape(-1)
+    ordered = np.array([
+        points[np.argmin(sums)],
+        points[np.argmin(diffs)],
+        points[np.argmax(sums)],
+        points[np.argmax(diffs)],
+    ], dtype="float32")
+    target = np.array([[0, 0], [1400, 0], [1400, 882], [0, 882]], dtype="float32")
+    matrix = cv2.getPerspectiveTransform(ordered, target)
+    return cv2.warpPerspective(image, matrix, (1400, 882))
+
+
+def _confident_text(data: dict, threshold: float = 30.0) -> str:
+    """Rebuild text from word-level results, dropping low-confidence garbage."""
+    required = ("text", "conf", "block_num", "par_num", "line_num")
+    if not all(key in data for key in required):
+        return ""
+    lines: dict[tuple[int, int, int], list[str]] = {}
+    for index, word in enumerate(data["text"]):
+        word = (word or "").strip()
+        if not word:
+            continue
+        try:
+            confidence = float(data["conf"][index])
+        except (TypeError, ValueError):
+            continue
+        if confidence < threshold:
+            continue
+        key = (data["block_num"][index], data["par_num"][index], data["line_num"][index])
+        lines.setdefault(key, []).append(word)
+    return "\n".join(" ".join(words) for _, words in sorted(lines.items()))
 
 
 def local_ocr(image_bytes: bytes, side: str = "") -> dict:
@@ -61,6 +127,7 @@ def local_ocr(image_bytes: bytes, side: str = "") -> dict:
                 enhanced = cv2.resize(enhanced, None, fx=scale, fy=scale,
                                       interpolation=cv2.INTER_CUBIC)
             for config in (("--psm 6", "--psm 4", "--psm 11") if side == "back"
+                           else ("--psm 6", "--psm 4", "--psm 11") if side == "pan"
                            else ("--psm 6", "--psm 11")):
                 try:
                     candidates.append((enhanced, config,
@@ -68,8 +135,43 @@ def local_ocr(image_bytes: bytes, side: str = "") -> dict:
                                                                    config=config, timeout=10)))
                 except (pytesseract.TesseractError, RuntimeError):
                     pass
+            if side == "pan":
+                try:
+                    threshold = cv2.adaptiveThreshold(
+                        gray, 255, cv2.ADAPTIVE_THRESH_GAUSSIAN_C, cv2.THRESH_BINARY, 31, 15)
+                    candidates.append((threshold, "--psm 6",
+                                       pytesseract.image_to_string(threshold, lang="eng",
+                                                                   config="--psm 6", timeout=10)))
+                except (pytesseract.TesseractError, RuntimeError):
+                    pass
+                cropped = _card_crop(image)
+                if cropped is not None:
+                    cropped_gray = cv2.cvtColor(cropped, cv2.COLOR_BGR2GRAY)
+                    cropped_enhanced = cv2.createCLAHE(clipLimit=2.0, tileGridSize=(8, 8)).apply(cropped_gray)
+                    try:
+                        candidates.append((cropped_enhanced, "--psm 6",
+                                           pytesseract.image_to_string(cropped_enhanced, lang="eng",
+                                                                       config="--psm 6", timeout=10)))
+                    except (pytesseract.TesseractError, RuntimeError):
+                        pass
         rank = (_address_read_quality if side == "back" else _front_read_quality if side == "front"
                 else _pan_read_quality if side == "pan" else _general_read_quality)
+        if side == "pan" and max(rank(entry[2]) for entry in candidates) < 40:
+            # Poor first read: try polarity, global threshold, rotation, and upscaling.
+            extras = [cv2.bitwise_not(enhanced)]
+            _, otsu = cv2.threshold(gray, 0, 255, cv2.THRESH_BINARY + cv2.THRESH_OTSU)
+            extras.append(otsu)
+            for code in (cv2.ROTATE_90_CLOCKWISE, cv2.ROTATE_180, cv2.ROTATE_90_COUNTERCLOCKWISE):
+                extras.append(cv2.rotate(enhanced, code))
+            if enhanced.shape[1] < 2400:
+                extras.append(cv2.resize(enhanced, None, fx=2, fy=2, interpolation=cv2.INTER_CUBIC))
+            for extra in extras:
+                try:
+                    candidates.append((extra, "--psm 6",
+                                       pytesseract.image_to_string(extra, lang="eng",
+                                                                   config="--psm 6", timeout=10)))
+                except (pytesseract.TesseractError, RuntimeError):
+                    pass
         selected_image, selected_config, text = max(candidates, key=lambda entry: rank(entry[2]))
         data = pytesseract.image_to_data(selected_image, lang="eng", config=selected_config,
                                          output_type=Output.DICT, timeout=10)
@@ -77,7 +179,15 @@ def local_ocr(image_bytes: bytes, side: str = "") -> dict:
         raise VerificationError("Local Tesseract OCR is unavailable.") from exc
     confidences = [float(value) for value in data["conf"] if float(value) >= 0]
     confidence = sum(confidences) / len(confidences) / 100 if confidences else 0.0
-    return {"ocrText": text, "confidence": round(confidence, 4)}
+    candidate_texts = []
+    for _, _, candidate in sorted(candidates, key=lambda entry: rank(entry[2]), reverse=True)[:6]:
+        candidate = candidate.strip()
+        if candidate and candidate not in candidate_texts:
+            candidate_texts.append(candidate)
+    filtered = _confident_text(data)
+    if filtered and filtered not in candidate_texts:
+        candidate_texts.append(filtered)
+    return {"ocrText": text, "candidates": candidate_texts, "confidence": round(confidence, 4)}
 
 
 def _general_read_quality(text: str) -> float:
@@ -116,17 +226,26 @@ def _front_read_quality(text: str) -> float:
     return score
 
 
+_PAN_DOB_LABEL = re.compile(
+    r"\b(?:D[.\s]?[O0][.\s]?B\.?|Date\s*of\s*B[i1l]rth|Birth\s*Date)\b", re.I)
+_PAN_DOB_VALUE = re.compile(
+    r"\b(?:D[.\s]?[O0][.\s]?B\.?|Date\s*of\s*B[i1l]rth|Birth\s*Date)\b\s*[:/-]?\s*"
+    r"\d{1,2}\s*[/.-]\s*\d{1,2}\s*[/.-]\s*\d{4}", re.I)
+
+
 def _pan_read_quality(text: str) -> float:
-    """Prefer the English OCR pass with a PAN number and labeled identity rows."""
+    """Prefer the English OCR pass with a PAN number and all labeled identity rows."""
     score = _general_read_quality(text) * 0.1
     if re.search(r"\b[A-Z]{5}[\s-]*\d{4}[\s-]*[A-Z]\b", text, re.I):
         score += 30
     if re.search(r"(?im)^\s*Name\s*[:/-]?\s*[A-Za-z]{2,}", text):
-        score += 10
+        score += 15
     if re.search(r"(?im)^\s*Father'?s?\s+Name\s*[:/-]?\s*[A-Za-z]{2,}", text):
-        score += 10
-    if re.search(r"\b(?:DOB|Date\s*of\s*Birth)\s*[:/-]?\s*\d{1,2}[/.-]\d{1,2}[/.-]\d{4}\b", text, re.I):
-        score += 10
+        score += 15
+    if _PAN_DOB_VALUE.search(text):
+        score += 25
+    elif _PAN_DOB_LABEL.search(text):
+        score += 5
     lines = text.splitlines()
     pan_line = next((i for i, line in enumerate(lines)
                      if re.search(r"\b[A-Z]{5}[\s-]*\d{4}[\s-]*[A-Z]\b", line, re.I)), -1)
@@ -369,6 +488,278 @@ def verify_qr_payload(decimal_text: str, certificates: tuple[Path, ...] = CERTIF
 
 def decode_signed_qr(image_bytes: bytes) -> SignedQr:
     return verify_qr_payload(read_qr_text(image_bytes))
+
+
+# ── PAN Enhanced 2.0 Secure QR ───────────────────────────────────────
+# Reference: incometax-pan-qr (MIT/Apache-2.0), which documents the wire
+# format: a numeric QR string -> 13-bit chunks -> zlib PII/WebP image
+# blobs -> P-384/SHA-384 ECDSA signature.
+
+PAN_ECC_KEY_1 = "AwEAA0VDQ1UAAAABAAwxLjMuMTMyLjAuMzQAYwRhBI1vbBVnA1KE/T1UpdQYzG6LLot++cuCP5DdEdeKtedw5G8RKAhU0KbNXVUwym8CSwUyzdAPC98DAgvkJGOZA/x+cnJOWhVvYTqJvy+IlcOgjSe9kqs0O7zEBy26UmvlIw=="
+PAN_ECC_KEY_2 = "AwEAA0VDQ1UAAAABAAwxLjMuMTMyLjAuMzQAYwRhBJ+fsFQNaIohp5JnCmGArWA5i25WAKHqFYnOEpRYsVmxK/O2W7iIy2T9x3vkZHaZm661w93VNc/99coCSzL92c1x9y5zxQPJCUztH2kT/EwGphLgvKKe2tK/rKMjNDMpSA=="
+PAN_VERSION_KEY_1 = {0x1E, 0x20}
+PAN_VERSION_KEY_2 = {0x1F, 0x21}
+PAN_WHITELISTED_VERSIONS = {0x9990, 0x998F, 0x1E, 0x20, 0x998E, 0x998D, 0x1F, 0x21}
+PAN_SCBLOB_PII = 0x0302
+PAN_SCBLOB_IMAGE = 0x0102
+PAN_STRUCTURE = re.compile(r"^[A-Z]{3}[PCHFATBLJG][A-Z][0-9]{4}[A-Z]$")
+
+
+@dataclass(frozen=True)
+class PanQr:
+    data: dict[str, str]
+    photo: bytes | None
+    version: int
+    signature_verified: bool
+    raw_text: str
+
+
+class _PanCursor:
+    def __init__(self, data: bytes):
+        self.data = data
+        self.pos = 0
+
+    def take(self, count: int) -> bytes:
+        if self.pos + count > len(self.data):
+            raise VerificationError("PAN Secure QR payload is incomplete.")
+        value = self.data[self.pos:self.pos + count]
+        self.pos += count
+        return value
+
+    def u8(self) -> int:
+        return self.take(1)[0]
+
+    def u16(self) -> int:
+        return int.from_bytes(self.take(2), "big")
+
+    def u32(self) -> int:
+        return int.from_bytes(self.take(4), "big")
+
+
+def read_pan_qr_text(image_bytes: bytes) -> str:
+    image = _image(image_bytes)
+
+    def usable(text: str) -> bool:
+        text = text.strip()
+        return bool(text) and text.isascii() and text.isdecimal() and len(text) % 4 == 0
+
+    variants = [image]
+    gray = cv2.cvtColor(image, cv2.COLOR_BGR2GRAY)
+    variants.append(gray)
+    _, otsu = cv2.threshold(gray, 0, 255, cv2.THRESH_BINARY + cv2.THRESH_OTSU)
+    variants.append(otsu)
+    variants.append(cv2.bitwise_not(gray))
+    if image.shape[1] < 2200:
+        variants.append(cv2.resize(image, None, fx=2, fy=2, interpolation=cv2.INTER_CUBIC))
+    if image.shape[1] > 600:
+        variants.append(cv2.resize(image, None, fx=0.5, fy=0.5, interpolation=cv2.INTER_AREA))
+
+    other_text = None
+    try:
+        import zxingcpp
+        for variant in variants:
+            try:
+                for barcode in zxingcpp.read_barcodes(variant):
+                    text = (barcode.text or "").strip()
+                    if usable(text):
+                        return text
+                    if text:
+                        other_text = other_text or text
+            except Exception:
+                continue
+        for variant in variants[:2]:
+            try:
+                for barcode in zxingcpp.read_barcodes(variant, is_pure=True):
+                    text = (barcode.text or "").strip()
+                    if usable(text):
+                        return text
+                    if text:
+                        other_text = other_text or text
+            except Exception:
+                continue
+    except ImportError:
+        pass
+
+    detector = cv2.QRCodeDetector()
+    for variant in variants:
+        try:
+            text, _, _ = detector.detectAndDecode(variant)
+        except Exception:
+            continue
+        text = (text or "").strip()
+        if usable(text):
+            return text
+        if text:
+            other_text = other_text or text
+    if other_text:
+        raise VerificationError("Scanned QR is not the signed Enhanced PAN QR.")
+    raise VerificationError("No readable PAN Secure QR code was found.")
+
+
+def _pan_unpack(scanned: str) -> bytes:
+    if not scanned or len(scanned) % 4 or not scanned.isascii() or not scanned.isdecimal():
+        raise VerificationError("Invalid PAN Secure QR payload.")
+    output = bytearray()
+    carry = 0
+    carry_bits = 0
+    for index in range(0, len(scanned), 4):
+        chunk = int(scanned[index:index + 4])
+        if chunk > 8191:
+            raise VerificationError("Invalid PAN Secure QR chunk.")
+        value = chunk & 0x1FFF
+        remaining = 13
+        if carry_bits > 0 and carry_bits + remaining >= 8:
+            combined = (carry | (value << carry_bits)) & 0xFF
+            carry = combined
+            value >>= 8 - carry_bits
+            remaining -= 8 - carry_bits
+            output.append(combined)
+            carry = 0
+            carry_bits = 0
+        while remaining // 8 > 0:
+            output.append(value & 0xFF)
+            value >>= 8
+            remaining -= 8
+        if remaining > 0:
+            carry = ((value << carry_bits) | carry) & 0xFF
+            carry_bits += remaining
+    return bytes(output)
+
+
+def _pan_block(cursor: _PanCursor) -> tuple[int, bytes]:
+    metadata = cursor.u8()
+    control_type = (((metadata >> 0) & 1) << 2) | (((metadata >> 1) & 1) << 1) | ((metadata >> 2) & 1)
+    exceed_length = bool((metadata >> 3) & 1)
+    length = cursor.u16() if exceed_length else cursor.u8()
+    return control_type, cursor.take(length)
+
+
+def _pan_outer(unpacked: bytes) -> tuple[int, list[tuple[int, bytes]], bytes, bytes]:
+    cursor = _PanCursor(unpacked)
+    cursor.u8()  # code_type
+    cursor.u8()  # reserved_0
+    version = cursor.u32()  # reserved_1
+    cursor.u8()  # reserved_2
+    reserved_3 = cursor.u16()
+    if version not in PAN_WHITELISTED_VERSIONS or reserved_3 > 6:
+        raise VerificationError("Unsupported PAN Secure QR version.")
+    blocks = []
+    for _ in range(cursor.u8()):
+        blocks.append(_pan_block(cursor))
+    for _ in range(cursor.u8()):
+        blocks.append(_pan_block(cursor))
+    message = unpacked[:cursor.pos]
+    if cursor.u8() != 1:
+        raise VerificationError("Invalid PAN Secure QR signature header.")
+    cursor.u8()  # signature_scheme
+    cursor.take(2)  # padding
+    signature = cursor.take(cursor.u16())
+    if any(cursor.data[cursor.pos:]):
+        raise VerificationError("Invalid PAN Secure QR trailing data.")
+    return version, blocks, message, signature
+
+
+def _pan_inflate(payload: bytes) -> bytes:
+    try:
+        stream = zlib.decompressobj()
+        inflated = stream.decompress(payload, MAX_QR_BYTES + 1)
+        if len(inflated) > MAX_QR_BYTES or not stream.eof or stream.unused_data:
+            raise VerificationError("PAN Secure QR PII is incomplete or too large.")
+        return inflated
+    except zlib.error as exc:
+        raise VerificationError("PAN Secure QR PII is not valid zlib data.") from exc
+
+
+def _pan_pii(data: bytes) -> dict[str, str]:
+    payloads: list[str] = []
+    index = 0
+    while index + 2 < len(data):
+        if data[index] == 0x08 and data[index + 1] == 0x02:
+            length = data[index + 2]
+            start = index + 3
+            end = start + length
+            if end > len(data):
+                raise VerificationError("PAN Secure QR PII is incomplete.")
+            payloads.append(data[start:end].decode("utf-8", "replace"))
+            index = end
+        else:
+            index += 1
+    if len(payloads) >= 4:
+        pan, name, father, dob = (value.strip() for value in payloads[:4])
+        return {
+            "pan": pan, "name": name, "fatherName": father, "dob": dob,
+            "panType": "Individual", "panValid": "true" if PAN_STRUCTURE.fullmatch(pan.upper()) else "false",
+        }
+    if len(payloads) == 3:
+        pan, name, incorporation = (value.strip() for value in payloads)
+        return {
+            "pan": pan, "name": name, "dateOfIncorporation": incorporation,
+            "panType": "Organization", "panValid": "true" if PAN_STRUCTURE.fullmatch(pan.upper()) else "false",
+        }
+    raise VerificationError("PAN Secure QR PII is incomplete.")
+
+
+def _pan_photo(data: bytes) -> bytes | None:
+    if len(data) < 16:
+        return None
+    fixed = b"RIFF" + data[2:6] + b"WEBP" + b"VP8 " + data[16:]
+    try:
+        with Image.open(BytesIO(fixed)) as image:
+            image.load()
+            converted = BytesIO()
+            image.convert("RGB").save(converted, format="JPEG", quality=90)
+            return converted.getvalue()
+    except Exception:
+        return None
+
+
+def _pan_verify(version: int, message: bytes, signature: bytes) -> bool:
+    key_b64 = PAN_ECC_KEY_1 if version in PAN_VERSION_KEY_1 else (
+        PAN_ECC_KEY_2 if version in PAN_VERSION_KEY_2 else None)
+    if not key_b64 or len(signature) != 96:
+        return False
+    try:
+        key_data = base64.b64decode(key_b64)
+        cursor = _PanCursor(key_data)
+        if cursor.take(2) != b"\x03\x01":
+            return False
+        cursor.take(2)
+        if cursor.take(3) != b"ECC":
+            return False
+        cursor.take(5)
+        cursor.take(cursor.u16())  # curve OID
+        key = cursor.take(cursor.u16())
+        public_key = ec.EllipticCurvePublicKey.from_encoded_point(ec.SECP384R1(), key[2:])
+        r = int.from_bytes(signature[:48], "big")
+        s = int.from_bytes(signature[48:], "big")
+        public_key.verify(encode_dss_signature(r, s), message, ec.ECDSA(hashes.SHA384()))
+        return True
+    except (InvalidSignature, ValueError, TypeError):
+        return False
+
+
+def decode_pan_qr_from_scanned(scanned: str) -> PanQr:
+    unpacked = _pan_unpack(scanned)
+    version, blocks, message, signature = _pan_outer(unpacked)
+    pii = None
+    photo = None
+    for control_type, block in blocks:
+        if control_type != 5:
+            continue
+        cursor = _PanCursor(block)
+        identifier = cursor.u16()
+        payload = block[cursor.pos:]
+        if identifier == PAN_SCBLOB_PII:
+            pii = _pan_pii(_pan_inflate(payload))
+        elif identifier == PAN_SCBLOB_IMAGE:
+            photo = _pan_photo(payload)
+    if pii is None:
+        raise VerificationError("PAN Secure QR does not contain PII.")
+    return PanQr(pii, photo, version, _pan_verify(version, message, signature), scanned)
+
+
+def decode_pan_qr(image_bytes: bytes) -> PanQr:
+    return decode_pan_qr_from_scanned(read_pan_qr_text(image_bytes))
 
 
 def _normal(value: str) -> str:
