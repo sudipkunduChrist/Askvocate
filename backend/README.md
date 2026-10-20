@@ -59,9 +59,9 @@ which calls for retaining only the last four digits and redacting stored card co
 `POST /api/documents/verify` (lawyer accounts only) accepts Aadhaar `front` and `back`. Local Tesseract OCR
 reads the English name, labeled date of birth, gender, and full printed number from the front;
 it reads only the English `Address` field from the back. Multiple local English-only
-Tesseract reads are compared for Aadhaar images. The selected OCR text is saved as
-`ocrText.front` and `ocrText.back` in the MongoDB `documents` record, including when
-field extraction fails. The Aadhaar document becomes `VERIFIED` only when a signed UIDAI
+Tesseract reads are compared for Aadhaar images. OCR text is used transiently for
+field extraction and matching, then discarded; raw `ocrText` is not stored in MongoDB.
+The Aadhaar document becomes `VERIFIED` only when a signed UIDAI
 Secure QR is present and verifies, and the printed OCR fields match the QR data. A
 printed-field mismatch is stored as `PENDING` for manual review; a missing or invalid QR
 fails the upload and asks for a re-upload. OCR alone never establishes that a card is

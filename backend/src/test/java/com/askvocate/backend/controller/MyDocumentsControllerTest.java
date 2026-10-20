@@ -105,6 +105,20 @@ class MyDocumentsControllerTest {
         assertEquals("AAAPL1234C", revealed.get("panNumber"));
     }
 
+    @Test void verifiedPanDetailIncludesSignedQrPhoto() {
+        when(sessions.requireAccount("Bearer lawyer")).thenReturn(new AppSessionService.Account("owner", "LAWYER_FRESHER"));
+        UserDocument pan = new UserDocument();
+        pan.setDocumentType(DocumentType.PAN);
+        pan.setVerificationStatus(VerificationStatus.VERIFIED);
+        pan.setPanQrPhotoUrl("https://res.cloudinary.com/demo/pan-qr.jpg");
+        when(verifiedDocs.findByUserIdAndDocumentType(anyString(), any())).thenReturn(Optional.empty());
+        when(verifiedDocs.findByUserIdAndDocumentType("owner", DocumentType.PAN)).thenReturn(Optional.of(pan));
+
+        var item = controller.detail("Bearer lawyer", "PAN").getBody();
+
+        assertEquals("https://res.cloudinary.com/demo/pan-qr.jpg", item.qrPhotoUrl());
+    }
+
     @Test void verifiedAadhaarDetailUsesSignedQrData() {
         when(sessions.requireAccount("Bearer lawyer")).thenReturn(new AppSessionService.Account("owner", "LAWYER_FRESHER"));
         UserDocument doc = new UserDocument();

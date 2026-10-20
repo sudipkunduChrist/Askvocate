@@ -1,6 +1,7 @@
 package com.askvocate.backend.model;
 
 import com.fasterxml.jackson.annotation.JsonIgnore;
+import lombok.Getter;
 import lombok.Setter;
 import org.springframework.data.annotation.Id;
 import org.springframework.data.mongodb.core.index.Indexed;
@@ -17,9 +18,10 @@ import java.util.Map;
  * 
  * <p>Stored in the {@code documents} collection. Each record is scoped to a
  * single {@code userId} (from the JWT {@code sub} claim) and a single
- * {@link DocumentType}. Aadhaar OCR text is persisted separately for each side;
- * full document numbers remain separate from the masked display number.
+ * {@link DocumentType}. OCR text is used transiently during verification and is
+ * not persisted; full document numbers remain separate from the masked display number.
  */
+@Getter
 @Document(collection = "documents")
 public class UserDocument {
 
@@ -176,95 +178,9 @@ public class UserDocument {
 
     // ── Getters & Setters ───────────────────────────────────────────────
 
-    public String getId() {
-        return id;
-    }
-
-    public String getUserId() {
-        return userId;
-    }
-
-    public DocumentType getDocumentType() {
-        return documentType;
-    }
-
-    public VerificationStatus getVerificationStatus() {
-        return verificationStatus;
-    }
-
     public void setVerificationStatus(VerificationStatus verificationStatus) {
         this.verificationStatus = verificationStatus;
         this.updatedAt = Instant.now();
-    }
-
-    public Map<String, String> getExtractedData() {
-        return extractedData;
-    }
-
-    public String getMaskedDocumentNumber() {
-        return maskedDocumentNumber;
-    }
-
-    public String getAadhaarNumber() {
-        return aadhaarNumber;
-    }
-
-    public String getAadhaarNumberHash() { return aadhaarNumberHash; }
-
-    public String getPanNumber() {
-        return panNumber;
-    }
-
-    public String getPanNumberHash() { return panNumberHash; }
-    public Map<String, String> getPanQrData() { return panQrData; }
-    public String getPanQrRawText() { return panQrRawText; }
-    public Boolean getIsPanQrVerified() { return isPanQrVerified; }
-    public String getPanQrPhotoUrl() { return panQrPhotoUrl; }
-    public String getPanQrPhotoPublicId() { return panQrPhotoPublicId; }
-    public Integer getPanQrVersion() { return panQrVersion; }
-    public List<String> getCrossDocumentMismatchFields() { return crossDocumentMismatchFields; }
-    public String getReviewedBy() { return reviewedBy; }
-    public Instant getReviewedAt() { return reviewedAt; }
-    public String getReviewDecision() { return reviewDecision; }
-    public String getReviewNotes() { return reviewNotes; }
-
-    public List<CloudinaryRef> getCloudinaryReferences() {
-        return cloudinaryReferences;
-    }
-
-    public Double getOcrConfidence() {
-        return ocrConfidence;
-    }
-
-    public Map<String, String> getQrDecodedData() { return qrDecodedData; }
-    public QrData getQrData() { return qrData; }
-    public String getQrRawText() { return qrRawText; }
-    public String getQrText() { return qrText; }
-    public Boolean getIsQrVerified() { return isQrVerified; }
-    public String getSubmissionToken() { return submissionToken; }
-    public String getQrImageSide() { return qrImageSide; }
-    public Boolean getQrPrintedMismatch() { return qrPrintedMismatch; }
-    public List<String> getQrMismatchFields() { return qrMismatchFields; }
-    public Double getConfidenceScore() { return confidenceScore; }
-    public Boolean getAutoApproved() { return autoApproved; }
-    public Boolean getRequiresManualReview() { return requiresManualReview; }
-    public String getManualReviewReason() { return manualReviewReason; }
-    public Instant getVerifiedAt() { return verifiedAt; }
-
-    public String getFailureReason() {
-        return failureReason;
-    }
-
-    public String getFailureFile() {
-        return failureFile;
-    }
-
-    public Instant getCreatedAt() {
-        return createdAt;
-    }
-
-    public Instant getUpdatedAt() {
-        return updatedAt;
     }
 
 }

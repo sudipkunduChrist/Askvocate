@@ -193,7 +193,9 @@ public class MyDocumentsController {
     }
 
     private String qrPhotoUrl(UserDocument doc) {
-        return doc.getQrData() == null ? null : doc.getQrData().getPhotoUrl();
+        QrData qr = doc.getQrData();
+        if (qr != null && qr.getPhotoUrl() != null) return qr.getPhotoUrl();
+        return doc.getDocumentType() == DocumentType.PAN ? doc.getPanQrPhotoUrl() : null;
     }
 
     /** Verified Aadhaar details are displayed from the signed QR, not noisy OCR text. */

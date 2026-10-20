@@ -166,6 +166,41 @@ class MyDocumentsApi(private val context: Context) {
         }
     }
 
+    /**
+     * Decodes the PAN QR from a still photo. Still-frame decoding is far more
+     * reliable for the dense PAN Secure QR than the live camera preview.
+     */
+    suspend fun scanPanQr(image: Uri): MyDocument = withContext(Dispatchers.IO) {
+        val file = compressImage(image)
+        val boundary = "askvocate-${UUID.randomUUID()}"
+        val conn = try {
+            connection("/PAN/qr", "POST").apply {
+                doOutput = true
+                setRequestProperty("Content-Type", "multipart/form-data; boundary=$boundary")
+                setChunkedStreamingMode(64 * 1024)
+            }
+        } catch (error: Exception) {
+            file.delete()
+            throw error
+        }
+        try {
+            conn.outputStream.buffered().use { out ->
+                out.write(("--$boundary\r\nContent-Disposition: form-data; name=\"image\"; " +
+                    "filename=\"pan-qr.jpg\"\r\nContent-Type: image/jpeg\r\n\r\n").toByteArray())
+                file.inputStream().use { input -> input.copyTo(out) }
+                out.write("\r\n--$boundary--\r\n".toByteArray())
+            }
+            MyDocument.from(JSONObject(response(conn)))
+        } catch (error: IOException) {
+            throw IllegalStateException("Could not upload the QR photo. Check your connection and try again.")
+        } catch (error: JSONException) {
+            throw IllegalStateException("The server returned an unexpected response. Please try again.")
+        } finally {
+            conn.disconnect()
+            file.delete()
+        }
+    }
+
     suspend fun media(type: String, side: String): ByteArray = withContext(Dispatchers.IO) {
         val conn = connection("/$type/media/$side")
         try {

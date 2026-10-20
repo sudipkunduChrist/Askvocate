@@ -122,6 +122,24 @@ class MyDocumentsFragment : Fragment() {
         }
         scanPanQrText(contents)
     }
+    private val qrPhotoCameraPermission =
+        registerForActivityResult(ActivityResultContracts.RequestPermission()) { granted ->
+            if (granted) runCatching { launchQrCamera() }
+                .onFailure { message(it.message ?: "Could not open the camera.") }
+            else message("Camera permission is needed to take a photo.")
+        }
+    private val qrPhotoCamera = registerForActivityResult(ActivityResultContracts.TakePicture()) { success ->
+        val uri = documentState.qrCameraUri
+        if (success && uri != null) submitQrPhoto(uri)
+        else {
+            documentState.discardQrCapture()
+            message("Photo was not captured. Try again or choose an image from files.")
+        }
+    }
+    private val qrPhotoPicker = registerForActivityResult(ActivityResultContracts.GetContent()) { uri ->
+        if (uri != null) runCatching { submitQrPhoto(uri) }
+            .onFailure { message(it.message ?: "Could not read the selected image.") }
+    }
 
     override fun onCreateView(inflater: LayoutInflater, container: ViewGroup?, savedInstanceState: Bundle?): View {
         _binding = FragmentMyDocumentsBinding.inflate(inflater, container, false)
@@ -142,6 +160,8 @@ class MyDocumentsFragment : Fragment() {
             front = state.getString("front_uri")?.let(Uri::parse) ?: front
             back = state.getString("back_uri")?.let(Uri::parse) ?: back
             cameraUri = state.getString("camera_uri")?.let(Uri::parse) ?: cameraUri
+            documentState.qrCameraUri = state.getString("qr_camera_uri")?.let(Uri::parse)
+                ?: documentState.qrCameraUri
             pickingBack = state.getBoolean("picking_back", pickingBack)
         }
         val cached = documentState.documents
@@ -155,6 +175,7 @@ class MyDocumentsFragment : Fragment() {
         outState.putString("front_uri", front?.toString())
         outState.putString("back_uri", back?.toString())
         outState.putString("camera_uri", cameraUri?.toString())
+        outState.putString("qr_camera_uri", documentState.qrCameraUri?.toString())
         outState.putBoolean("picking_back", pickingBack)
     }
 
@@ -552,11 +573,19 @@ class MyDocumentsFragment : Fragment() {
             doc.verifiedAt?.let { detailRow(detailCard, "Verified", date(it)) }
             binding.documentsContent.addView(detailCard, marginParams(12))
         }
-        if (useQrDetails && !doc.qrPhotoUrl.isNullOrBlank()) {
-            sectionTitle("Aadhaar QR photo", "Photo embedded in your signed Aadhaar QR")
+        val showQrPhoto = !doc.qrPhotoUrl.isNullOrBlank() && when (doc.type) {
+            "AADHAAR" -> useQrDetails
+            // The uploaded card photo takes priority; the QR photo is the fallback
+            // for live scans, where no card image was ever uploaded.
+            "PAN" -> doc.status == "VERIFIED" && doc.media.isEmpty()
+            else -> false
+        }
+        if (showQrPhoto) {
+            val qrName = if (doc.type == "PAN") "PAN" else "Aadhaar"
+            sectionTitle("$qrName QR photo", "Photo embedded in your signed $qrName QR")
             val photoCard = card()
             photoCard.addView(ImageView(requireContext()).apply {
-                contentDescription = "Aadhaar QR photo"
+                contentDescription = "$qrName QR photo"
                 scaleType = ImageView.ScaleType.CENTER_CROP
                 load(doc.qrPhotoUrl) { crossfade(true) }
             }, LinearLayout.LayoutParams(-1, dp(180)))
@@ -569,6 +598,7 @@ class MyDocumentsFragment : Fragment() {
             qrCard.addView(label("Open the live scanner and point the camera at the QR code on the PAN card.",
                 13f, R.color.text_secondary), marginParams(6, false))
             addAction(qrCard, "Open live QR scanner", true) { launchLiveQrScanner() }
+            addAction(qrCard, "Use a photo of the QR", false) { chooseQrPhotoSource() }
             binding.documentsContent.addView(qrCard, marginParams(12))
         }
         if (doc.liveCapture) {
@@ -861,6 +891,36 @@ class MyDocumentsFragment : Fragment() {
         liveQrScanner.launch(options)
     }
 
+    private fun chooseQrPhotoSource() {
+        MaterialAlertDialogBuilder(requireContext()).setTitle("Add a photo of the PAN QR")
+            .setItems(arrayOf("Take photo", "Choose from files")) { _, which ->
+                if (which == 0) qrPhotoCameraPermission.launch(android.Manifest.permission.CAMERA)
+                else runCatching { qrPhotoPicker.launch("image/*") }
+                    .onFailure { message(it.message ?: "Could not open image files.") }
+            }.show()
+    }
+
+    private fun launchQrCamera() {
+        val dir = File(requireContext().cacheDir, "document_captures").apply { mkdirs() }
+        val file = File.createTempFile("pan_qr_", ".jpg", dir)
+        val uri = FileProvider.getUriForFile(requireContext(),
+            "${requireContext().packageName}.documents", file)
+        documentState.qrCameraFile = file
+        documentState.qrCameraUri = uri
+        qrPhotoCamera.launch(uri)
+    }
+
+    private fun submitQrPhoto(uri: Uri) {
+        setBusy(true, "Verifying PAN QR", "Reading the QR code from your photo…")
+        viewLifecycleOwner.lifecycleScope.launch {
+            val result = runCatching { api.scanPanQr(uri) }
+            documentState.discardQrCapture()
+            result.onSuccess { doc -> if (_binding != null) applyPanDocument(doc) }
+                .onFailure { if (_binding != null) message(it.message ?: "Could not verify the PAN QR.") }
+            if (_binding != null) setBusy(false)
+        }
+    }
+
     private fun scanPanQrText(qrText: String) {
         setBusy(true, "Verifying PAN QR", "Decoding the signed PAN QR…")
         viewLifecycleOwner.lifecycleScope.launch {
@@ -1038,6 +1098,8 @@ internal class MyDocumentsState : ViewModel() {
     var back: Uri? = null
     var pickingBack = false
     var cameraUri: Uri? = null
+    var qrCameraUri: Uri? = null
+    var qrCameraFile: File? = null
     val capturedFiles = mutableSetOf<File>()
 
     fun discardPendingCapture() {
@@ -1048,9 +1110,16 @@ internal class MyDocumentsState : ViewModel() {
         cameraUri = null
     }
 
+    fun discardQrCapture() {
+        qrCameraFile?.delete()
+        qrCameraFile = null
+        qrCameraUri = null
+    }
+
     fun clearCapturedFiles() {
         capturedFiles.forEach(File::delete)
         capturedFiles.clear()
+        discardQrCapture()
         cameraUri = null
     }
 
