@@ -74,7 +74,7 @@ class DocumentVerificationServiceTest {
     }
 
     @Test
-    @DisplayName("Should successfully verify lawyer direct Bar Council enrollment and update profile")
+    @DisplayName("Bar Council number format alone is sent to manual review")
     void testVerifyBarCouncilDirectSuccess() {
         when(documentRepository.findByUserIdAndDocumentType("lawyer-123", DocumentType.BAR_COUNCIL_ID))
                 .thenReturn(Optional.empty());
@@ -97,12 +97,13 @@ class DocumentVerificationServiceTest {
         DocumentVerificationResponse response = documentVerificationService.verifyBarCouncilDirect(request);
 
         assertNotNull(response);
-        assertEquals(VerificationStatus.VERIFIED, response.getVerificationStatus());
+        assertEquals(VerificationStatus.PENDING, response.getVerificationStatus());
         assertEquals(DocumentType.BAR_COUNCIL_ID, response.getDocumentType());
         assertEquals("PENDING", response.getLawyerVerificationStatus());
         assertEquals(Boolean.TRUE, response.getNameMatched());
+        assertTrue(response.getRequiresManualReview());
+        assertEquals("BAR_REVIEW", response.getPendingReason());
         verify(lawyerExperiencedProfileRepository).save(mockExperiencedLawyer);
-        assertEquals("MAH/5678/2019", mockExperiencedLawyer.getBarCouncilId());
         assertEquals(Verification_Status.PENDING, mockExperiencedLawyer.getVerificationStatus());
     }
 
@@ -136,8 +137,20 @@ class DocumentVerificationServiceTest {
         panDoc.setDocumentType(DocumentType.PAN);
         panDoc.setVerificationStatus(VerificationStatus.VERIFIED);
 
+        UserDocument copDoc = new UserDocument();
+        copDoc.setId("doc-cop");
+        copDoc.setUserId("lawyer-123");
+        copDoc.setDocumentType(DocumentType.CERTIFICATE_OF_PRACTICE);
+        copDoc.setVerificationStatus(VerificationStatus.VERIFIED);
+
+        UserDocument aibeDoc = new UserDocument();
+        aibeDoc.setId("doc-aibe");
+        aibeDoc.setUserId("lawyer-123");
+        aibeDoc.setDocumentType(DocumentType.AIBE_CERTIFICATE);
+        aibeDoc.setVerificationStatus(VerificationStatus.VERIFIED);
+
         when(documentRepository.findByUserId("lawyer-123"))
-                .thenReturn(List.of(barDoc, aadharDoc, panDoc));
+                .thenReturn(List.of(barDoc, aadharDoc, panDoc, copDoc, aibeDoc));
         when(selfieVerificationRepository.existsByUserIdAndAadhaarDocumentIdAndAadhaarSubmissionTokenAndVerificationStatus(
                 "lawyer-123", "doc-aadhaar", "aadhaar-revision", VerificationStatus.VERIFIED)).thenReturn(true);
 
@@ -148,10 +161,14 @@ class DocumentVerificationServiceTest {
         assertEquals("Adv. Rajesh Sharma", summary.getLawyerName());
         assertEquals(100, summary.getCompletionPercentage());
         assertTrue(summary.isBarCouncilVerified());
+        assertTrue(summary.isBarEnrollmentVerified());
+        assertTrue(summary.isCopVerified());
+        assertTrue(summary.isAibeVerified());
+        assertFalse(summary.isDegreeVerified());
         assertTrue(summary.isAadhaarVerified());
         assertTrue(summary.isPanVerified());
         assertTrue(summary.isIdentityVerified());
-        assertEquals(3, summary.getVerifiedDocuments().size());
+        assertEquals(5, summary.getVerifiedDocuments().size());
     }
 
     @Test
@@ -171,12 +188,12 @@ class DocumentVerificationServiceTest {
         LawyerVerificationSummaryResponse summary = documentVerificationService.getLawyerVerificationSummary("lawyer-123");
 
         assertEquals(Verification_Status.PENDING, summary.getVerificationStatus());
-        assertEquals(25, summary.getCompletionPercentage());
+        assertEquals(16, summary.getCompletionPercentage());
         assertFalse(summary.isBarCouncilVerified());
     }
 
     @Test
-    void lastRequiredDocumentMarksLawyerVerified() {
+    void barNumberFormatDoesNotCompleteLawyerVerification() {
         when(lawyerExperiencedProfileRepository.findById("lawyer-123"))
                 .thenReturn(Optional.of(mockExperiencedLawyer));
         UserDocument aadhaar = new UserDocument();
@@ -204,8 +221,10 @@ class DocumentVerificationServiceTest {
 
         DocumentVerificationResponse response = documentVerificationService.verifyBarCouncilDirect(request);
 
-        assertEquals(Verification_Status.VERIFIED, mockExperiencedLawyer.getVerificationStatus());
-        assertEquals("VERIFIED", response.getLawyerVerificationStatus());
-        assertNotNull(mockExperiencedLawyer.getVerifiedAt());
+        assertEquals(Verification_Status.PENDING, mockExperiencedLawyer.getVerificationStatus());
+        assertEquals("PENDING", response.getLawyerVerificationStatus());
+        assertTrue(response.getRequiresManualReview());
+        assertEquals("BAR_REVIEW", response.getPendingReason());
+        assertNull(mockExperiencedLawyer.getVerifiedAt());
     }
 }

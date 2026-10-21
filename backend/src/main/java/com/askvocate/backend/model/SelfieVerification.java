@@ -26,6 +26,8 @@ public class SelfieVerification {
     private Double faceMatchThreshold;
     private Boolean livenessPassed;
     private Double livenessScore;
+    /** MiniFASNet live-class probability (lower of the three frames), for audit. */
+    private Double padScore;
     private VerificationStatus verificationStatus = VerificationStatus.PENDING;
     private String failureReason;
     private Instant createdAt = Instant.now();

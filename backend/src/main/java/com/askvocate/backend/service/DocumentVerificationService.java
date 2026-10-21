@@ -182,7 +182,9 @@ public class DocumentVerificationService {
                 status = VerificationStatus.PENDING;
             }
         } else if (documentType != DocumentType.AADHAAR) {
-            status = ocrSuccess ? VerificationStatus.VERIFIED : VerificationStatus.FAILED;
+            // Bar Council, COP, Degree and AIBE are evidenced by the uploaded
+            // certificate and reviewed manually; OCR alone never verifies them.
+            status = VerificationStatus.PENDING;
         } else if (qrVerified && !qrMismatch && ocrSuccess) {
             status = VerificationStatus.VERIFIED;
         } else if (qrVerified) {
@@ -240,6 +242,25 @@ public class DocumentVerificationService {
             }
         }
 
+        // Certificate-backed documents: compare the printed name with the profile and
+        // detect a duplicate Bar Council enrollment number.
+        boolean isBarDocument = documentType == DocumentType.BAR_COUNCIL_ID
+                || documentType == DocumentType.BAR_CERTIFICATE
+                || documentType == DocumentType.CERTIFICATE_OF_PRACTICE;
+        String extractedName = extractionResult.extractedFields().get("name");
+        String profileName = lawyerProfileName(userId);
+        boolean certificateNameMismatch = extractedName != null && profileName != null
+                && !barCouncilValidationService.isNameMatching(extractedName, profileName);
+        String enrollmentNumber = extractionResult.extractedFields().get("enrollmentNumber");
+        String enrollmentHash = null;
+        boolean duplicateEnrollment = false;
+        if (isBarDocument && enrollmentNumber != null && !enrollmentNumber.isBlank()) {
+            enrollmentHash = hashEnrollment(enrollmentNumber);
+            Optional<UserDocument> duplicate = documentRepository.findByEnrollmentNumberHash(enrollmentHash);
+            duplicateEnrollment = duplicate.isPresent()
+                    && !Objects.equals(userId, duplicate.get().getUserId());
+        }
+
         // Manual review is reserved for data conflicts that a retry cannot fix.
         // Every other pending outcome is a re-upload state and auto-approves on a correct retry.
         String pendingReason = null;
@@ -266,10 +287,43 @@ public class DocumentVerificationService {
                 } else {
                     pendingReason = "PAN_WAITING_AADHAAR";
                 }
+            } else {
+                String prefix = switch (documentType) {
+                    case BAR_COUNCIL_ID, BAR_CERTIFICATE, CERTIFICATE_OF_PRACTICE -> "BAR";
+                    case DEGREE_CERTIFICATE -> "DEGREE";
+                    case AIBE_CERTIFICATE -> "AIBE";
+                    default -> "DOC";
+                };
+                if (!ocrSuccess) {
+                    pendingReason = prefix + "_OCR_UNREADABLE";
+                } else if (duplicateEnrollment) {
+                    pendingReason = "BAR_DUPLICATE";
+                    requiresManualReview = true;
+                } else if (certificateNameMismatch) {
+                    pendingReason = prefix + "_MISMATCH";
+                    requiresManualReview = true;
+                } else {
+                    pendingReason = prefix + "_REVIEW";
+                    requiresManualReview = true;
+                }
             }
         }
         if ("PAN_WAITING_AADHAAR".equals(pendingReason)) {
             manualReviewReason = "PAN QR verified. Verify your Aadhaar to complete PAN verification automatically.";
+        }
+        if (status == VerificationStatus.PENDING && documentType != DocumentType.AADHAAR
+                && documentType != DocumentType.PAN) {
+            manualReviewReason = switch (pendingReason == null ? "" : pendingReason) {
+                case "BAR_OCR_UNREADABLE", "DEGREE_OCR_UNREADABLE", "AIBE_OCR_UNREADABLE" ->
+                        "Could not read this certificate. Re-upload a clearer photo.";
+                case "BAR_DUPLICATE" ->
+                        "This Bar Council enrollment number is already registered to another account. "
+                        + "Manual review is in progress.";
+                case "BAR_MISMATCH", "DEGREE_MISMATCH", "AIBE_MISMATCH" ->
+                        "The name on the certificate does not match your profile. "
+                        + "Manual review is in progress.";
+                default -> "Certificate uploaded. Manual verification is in progress.";
+            };
         }
 
         // PAN evidence is kept only when the card is fully auto-verified, the QR was
@@ -323,6 +377,7 @@ public class DocumentVerificationService {
                 : null;
         userDocument.setPanNumber(panNumber);
         userDocument.setPanNumberHash(documentType == DocumentType.PAN ? hashPan(panNumber) : null);
+        userDocument.setEnrollmentNumberHash(isBarDocument ? enrollmentHash : null);
         if (documentType == DocumentType.PAN && panNumber != null) {
             userDocument.setMaskedDocumentNumber(ocrExtractionService.maskPan(panNumber));
         }
@@ -367,6 +422,9 @@ public class DocumentVerificationService {
         userDocument.setQrText(qrText(qrData));
         userDocument.setRequiresManualReview(requiresManualReview);
         userDocument.setPendingReason(pendingReason);
+        userDocument.setManualReviewReason(manualReviewReason);
+        userDocument.setAutoApproved(status == VerificationStatus.VERIFIED);
+        userDocument.setConfidenceScore(extractionResult.confidence());
         userDocument.setUpdatedAt(Instant.now());
         if (documentType == DocumentType.AADHAAR) {
             userDocument.setIsQrVerified(qrVerified);
@@ -492,7 +550,7 @@ public class DocumentVerificationService {
         fields.put("stateCouncil", validationResult.stateCouncil());
         fields.put("enrollmentYear", String.valueOf(validationResult.enrollmentYear()));
         fields.put("sequenceNumber", validationResult.sequenceNumber());
-        fields.put("verificationMethod", "DIRECT_BAR_COUNCIL_REGISTRY_VALIDATION");
+        fields.put("verificationMethod", "BAR_COUNCIL_NUMBER_FORMAT_CHECK");
 
         if (request.getAdvocateName() != null && !request.getAdvocateName().isBlank()) {
             fields.put("name", request.getAdvocateName().trim());
@@ -503,11 +561,19 @@ public class DocumentVerificationService {
 
         userDocument.setUserId(userId);
         userDocument.setDocumentType(DocumentType.BAR_COUNCIL_ID);
-        userDocument.setVerificationStatus(VerificationStatus.VERIFIED);
+        // Format validation alone is not proof; a certificate must be reviewed.
+        userDocument.setVerificationStatus(VerificationStatus.PENDING);
+        userDocument.setRequiresManualReview(true);
+        userDocument.setPendingReason("BAR_REVIEW");
+        userDocument.setManualReviewReason(
+                "Bar Council number format validated. Upload the enrollment certificate for manual review.");
+        userDocument.setAutoApproved(false);
+        userDocument.setVerifiedAt(null);
         userDocument.setMaskedDocumentNumber(validationResult.maskedNumber());
         userDocument.setExtractedData(fields);
+        userDocument.setEnrollmentNumberHash(hashEnrollment(validationResult.normalizedNumber()));
         userDocument.setOcrConfidence(1.0);
-        userDocument.setFailureReason(null);
+        userDocument.setFailureReason("Manual verification is required.");
         userDocument.setUpdatedAt(Instant.now());
 
         UserDocument saved = documentRepository.save(userDocument);
@@ -562,44 +628,29 @@ public class DocumentVerificationService {
                 .map(this::toResponse)
                 .toList();
 
-        boolean barCouncilVerified = documents.stream().anyMatch(d ->
-                (d.getDocumentType() == DocumentType.BAR_COUNCIL_ID
-                        || d.getDocumentType() == DocumentType.BAR_CERTIFICATE
-                        || d.getDocumentType() == DocumentType.CERTIFICATE_OF_PRACTICE)
-                        && d.getVerificationStatus() == VerificationStatus.VERIFIED
-        );
+        boolean experienced = expOpt.isPresent();
+        VerificationChecklist checklist = checklist(userId, documents, experienced);
+        boolean identityVerified = checklist.aadhaar() && checklist.pan() && checklist.selfie();
+        int completionPercentage = checklist.requiredCount() == 0 ? 0
+                : checklist.verifiedCount() * 100 / checklist.requiredCount();
+        boolean fullyVerified = checklist.verifiedCount() == checklist.requiredCount();
+        overallStatus = fullyVerified ? Verification_Status.VERIFIED : Verification_Status.PENDING;
 
-        boolean aadhaarVerified = documents.stream().anyMatch(this::isVerifiedAadhaar);
-
-        boolean panVerified = documents.stream().anyMatch(d ->
-                d.getDocumentType() == DocumentType.PAN
-                        && d.getVerificationStatus() == VerificationStatus.VERIFIED
-        );
-
-        boolean selfieVerified = documents.stream().anyMatch(d -> hasVerifiedSelfie(userId, d));
-        boolean identityVerified = aadhaarVerified && panVerified && selfieVerified;
-
-        int verifiedCount = (barCouncilVerified ? 1 : 0) + (aadhaarVerified ? 1 : 0)
-                + (panVerified ? 1 : 0) + (selfieVerified ? 1 : 0);
-        int completionPercentage = verifiedCount * 25;
-        if (verifiedCount < 4) overallStatus = Verification_Status.PENDING;
-
-        List<String> missing = new ArrayList<>();
-        if (!barCouncilVerified) missing.add("Bar Council ID / Certificate");
-        if (!aadhaarVerified) missing.add("Aadhaar Card (front + back)");
-        if (!panVerified) missing.add("PAN Card");
-        if (!selfieVerified) missing.add("Live Selfie");
-
-        String nextStep = missing.isEmpty()
-                ? "Bar Council, Aadhaar, PAN, and live selfie are verified."
-                : "Missing: " + String.join(" and ", missing) + " to achieve 100% document verification process complete (" + completionPercentage + "% completed).";
+        List<String> missing = missingRequired(checklist, experienced);
+        String nextStep = fullyVerified
+                ? "All documents required for this role are verified."
+                : "Missing: " + String.join(", ", missing) + " to complete verification ("
+                    + completionPercentage + "% completed).";
 
         Map<String, Object> summaryDetails = new LinkedHashMap<>();
         summaryDetails.put("totalDocumentsSubmitted", documents.size());
-        summaryDetails.put("isFullyVerified", completionPercentage == 100);
-        summaryDetails.put("mandatoryDocumentsRequired", 4);
-        summaryDetails.put("selfieVerified", selfieVerified);
-        summaryDetails.put("mandatoryDocumentsVerified", verifiedCount);
+        summaryDetails.put("isFullyVerified", fullyVerified);
+        summaryDetails.put("mandatoryDocumentsRequired", checklist.requiredCount());
+        summaryDetails.put("mandatoryDocumentsVerified", checklist.verifiedCount());
+        summaryDetails.put("selfieVerified", checklist.selfie());
+        summaryDetails.put("roleRequirements", experienced
+                ? "Bar enrollment, COP, AIBE, Aadhaar, PAN, live selfie"
+                : "Bar enrollment, LL.B. degree, Aadhaar, PAN, live selfie");
 
         return LawyerVerificationSummaryResponse.builder()
                 .userId(userId)
@@ -609,10 +660,16 @@ public class DocumentVerificationService {
                 .verificationStatus(overallStatus)
                 .barCouncilId(barCouncilId)
                 .completionPercentage(completionPercentage)
-                .barCouncilVerified(barCouncilVerified)
-                .aadhaarVerified(aadhaarVerified)
-                .panVerified(panVerified)
+                .barCouncilVerified(checklist.barEnrollment())
+                .aadhaarVerified(checklist.aadhaar())
+                .panVerified(checklist.pan())
                 .identityVerified(identityVerified)
+                .barEnrollmentVerified(checklist.barEnrollment())
+                .copVerified(checklist.cop())
+                .aibeVerified(checklist.aibe())
+                .degreeVerified(checklist.degree())
+                .requiredDocumentCount(checklist.requiredCount())
+                .verifiedDocumentCount(checklist.verifiedCount())
                 .nextStep(nextStep)
                 .verifiedDocuments(docResponses)
                 .summaryDetails(summaryDetails)
@@ -671,35 +728,18 @@ public class DocumentVerificationService {
             allDocs.add(doc);
         }
 
-        boolean hasBarCouncilVerified = allDocs.stream().anyMatch(d ->
-                (d.getDocumentType() == DocumentType.BAR_COUNCIL_ID
-                        || d.getDocumentType() == DocumentType.BAR_CERTIFICATE
-                        || d.getDocumentType() == DocumentType.CERTIFICATE_OF_PRACTICE)
-                        && d.getVerificationStatus() == VerificationStatus.VERIFIED
-        );
+        boolean experienced = expOpt.isPresent();
+        VerificationChecklist checklist = checklist(userId, allDocs, experienced);
+        boolean isFullyVerified = checklist.verifiedCount() == checklist.requiredCount();
+        int percentage = checklist.requiredCount() == 0 ? 0
+                : checklist.verifiedCount() * 100 / checklist.requiredCount();
 
-        boolean hasAadhaarVerified = allDocs.stream().anyMatch(this::isVerifiedAadhaar);
-
-        boolean hasPanVerified = allDocs.stream().anyMatch(d ->
-                d.getDocumentType() == DocumentType.PAN
-                        && d.getVerificationStatus() == VerificationStatus.VERIFIED
-        );
-
-        boolean hasSelfieVerified = allDocs.stream().anyMatch(d -> hasVerifiedSelfie(userId, d));
-        int verifiedCount = (hasBarCouncilVerified ? 1 : 0) + (hasAadhaarVerified ? 1 : 0)
-                + (hasPanVerified ? 1 : 0) + (hasSelfieVerified ? 1 : 0);
-        int percentage = verifiedCount * 25;
-        boolean isFullyVerified = verifiedCount == 4;
-
-        List<String> remainingDocs = new ArrayList<>();
-        if (!hasBarCouncilVerified) remainingDocs.add("Bar Council ID / Certificate");
-        if (!hasAadhaarVerified) remainingDocs.add("Aadhaar Card");
-        if (!hasPanVerified) remainingDocs.add("PAN Card");
-        if (!hasSelfieVerified) remainingDocs.add("Live Selfie");
+        List<String> remainingDocs = missingRequired(checklist, experienced);
 
         String progressMsg = isFullyVerified
-                ? "Bar Council, Aadhaar, PAN, and live selfie verified."
-                : doc.getDocumentType() + " processed (" + percentage + "% complete). Missing: " + String.join(", ", remainingDocs) + ".";
+                ? "All required documents are verified."
+                : doc.getDocumentType() + " processed (" + percentage + "% complete). Missing: "
+                    + String.join(", ", remainingDocs) + ".";
 
         if (expOpt.isEmpty() && fresherOpt.isEmpty()) {
             throw new DocumentVerificationException("Invalid userID or lawyer role.");
@@ -730,7 +770,7 @@ public class DocumentVerificationService {
                 lawyerExperiencedProfileRepository.save(exp);
                 return new LawyerUpdateResult(true, Verification_Status.PENDING, nameMatch,
                         doc.getVerificationStatus() == VerificationStatus.PENDING
-                                ? "Aadhaar is pending signed QR and printed-field matching: " + doc.getManualReviewReason()
+                                ? doc.getDocumentType() + " is pending review: " + doc.getManualReviewReason()
                                 : "Document verification failed: " + doc.getFailureReason());
             }
         } else {
@@ -758,7 +798,7 @@ public class DocumentVerificationService {
                 lawyerFresherProfileRepository.save(fresher);
                 return new LawyerUpdateResult(true, Verification_Status.PENDING, nameMatch,
                         doc.getVerificationStatus() == VerificationStatus.PENDING
-                                ? "Aadhaar is pending signed QR and printed-field matching: " + doc.getManualReviewReason()
+                                ? doc.getDocumentType() + " is pending review: " + doc.getManualReviewReason()
                                 : "Document verification failed: " + doc.getFailureReason());
             }
         }
@@ -772,6 +812,17 @@ public class DocumentVerificationService {
     private Optional<LawyerFresherProfile> findFresherLawyer(String userId) {
         return lawyerFresherProfileRepository.findById(userId)
                 .filter(profile -> profile.getRole() == Role.LAWYER_FRESHER);
+    }
+
+    private String lawyerProfileName(String userId) {
+        return findExperiencedLawyer(userId).map(LawyerExperiencedProfile::getName)
+                .or(() -> findFresherLawyer(userId).map(LawyerFresherProfile::getName))
+                .orElse(null);
+    }
+
+    private String hashEnrollment(String number) {
+        return number == null || number.isBlank() ? null
+                : hashIdentity(number.replaceAll("[\\s-]", "").toUpperCase());
     }
 
     // OCR is required for verification. A failed upload cannot create local identity data.
@@ -868,17 +919,50 @@ public class DocumentVerificationService {
         });
     }
 
-    private boolean hasAllRequiredDocuments(String userId, List<UserDocument> documents) {
-        boolean bar = documents.stream().anyMatch(d ->
-                (d.getDocumentType() == DocumentType.BAR_COUNCIL_ID
-                        || d.getDocumentType() == DocumentType.BAR_CERTIFICATE
-                        || d.getDocumentType() == DocumentType.CERTIFICATE_OF_PRACTICE)
-                        && d.getVerificationStatus() == VerificationStatus.VERIFIED);
-        boolean aadhaar = documents.stream().anyMatch(this::isVerifiedAadhaar);
-        boolean pan = documents.stream().anyMatch(d -> d.getDocumentType() == DocumentType.PAN
+    private boolean isVerifiedType(List<UserDocument> documents, DocumentType type) {
+        return documents.stream().anyMatch(d -> d.getDocumentType() == type
                 && d.getVerificationStatus() == VerificationStatus.VERIFIED);
+    }
+
+    private boolean isBarEnrollmentVerified(List<UserDocument> documents) {
+        return isVerifiedType(documents, DocumentType.BAR_CERTIFICATE)
+                || isVerifiedType(documents, DocumentType.BAR_COUNCIL_ID);
+    }
+
+    private record VerificationChecklist(boolean barEnrollment, boolean cop, boolean aibe, boolean degree,
+            boolean aadhaar, boolean pan, boolean selfie, int verifiedCount, int requiredCount) {}
+
+    /** Role-based mandatory set: experienced needs COP+AIBE, freshers need an LL.B. degree. */
+    private VerificationChecklist checklist(String userId, List<UserDocument> documents, boolean experienced) {
+        boolean bar = isBarEnrollmentVerified(documents);
+        boolean cop = isVerifiedType(documents, DocumentType.CERTIFICATE_OF_PRACTICE);
+        boolean aibe = isVerifiedType(documents, DocumentType.AIBE_CERTIFICATE);
+        boolean degree = isVerifiedType(documents, DocumentType.DEGREE_CERTIFICATE);
+        boolean aadhaar = documents.stream().anyMatch(this::isVerifiedAadhaar);
+        boolean pan = isVerifiedType(documents, DocumentType.PAN);
         boolean selfie = documents.stream().anyMatch(d -> hasVerifiedSelfie(userId, d));
-        return bar && aadhaar && pan && selfie;
+        int required = experienced ? 6 : 5;
+        int verified = (bar ? 1 : 0) + (aadhaar ? 1 : 0) + (pan ? 1 : 0) + (selfie ? 1 : 0)
+                + (experienced ? (cop ? 1 : 0) + (aibe ? 1 : 0) : (degree ? 1 : 0));
+        return new VerificationChecklist(bar, cop, aibe, degree, aadhaar, pan, selfie, verified, required);
+    }
+
+    private List<String> missingRequired(VerificationChecklist c, boolean experienced) {
+        List<String> missing = new ArrayList<>();
+        if (!c.barEnrollment()) missing.add("Bar Council enrollment certificate");
+        if (experienced && !c.cop()) missing.add("Certificate of Practice");
+        if (experienced && !c.aibe()) missing.add("AIBE certificate");
+        if (!experienced && !c.degree()) missing.add("LL.B. degree certificate");
+        if (!c.aadhaar()) missing.add("Aadhaar Card");
+        if (!c.pan()) missing.add("PAN Card");
+        if (!c.selfie()) missing.add("Live Selfie");
+        return missing;
+    }
+
+    private boolean hasAllRequiredDocuments(String userId, List<UserDocument> documents) {
+        boolean experienced = findExperiencedLawyer(userId).isPresent();
+        VerificationChecklist c = checklist(userId, documents, experienced);
+        return c.verifiedCount() == c.requiredCount();
     }
 
     private boolean isVerifiedAadhaar(UserDocument document) {
@@ -1268,9 +1352,8 @@ public class DocumentVerificationService {
     private UserDocument requireReviewableDocument(String documentId) {
         UserDocument doc = documentRepository.findById(documentId)
                 .orElseThrow(() -> new DocumentVerificationException("Document not found."));
-        if (doc.getDocumentType() != DocumentType.PAN && doc.getDocumentType() != DocumentType.AADHAAR) {
-            throw new DocumentVerificationException(
-                    "Manual review is available for Aadhaar and PAN documents only.");
+        if (doc.getDocumentType() == null) {
+            throw new DocumentVerificationException("Document type is missing.");
         }
         if (doc.getRequiresManualReview() == null || !doc.getRequiresManualReview()) {
             throw new DocumentVerificationException("Document is not waiting for manual review.");
@@ -1440,6 +1523,7 @@ public class DocumentVerificationService {
         response.setAutoApproved(doc.getAutoApproved());
         response.setRequiresManualReview(doc.getRequiresManualReview());
         response.setManualReviewReason(doc.getManualReviewReason());
+        response.setPendingReason(doc.getPendingReason());
         response.setVerifiedAt(doc.getVerifiedAt());
         return response;
     }

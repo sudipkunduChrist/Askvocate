@@ -5,9 +5,12 @@ import android.animation.Animator
 import android.animation.AnimatorListenerAdapter
 import android.animation.ValueAnimator
 import android.content.res.ColorStateList
+import android.graphics.Bitmap
 import android.graphics.BitmapFactory
+import android.graphics.Matrix
 import android.graphics.Typeface
 import android.graphics.drawable.GradientDrawable
+import android.media.ExifInterface
 import android.net.Uri
 import android.os.Bundle
 import android.view.Gravity
@@ -45,6 +48,7 @@ import kotlinx.coroutines.Job
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 import java.io.File
+import java.io.ByteArrayInputStream
 import java.time.Instant
 import java.time.ZoneId
 import java.time.format.DateTimeFormatter
@@ -433,11 +437,13 @@ class MyDocumentsFragment : Fragment() {
         checkStatusButton = null
         binding.documentsTitle.text = "My Documents"
         binding.documentsSubtitle.text = "Your secure document vault"
-        val verified = docs.count { it.status == "VERIFIED" }
+        val requiredDocs = docs.filter { it.required || it.requirementGroup != null }
+            .groupBy { it.requirementGroup ?: it.type }
+        val verified = requiredDocs.count { (_, items) -> items.any { it.status == "VERIFIED" } }
         val hero = card(R.color.navy_primary).apply {
             addView(label("YOUR VAULT", 12f, R.color.amber_light, true))
             addView(label("Documents, all in one place", 21f, R.color.white, true), marginParams(8))
-            addView(label("$verified of ${docs.size} verified  •  Select a document to view its status.",
+            addView(label("$verified of ${requiredDocs.size} required documents verified  •  Select one to view its status.",
                 13f, R.color.white), marginParams(8))
         }
         binding.documentsContent.addView(hero, marginParams(0))
@@ -456,6 +462,10 @@ class MyDocumentsFragment : Fragment() {
             val copy = LinearLayout(requireContext()).apply { orientation = LinearLayout.VERTICAL }
             copy.addView(label(doc.title, 16f, R.color.text_primary, true))
             copy.addView(statusChip(doc), marginParams(8, false))
+            copy.addView(label(requirementLabel(doc), 11f,
+                if (doc.required || doc.requirementGroup != null) R.color.navy_primary
+                else R.color.text_secondary,
+                doc.required || doc.requirementGroup != null), marginParams(4, false))
             row.addView(copy, LinearLayout.LayoutParams(0, ViewGroup.LayoutParams.WRAP_CONTENT, 1f).apply {
                 marginStart = dp(14)
             })
@@ -492,13 +502,22 @@ class MyDocumentsFragment : Fragment() {
         checkStatusButton = null
         selected = doc
         binding.documentsTitle.text = doc.title
-        binding.documentsSubtitle.text = "Status, images and details"
+        binding.documentsSubtitle.text = when {
+            doc.requirementGroup == "BAR_ENROLLMENT" ->
+                "Bar enrollment proof · upload either this or the Bar Council ID"
+            doc.required -> "Required document · status, images and details"
+            else -> "Optional document · status, images and details"
+        }
         val statusNote = doc.note?.trim()?.takeIf {
             it.isNotEmpty() && !it.equals("null", ignoreCase = true)
-        } ?: when (doc.status) {
-            "VERIFIED" -> "Verification complete."
-            "PENDING" -> "Manual review is in progress."
-            "NOT_UPLOADED" -> "Upload a clear image to begin."
+        } ?: when {
+            doc.type == "SELFIE" && doc.status == "PENDING" ->
+                "Complete the live camera check to verify your selfie."
+            doc.type == "SELFIE" && doc.status == "FAILED" ->
+                "Selfie verification failed. Try again from the live selfie screen."
+            doc.status == "VERIFIED" -> "Verification complete."
+            doc.status == "PENDING" -> "Manual review is in progress."
+            doc.status == "NOT_UPLOADED" -> "Upload a clear image to begin."
             else -> "Review the document and try again if needed."
         }
         val statusCard = card(statusBackground(doc.status)).apply {
@@ -568,7 +587,7 @@ class MyDocumentsFragment : Fragment() {
                 viewLifecycleOwner.lifecycleScope.launch {
                     runCatching {
                         val bytes = api.media(doc.type, side)
-                        BitmapFactory.decodeByteArray(bytes, 0, bytes.size) ?: error("Cannot read image preview.")
+                        decodeUpright(bytes) ?: error("Cannot read image preview.")
                     }.onSuccess { bitmap ->
                         if (_binding != null && selectedType == doc.type && preview.parent != null) {
                             preview.setImageBitmap(bitmap)
@@ -649,8 +668,7 @@ class MyDocumentsFragment : Fragment() {
             revealContent()
             return
         }
-        val canReupload = doc.status != "VERIFIED" &&
-            (doc.status != "PENDING" || doc.type == "AADHAAR")
+        val canReupload = doc.status != "VERIFIED"
         if (canReupload) {
             val uploadTitle = when {
                 doc.status == "PENDING" -> "Retry upload"
@@ -709,6 +727,37 @@ class MyDocumentsFragment : Fragment() {
             .map(String::trim)
             .filter(String::isNotEmpty)
             .joinToString("\n")
+
+    /** Camera JPEGs carry EXIF rotation; apply it so previews are upright (portrait selfies). */
+    private fun decodeUpright(bytes: ByteArray): Bitmap? {
+        val bitmap = BitmapFactory.decodeByteArray(bytes, 0, bytes.size) ?: return null
+        val orientation = runCatching {
+            ExifInterface(ByteArrayInputStream(bytes)).getAttributeInt(
+                ExifInterface.TAG_ORIENTATION, ExifInterface.ORIENTATION_NORMAL
+            )
+        }.getOrDefault(ExifInterface.ORIENTATION_NORMAL)
+        val matrix = Matrix()
+        when (orientation) {
+            ExifInterface.ORIENTATION_ROTATE_90 -> matrix.postRotate(90f)
+            ExifInterface.ORIENTATION_ROTATE_180 -> matrix.postRotate(180f)
+            ExifInterface.ORIENTATION_ROTATE_270 -> matrix.postRotate(270f)
+            ExifInterface.ORIENTATION_FLIP_HORIZONTAL -> matrix.postScale(-1f, 1f)
+            ExifInterface.ORIENTATION_FLIP_VERTICAL -> matrix.postScale(1f, -1f)
+            ExifInterface.ORIENTATION_TRANSPOSE -> {
+                matrix.postRotate(90f)
+                matrix.postScale(-1f, 1f)
+            }
+            ExifInterface.ORIENTATION_TRANSVERSE -> {
+                matrix.postRotate(270f)
+                matrix.postScale(-1f, 1f)
+            }
+            else -> return bitmap
+        }
+        return runCatching {
+            Bitmap.createBitmap(bitmap, 0, 0, bitmap.width, bitmap.height, matrix, true)
+                .also { if (it !== bitmap) bitmap.recycle() }
+        }.getOrDefault(bitmap)
+    }
 
     private fun statusColor(status: String) = when (status) {
         "VERIFIED" -> R.color.justitia_teal_success
@@ -907,12 +956,32 @@ class MyDocumentsFragment : Fragment() {
             .withZone(ZoneId.systemDefault()).format(Instant.parse(raw))
     }.getOrDefault(raw)
 
+    /** Bar enrollment accepts either the certificate (preferred) or the Bar Council ID card. */
+    private fun requirementLabel(doc: MyDocument): String = when {
+        doc.requirementGroup == "BAR_ENROLLMENT" && doc.required -> "Required · or Bar Council ID"
+        doc.requirementGroup == "BAR_ENROLLMENT" -> "Alternative bar proof"
+        doc.required -> "Required"
+        else -> "Optional"
+    }
+
     /** PENDING is split by reason: re-upload states vs real manual-review conflicts. */
-    private fun statusLabel(doc: MyDocument): String = when (doc.pendingReason) {
-        "AADHAAR_QR_UNREADABLE", "AADHAAR_OCR_UNREADABLE", "PAN_QR_UNREADABLE" -> "Re-upload required"
-        "PAN_WAITING_AADHAAR" -> "Waiting for Aadhaar"
-        "AADHAAR_OCR_MISMATCH", "PAN_MISMATCH", "PAN_DUPLICATE" -> "Manual review"
-        else -> statusText(doc.status)
+    private fun statusLabel(doc: MyDocument): String {
+        if (doc.type == "SELFIE") {
+            return when (doc.status) {
+                "VERIFIED" -> "Verified"
+                "FAILED" -> "Selfie not verified"
+                "PENDING" -> "Selfie pending"
+                else -> statusText(doc.status)
+            }
+        }
+        return when {
+            doc.pendingReason == "PAN_WAITING_AADHAAR" -> "Waiting for Aadhaar"
+            doc.pendingReason?.endsWith("_UNREADABLE") == true -> "Re-upload required"
+            doc.pendingReason?.let {
+                it.endsWith("_REVIEW") || it.endsWith("_MISMATCH") || it.endsWith("_DUPLICATE")
+            } == true -> "Manual review"
+            else -> statusText(doc.status)
+        }
     }
 
     private fun statusText(status: String): String = when (status) {
@@ -1078,7 +1147,7 @@ class MyDocumentsFragment : Fragment() {
         viewLifecycleOwner.lifecycleScope.launch {
             runCatching {
                 val bytes = api.media(type, side)
-                BitmapFactory.decodeByteArray(bytes, 0, bytes.size) ?: error("Cannot open image.")
+                decodeUpright(bytes) ?: error("Cannot open image.")
             }.onSuccess { bitmap ->
                 if (isAdded) MaterialAlertDialogBuilder(requireContext())
                     .setTitle("${side.replaceFirstChar { it.uppercase() }} image")

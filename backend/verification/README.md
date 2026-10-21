@@ -32,4 +32,9 @@ The models and OCR language files live beside the worker; no download occurs dur
 verification request. Keep the UIDAI public certificates current as signing keys change.
 
 Run the local tests from this directory with `python -m unittest discover -s tests -v`.
-The head-turn check is a basic replay deterrent and needs real-device calibration.
+Live selfie checks now combine a three-frame head-turn challenge, capture-quality gates
+(brightness, blur, face size), and a local MiniFASNetV2 anti-spoof score
+(`models/minifasnet_v2.onnx`, run with OpenCV DNN). Spring also limits each lawyer to
+5 selfie challenges per hour. `FACE_THRESHOLD` and `PAD_THRESHOLD` are starting points,
+not calibrated values; validate false-accept and false-reject rates on real live/spoof
+samples before production use.

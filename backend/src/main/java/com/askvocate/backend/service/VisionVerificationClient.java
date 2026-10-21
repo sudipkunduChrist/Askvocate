@@ -296,9 +296,9 @@ public class VisionVerificationClient {
     }
 
     public record SelfieResult(Double faceMatchScore, Double faceMatchThreshold, Boolean livenessPassed,
-                               Double livenessScore, Boolean matched, String reason) {
+                               Double livenessScore, Double padScore, Boolean matched, String reason) {
         public static SelfieResult unavailable(String reason) {
-            return new SelfieResult(null, null, false, null, false, reason);
+            return new SelfieResult(null, null, false, null, null, false, reason);
         }
     }
 }

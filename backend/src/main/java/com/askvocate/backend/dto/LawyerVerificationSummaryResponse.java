@@ -25,6 +25,12 @@ public class LawyerVerificationSummaryResponse {
     private String barCouncilId;
     private int completionPercentage;
     private boolean barCouncilVerified;
+    private boolean barEnrollmentVerified;
+    private boolean copVerified;
+    private boolean aibeVerified;
+    private boolean degreeVerified;
+    private int requiredDocumentCount;
+    private int verifiedDocumentCount;
     private boolean aadhaarVerified;
     private boolean panVerified;
     private boolean identityVerified;

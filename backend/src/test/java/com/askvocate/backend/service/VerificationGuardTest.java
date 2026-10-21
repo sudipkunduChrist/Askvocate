@@ -121,7 +121,9 @@ class VerificationGuardTest {
         when(experienced.findById("experienced-id")).thenReturn(Optional.of(profile));
         when(documents.findByUserId("experienced-id")).thenReturn(List.of(
                 verifiedDocument(DocumentType.AADHAAR), verifiedDocument(DocumentType.PAN),
-                verifiedDocument(DocumentType.BAR_COUNCIL_ID)));
+                verifiedDocument(DocumentType.BAR_COUNCIL_ID),
+                verifiedDocument(DocumentType.CERTIFICATE_OF_PRACTICE),
+                verifiedDocument(DocumentType.AIBE_CERTIFICATE)));
         when(selfies.existsByUserIdAndAadhaarDocumentIdAndAadhaarSubmissionTokenAndVerificationStatus(
                 eq("experienced-id"), eq("test-aadhaar"), eq("aadhaar-revision"),
                 eq(com.askvocate.backend.model.VerificationStatus.VERIFIED))).thenReturn(true);
@@ -880,6 +882,55 @@ class VerificationGuardTest {
         assertFalse(stored.get().getCloudinaryReferences().isEmpty());
     }
 
+    @Test
+    void barCertificateUploadGoesToManualReview() throws Exception {
+        var profile = new LawyerFresherProfile();
+        profile.setId("fresher-id");
+        profile.setName("Test Lawyer");
+        when(freshers.findById("fresher-id")).thenReturn(Optional.of(profile));
+        when(cloudinary.uploadWithOcr(eq(front), anyString(), eq("front")))
+                .thenReturn(new CloudinaryService.UploadResult(
+                        new com.askvocate.backend.model.CloudinaryRef(),
+                        Map.of("text", "Bar Council of Delhi\nEnrolment No: D/1234/2021\nName: Test Lawyer")));
+        AtomicReference<com.askvocate.backend.model.UserDocument> stored = new AtomicReference<>();
+        when(documents.save(any())).thenAnswer(invocation -> {
+            stored.set(invocation.getArgument(0));
+            return stored.get();
+        });
+
+        var response = service.verifyDocument("fresher-id", DocumentType.BAR_CERTIFICATE, front, null);
+
+        assertEquals(com.askvocate.backend.model.VerificationStatus.PENDING, response.getVerificationStatus());
+        assertTrue(stored.get().getRequiresManualReview());
+        assertEquals("BAR_REVIEW", stored.get().getPendingReason());
+        assertNotNull(stored.get().getEnrollmentNumberHash());
+        assertFalse(stored.get().getCloudinaryReferences().isEmpty());
+    }
+
+    @Test
+    void degreeCertificateUploadGoesToManualReview() throws Exception {
+        var profile = new LawyerFresherProfile();
+        profile.setId("fresher-id");
+        profile.setName("Test Lawyer");
+        when(freshers.findById("fresher-id")).thenReturn(Optional.of(profile));
+        when(cloudinary.uploadWithOcr(eq(front), anyString(), eq("front")))
+                .thenReturn(new CloudinaryService.UploadResult(
+                        new com.askvocate.backend.model.CloudinaryRef(),
+                        Map.of("text", "University of Delhi\nName: Test Lawyer\n2020")));
+        AtomicReference<com.askvocate.backend.model.UserDocument> stored = new AtomicReference<>();
+        when(documents.save(any())).thenAnswer(invocation -> {
+            stored.set(invocation.getArgument(0));
+            return stored.get();
+        });
+
+        var response = service.verifyDocument("fresher-id", DocumentType.DEGREE_CERTIFICATE, front, null);
+
+        assertEquals(com.askvocate.backend.model.VerificationStatus.PENDING, response.getVerificationStatus());
+        assertTrue(stored.get().getRequiresManualReview());
+        assertEquals("DEGREE_REVIEW", stored.get().getPendingReason());
+        assertFalse(stored.get().getCloudinaryReferences().isEmpty());
+    }
+
     private com.askvocate.backend.model.UserDocument verifiedAadhaarWithQr(String name, String dob) {
         var aadhaar = new com.askvocate.backend.model.UserDocument();
         aadhaar.setUserId("fresher-id");
@@ -923,7 +974,9 @@ class VerificationGuardTest {
 
         var response = service.verifyBarCouncilDirect(request);
 
-        assertEquals(com.askvocate.backend.model.VerificationStatus.VERIFIED, response.getVerificationStatus());
+        assertEquals(com.askvocate.backend.model.VerificationStatus.PENDING, response.getVerificationStatus());
+        assertTrue(response.getRequiresManualReview());
+        assertEquals("BAR_REVIEW", response.getPendingReason());
         verify(experienced).save(profile);
         verify(freshers, never()).save(any());
     }

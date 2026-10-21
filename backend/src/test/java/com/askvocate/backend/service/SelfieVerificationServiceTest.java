@@ -48,6 +48,16 @@ class SelfieVerificationServiceTest {
     }
 
     @Test
+    void selfieChallengesAreRateLimited() {
+        when(documentRepository.findByUserIdAndDocumentType("lawyer", DocumentType.AADHAAR))
+                .thenReturn(Optional.of(verifiedAadhaar()));
+        when(selfies.countByUserIdAndCreatedAtAfter(eq("lawyer"), any())).thenReturn(5L);
+
+        assertThrows(DocumentVerificationException.class, () -> service.createChallenge("lawyer"));
+        verify(selfies, never()).save(any());
+    }
+
+    @Test
     void successfulMatchConsumesChallengeAndStoresSeparateSelfie() throws Exception {
         when(documentRepository.findByUserIdAndDocumentType("lawyer", DocumentType.AADHAAR))
                 .thenReturn(Optional.of(verifiedAadhaar()));
@@ -64,7 +74,7 @@ class SelfieVerificationServiceTest {
                 new VisionVerificationClient.QrResult(true, Map.of("name", "Test Lawyer"), true,
                         "test.cer", "4626", List.of(), false, null, null, null));
         when(vision.verifySelfie(any(), anyList(), eq("left"))).thenReturn(
-                new VisionVerificationClient.SelfieResult(0.8, 0.363, true, 0.9, true, null));
+                new VisionVerificationClient.SelfieResult(0.8, 0.363, true, 0.9, 0.95, true, null));
         when(cloudinary.uploadSelfie(any(), anyString()))
                 .thenReturn(new CloudinaryRef("selfie-public-id", "https://res.cloudinary.com/test/image", "selfie"));
         when(selfies.save(any())).thenAnswer(call -> call.getArgument(0));

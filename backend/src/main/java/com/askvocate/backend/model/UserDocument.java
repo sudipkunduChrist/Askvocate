@@ -74,6 +74,12 @@ public class UserDocument {
     @JsonIgnore
     private String panNumber;
 
+    /** Keyed digest of the Bar Council enrollment number for duplicate detection. */
+    @Setter
+    @JsonIgnore
+    @Indexed
+    private String enrollmentNumberHash;
+
     /** Keyed digest of the full PAN for duplicate detection. */
     @Setter
     @JsonIgnore

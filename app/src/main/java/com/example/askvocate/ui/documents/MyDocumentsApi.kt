@@ -32,7 +32,8 @@ data class MyDocument(
     val uploadOnly: Boolean, val liveCapture: Boolean, val aadhaarNumber: String? = null,
     val panNumber: String? = null,
     val qrDetails: Map<String, String> = emptyMap(), val qrPhotoUrl: String? = null,
-    val requiresManualReview: Boolean = false, val pendingReason: String? = null
+    val requiresManualReview: Boolean = false, val pendingReason: String? = null,
+    val required: Boolean = false, val requirementGroup: String? = null
 ) {
     companion object {
         fun from(json: JSONObject): MyDocument {
@@ -52,7 +53,8 @@ data class MyDocument(
                 json.optBoolean("requiresBack"), json.optBoolean("uploadOnly"), json.optBoolean("liveCapture"),
                 json.optionalText("aadhaarNumber"), json.optionalText("panNumber"),
                 qrDetails, json.optionalText("qrPhotoUrl"),
-                json.optBoolean("requiresManualReview"), json.optionalText("pendingReason"))
+                json.optBoolean("requiresManualReview"), json.optionalText("pendingReason"),
+                json.optBoolean("required"), json.optionalText("requirementGroup"))
         }
     }
 }

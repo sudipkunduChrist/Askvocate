@@ -36,6 +36,7 @@ public class DocumentVerificationResponse {
     private Boolean autoApproved;
     private Boolean requiresManualReview;
     private String manualReviewReason;
+    private String pendingReason;
     private Instant verifiedAt;
     private String failureReason;
     private String file;
@@ -180,6 +181,8 @@ public class DocumentVerificationResponse {
     public void setRequiresManualReview(Boolean value) { requiresManualReview = value; }
     public String getManualReviewReason() { return manualReviewReason; }
     public void setManualReviewReason(String value) { manualReviewReason = value; }
+    public String getPendingReason() { return pendingReason; }
+    public void setPendingReason(String value) { pendingReason = value; }
     public Instant getVerifiedAt() { return verifiedAt; }
     public void setVerifiedAt(Instant value) { verifiedAt = value; }
 

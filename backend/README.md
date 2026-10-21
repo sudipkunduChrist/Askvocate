@@ -78,10 +78,24 @@ which calls for retaining only the last four digits and redacting stored card co
   - `FAILED` — organization/non-individual or structurally invalid PAN.
 - Image retention: only `VERIFIED`, `PAN_QR_UNREADABLE`, and `PAN_WAITING_AADHAAR` keep the latest image. Mismatch/duplicate/org/invalid discard it. A new submission replaces (and deletes) the previous Cloudinary asset.
 
+#### Role-based document sets
+
+| Role | Required | Optional |
+|---|---|---|
+| `LAWYER_EXPERIENCED` | Bar enrollment **proof** (certificate preferred, or Bar Council ID), Certificate of Practice, AIBE certificate, Aadhaar, PAN, live selfie | — |
+| `LAWYER_FRESHER` | Bar enrollment **proof** (certificate preferred, or Bar Council ID), LL.B. degree certificate, Aadhaar, PAN, live selfie | AIBE certificate |
+
+"Bar enrollment proof" is one requirement satisfied by **either** the enrollment certificate **or** the Bar Council ID card; the certificate is preferred.
+
+Bar Council, COP, Degree and AIBE uploads are OCR-extracted and **always go to manual review**
+(`BAR_REVIEW`, `BAR_MISMATCH`, `BAR_DUPLICATE`, `DEGREE_REVIEW`, `AIBE_REVIEW`). Unreadable
+uploads are `*_OCR_UNREADABLE` re-upload states. OCR never auto-verifies these certificates.
+Completion percentage and "fully verified" are computed from the role's required set.
+
 #### Manual review (admin)
 
 - `POST /api/admin/login`, then `GET /api/admin/verification/documents/pending?type=PAN` or `?type=AADHAAR`.
-- Only documents with `requiresManualReview=true` are queued: Aadhaar/PAN OCR↔QR mismatches and duplicate PAN. QR/OCR-unreadable cases are re-upload states and are **not** queued.
+- Only documents with `requiresManualReview=true` are queued: Aadhaar/PAN OCR↔QR mismatches, duplicate PAN, and Bar/COP/Degree/AIBE certificate reviews. QR/OCR-unreadable cases are re-upload states and are **not** queued.
 - `POST /api/admin/verification/documents/{id}/approve|reject`.
 - An Aadhaar without a verified Secure QR **cannot be approved**.
 - Set `ADMIN_PASSWORD` in production; the default is `askvocate-admin`. Set `AADHAAR_HASH_KEY` to enable keyed duplicate detection. Bar Council verification retains its existing parsing and status rules.
@@ -96,9 +110,12 @@ as multipart fields to `POST /api/documents/selfie/verify?userId=...` with `chal
 The attempt is stored in `selfie_verifications` using the existing `DocType.SELFIE`.
 The selfie step re-reads the signed Aadhaar QR from the stored Aadhaar images and compares
 its embedded photo to the live capture; an Aadhaar without a readable signed QR cannot pass
-selfie matching. The overall lawyer profile becomes `VERIFIED` only after Bar Council,
-Aadhaar, PAN, and a selfie tied to that verified Aadhaar are all verified. A new Aadhaar
-submission requires a new selfie match.
+selfie matching. Live capture is hardened with local quality gates (brightness, blur, face
+size), a three-frame head-turn challenge, a local MiniFASNetV2 anti-spoof score, and a limit
+of 5 selfie challenges per lawyer per hour. The QR photo and PAD thresholds are starting
+points and must be calibrated on representative live/spoof samples. The overall lawyer
+profile becomes `VERIFIED` only after Bar Council, Aadhaar, PAN, and a selfie tied to that
+verified Aadhaar are all verified. A new Aadhaar submission requires a new selfie match.
 
 All OCR, QR, signature, and face checks run locally without a paid per-verification API.
 Cloudinary image storage remains subject to its account quota and pricing.
@@ -169,10 +186,10 @@ accounts are rejected. `GET /api/my-documents` returns the lawyer verification c
 preview and download. Aadhaar needs both images. Live selfie uses the existing
 challenge and verify endpoints. Degree and AIBE certificates support upload and
 view only; they are labeled unverified until a verification backend is added.
-`PENDING` items expose `requiresManualReview` and `pendingReason`
+`PENDING` items expose `requiresManualReview`, `pendingReason` and `required`
 (`AADHAAR_QR_UNREADABLE`, `AADHAAR_OCR_UNREADABLE`, `AADHAAR_OCR_MISMATCH`,
-`PAN_QR_UNREADABLE`, `PAN_MISMATCH`, `PAN_DUPLICATE`, `PAN_WAITING_AADHAAR`) so the
-app can show the right label and retry actions.
+`PAN_QR_UNREADABLE`, `PAN_MISMATCH`, `PAN_DUPLICATE`, `PAN_WAITING_AADHAAR`,
+`BAR_*`, `DEGREE_*`, `AIBE_*`) so the app can show the right label and retry actions.
 
 The older `/api/documents` upload, verification, listing, download URL, and deletion
 routes also require an app token belonging to the requested user. Selfie challenge
