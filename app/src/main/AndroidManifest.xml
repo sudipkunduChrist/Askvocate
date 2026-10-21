@@ -24,7 +24,7 @@
         </provider>
         <activity android:name=".ui.verification.LiveSelfieActivity" android:exported="false" />
         <activity
-            android:name=".ui.documents.PortraitCaptureActivity"
+            android:name=".ui.documents.PanQrScanActivity"
             android:exported="false"
             android:screenOrientation="portrait" />
         <activity

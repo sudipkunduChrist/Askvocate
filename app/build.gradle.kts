@@ -122,7 +122,7 @@ dependencies {
     implementation(libs.androidx.camera.view)
 
     // Live QR scanner
-    implementation("com.journeyapps:zxing-android-embedded:4.3.0")
+    implementation(libs.mlkit.barcode.scanning)
 
     // Testing
     testImplementation(libs.junit)

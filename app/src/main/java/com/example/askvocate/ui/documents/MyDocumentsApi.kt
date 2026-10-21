@@ -31,7 +31,8 @@ data class MyDocument(
     val verifiedAt: String?, val media: List<String>, val requiresBack: Boolean,
     val uploadOnly: Boolean, val liveCapture: Boolean, val aadhaarNumber: String? = null,
     val panNumber: String? = null,
-    val qrDetails: Map<String, String> = emptyMap(), val qrPhotoUrl: String? = null
+    val qrDetails: Map<String, String> = emptyMap(), val qrPhotoUrl: String? = null,
+    val requiresManualReview: Boolean = false, val pendingReason: String? = null
 ) {
     companion object {
         fun from(json: JSONObject): MyDocument {
@@ -50,7 +51,8 @@ data class MyDocument(
                 (0 until mediaArray.length()).map { mediaArray.getString(it) },
                 json.optBoolean("requiresBack"), json.optBoolean("uploadOnly"), json.optBoolean("liveCapture"),
                 json.optionalText("aadhaarNumber"), json.optionalText("panNumber"),
-                qrDetails, json.optionalText("qrPhotoUrl"))
+                qrDetails, json.optionalText("qrPhotoUrl"),
+                json.optBoolean("requiresManualReview"), json.optionalText("pendingReason"))
         }
     }
 }
@@ -167,14 +169,15 @@ class MyDocumentsApi(private val context: Context) {
     }
 
     /**
-     * Decodes the PAN QR from a still photo. Still-frame decoding is far more
-     * reliable for the dense PAN Secure QR than the live camera preview.
+     * Submits a PAN card/QR photo. The backend stores the image (replacing any previous
+     * submission), decodes the signed QR when possible, and routes images without a
+     * readable QR to manual review as evidence.
      */
-    suspend fun scanPanQr(image: Uri): MyDocument = withContext(Dispatchers.IO) {
+    suspend fun submitPanImage(image: Uri): MyDocument = withContext(Dispatchers.IO) {
         val file = compressImage(image)
         val boundary = "askvocate-${UUID.randomUUID()}"
         val conn = try {
-            connection("/PAN/qr", "POST").apply {
+            connection("/PAN", "POST").apply {
                 doOutput = true
                 setRequestProperty("Content-Type", "multipart/form-data; boundary=$boundary")
                 setChunkedStreamingMode(64 * 1024)
@@ -185,8 +188,8 @@ class MyDocumentsApi(private val context: Context) {
         }
         try {
             conn.outputStream.buffered().use { out ->
-                out.write(("--$boundary\r\nContent-Disposition: form-data; name=\"image\"; " +
-                    "filename=\"pan-qr.jpg\"\r\nContent-Type: image/jpeg\r\n\r\n").toByteArray())
+                out.write(("--$boundary\r\nContent-Disposition: form-data; name=\"front\"; " +
+                    "filename=\"pan.jpg\"\r\nContent-Type: image/jpeg\r\n\r\n").toByteArray())
                 file.inputStream().use { input -> input.copyTo(out) }
                 out.write("\r\n--$boundary--\r\n".toByteArray())
             }

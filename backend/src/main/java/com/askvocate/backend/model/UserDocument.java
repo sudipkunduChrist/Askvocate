@@ -154,6 +154,9 @@ public class UserDocument {
     private Boolean requiresManualReview;
     @Setter
     private String manualReviewReason;
+    /** Machine-readable reason for a PENDING status, used to drive the app UI. */
+    @Setter
+    private String pendingReason;
     @Setter
     private Instant verifiedAt;
 

@@ -133,6 +133,7 @@ class MyDocumentsControllerTest {
         qr.setAddress("12 Road, Delhi");
         qr.setPincode("110001");
         qr.setAadhaarLast4("1234");
+        qr.setPhotoUrl("https://res.cloudinary.com/demo/aadhaar-qr.jpg");
         doc.setQrData(qr);
         doc.setIsQrVerified(true);
         when(verifiedDocs.findByUserIdAndDocumentType("owner", DocumentType.AADHAAR)).thenReturn(Optional.of(doc));
@@ -143,5 +144,6 @@ class MyDocumentsControllerTest {
         assertEquals("01-02-1990", item.qrDetails().get("Date of Birth"));
         assertEquals("FEMALE", item.qrDetails().get("Gender"));
         assertEquals("OCR N@me", item.details().get("name"));
+        assertNull(item.qrPhotoUrl());
     }
 }

@@ -1,6 +1,8 @@
 package com.example.askvocate.ui.documents
 
 import android.content.Intent
+import android.animation.Animator
+import android.animation.AnimatorListenerAdapter
 import android.animation.ValueAnimator
 import android.content.res.ColorStateList
 import android.graphics.BitmapFactory
@@ -39,8 +41,6 @@ import com.example.askvocate.util.applyStatusBarInset
 import com.google.android.material.dialog.MaterialAlertDialogBuilder
 import com.google.android.material.button.MaterialButton
 import com.google.android.material.progressindicator.LinearProgressIndicator
-import com.journeyapps.barcodescanner.ScanContract
-import com.journeyapps.barcodescanner.ScanOptions
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
@@ -82,6 +82,7 @@ class MyDocumentsFragment : Fragment() {
     private var loadingStage: Job? = null
     private var skeletonAnimator: ValueAnimator? = null
     private var submitProgressAnimator: ValueAnimator? = null
+    private var submitPercentJob: Job? = null
     private var checkStatusButton: MaterialButton? = null
 
     private val chooseImage = registerForActivityResult(ActivityResultContracts.GetContent()) { uri ->
@@ -113,15 +114,21 @@ class MyDocumentsFragment : Fragment() {
             setBusy(false)
         }
     }
-    private val liveQrScanner = registerForActivityResult(ScanContract()) { result ->
-        val contents = result.contents?.trim()
-        if (contents.isNullOrEmpty()) return@registerForActivityResult
-        if (!contents.all(Char::isDigit) || contents.length % 4 != 0) {
-            message("That QR is not the signed Enhanced PAN QR.")
-            return@registerForActivityResult
+    private val liveQrScanner =
+        registerForActivityResult(ActivityResultContracts.StartActivityForResult()) { result ->
+            if (result.resultCode != android.app.Activity.RESULT_OK) return@registerForActivityResult
+            val contents = result.data?.getStringExtra(PanQrScanActivity.EXTRA_QR_TEXT)?.trim()
+            if (contents.isNullOrEmpty()) return@registerForActivityResult
+            if (!contents.all(Char::isDigit) || contents.length % 4 != 0) {
+                message("That QR is not the signed Enhanced PAN QR.")
+                return@registerForActivityResult
+            }
+            // A still of the scan is saved as review evidence whenever the camera captured one.
+            val captured = result.data?.getStringExtra(PanQrScanActivity.EXTRA_IMAGE_PATH)
+                ?.let(::File)?.takeIf { it.isFile }
+            if (captured != null) submitQrPhoto(Uri.fromFile(captured))
+            else scanPanQrText(contents)
         }
-        scanPanQrText(contents)
-    }
     private val qrPhotoCameraPermission =
         registerForActivityResult(ActivityResultContracts.RequestPermission()) { granted ->
             if (granted) runCatching { launchQrCamera() }
@@ -196,6 +203,8 @@ class MyDocumentsFragment : Fragment() {
         val current = _binding ?: return
         current.documentsLoadingOverlay.isVisible = value
         current.documentsInlineProgress.isVisible = false
+        current.documentsLoadingPercent.isVisible = false
+        current.documentsLoadingPercent.text = "0%"
         if (value) {
             stopSkeletons()
             current.documentsProgress.isIndeterminate = true
@@ -223,6 +232,8 @@ class MyDocumentsFragment : Fragment() {
             loadingAnimator = null
             submitProgressAnimator?.cancel()
             submitProgressAnimator = null
+            submitPercentJob?.cancel()
+            submitPercentJob = null
             current.documentsProgress.isIndeterminate = true
             current.documentsProgress.progress = 0
             current.documentsLoadingIcon.scaleX = 1f
@@ -302,17 +313,45 @@ class MyDocumentsFragment : Fragment() {
         val bar = _binding?.documentsProgress ?: return
         bar.isIndeterminate = false
         bar.progress = 0
+        submitPercentJob?.cancel()
+        _binding?.documentsLoadingPercent?.apply {
+            isVisible = true
+            text = "0%"
+        }
         submitProgressAnimator?.cancel()
         if (!ValueAnimator.areAnimatorsEnabled()) {
             bar.progress = 45
+            _binding?.documentsLoadingPercent?.text = "45%"
             return
         }
         submitProgressAnimator = ValueAnimator.ofInt(0, 90).apply {
             duration = 9000
             interpolator = DecelerateInterpolator()
             addUpdateListener {
-                if (_binding != null) bar.progress = it.animatedValue as Int
+                if (_binding != null) {
+                    val progress = it.animatedValue as Int
+                    bar.progress = progress
+                    _binding?.documentsLoadingPercent?.text = "$progress%"
+                }
             }
+            addListener(object : AnimatorListenerAdapter() {
+                override fun onAnimationEnd(animation: Animator) {
+                    if (_binding == null || !busy) return
+                    // Never freeze at 90%: keep the bar moving while the server finishes.
+                    bar.isIndeterminate = true
+                    _binding?.documentsLoadingPercent?.text = "90%"
+                    submitPercentJob?.cancel()
+                    submitPercentJob = viewLifecycleOwner.lifecycleScope.launch {
+                        var shown = 90
+                        while (busy) {
+                            delay(1200)
+                            if (!busy || _binding == null) break
+                            if (shown < 99) shown++
+                            _binding?.documentsLoadingPercent?.text = "$shown%"
+                        }
+                    }
+                }
+            })
             start()
         }
     }
@@ -416,7 +455,7 @@ class MyDocumentsFragment : Fragment() {
             }, LinearLayout.LayoutParams(dp(48), dp(48)))
             val copy = LinearLayout(requireContext()).apply { orientation = LinearLayout.VERTICAL }
             copy.addView(label(doc.title, 16f, R.color.text_primary, true))
-            copy.addView(statusChip(doc.status), marginParams(8, false))
+            copy.addView(statusChip(doc), marginParams(8, false))
             row.addView(copy, LinearLayout.LayoutParams(0, ViewGroup.LayoutParams.WRAP_CONTENT, 1f).apply {
                 marginStart = dp(14)
             })
@@ -458,7 +497,7 @@ class MyDocumentsFragment : Fragment() {
             it.isNotEmpty() && !it.equals("null", ignoreCase = true)
         } ?: when (doc.status) {
             "VERIFIED" -> "Verification complete."
-            "PENDING" -> "Verification is in progress."
+            "PENDING" -> "Manual review is in progress."
             "NOT_UPLOADED" -> "Upload a clear image to begin."
             else -> "Review the document and try again if needed."
         }
@@ -473,10 +512,12 @@ class MyDocumentsFragment : Fragment() {
                 setBackgroundResource(R.drawable.bg_document_icon)
                 setPadding(dp(12), dp(12), dp(12), dp(12))
             }, LinearLayout.LayoutParams(dp(48), dp(48)))
-            heading.addView(label(statusText(doc.status), 19f, statusColor(doc.status), true),
+            heading.addView(label(statusLabel(doc), 19f, statusColor(doc.status), true),
                 LinearLayout.LayoutParams(0, ViewGroup.LayoutParams.WRAP_CONTENT, 1f).apply { marginStart = dp(14) })
             addView(heading)
-            addView(label(statusNote, 14f, R.color.text_secondary), marginParams(14, false))
+            addView(label(sentenceLines(statusNote), 14f, R.color.text_secondary).apply {
+                setLineSpacing(dp(4).toFloat(), 1.1f)
+            }, marginParams(14, false))
             if (doc.status == "PENDING") {
                 addView(LinearProgressIndicator(requireContext()).apply {
                     isIndeterminate = true
@@ -491,6 +532,9 @@ class MyDocumentsFragment : Fragment() {
             val check = actionButton("Check verification status", false) { refresh() }
             checkStatusButton = check
             binding.documentsContent.addView(check, marginParams(12))
+            if (doc.type == "PAN") {
+                addAction(binding.documentsContent, "Retry QR scan", true) { launchLiveQrScanner() }
+            }
         }
         if (doc.uploadOnly) {
             val note = card(R.color.doc_navy_soft).apply {
@@ -573,25 +617,21 @@ class MyDocumentsFragment : Fragment() {
             doc.verifiedAt?.let { detailRow(detailCard, "Verified", date(it)) }
             binding.documentsContent.addView(detailCard, marginParams(12))
         }
-        val showQrPhoto = !doc.qrPhotoUrl.isNullOrBlank() && when (doc.type) {
-            "AADHAAR" -> useQrDetails
-            // The uploaded card photo takes priority; the QR photo is the fallback
-            // for live scans, where no card image was ever uploaded.
-            "PAN" -> doc.status == "VERIFIED" && doc.media.isEmpty()
-            else -> false
-        }
+        // PAN scans have no card image, so show the photo embedded in the signed QR.
+        // Aadhaar verified details come from the QR text only; its embedded photo is not shown.
+        val showQrPhoto = doc.type == "PAN" && doc.status == "VERIFIED" &&
+            doc.media.isEmpty() && !doc.qrPhotoUrl.isNullOrBlank()
         if (showQrPhoto) {
-            val qrName = if (doc.type == "PAN") "PAN" else "Aadhaar"
-            sectionTitle("$qrName QR photo", "Photo embedded in your signed $qrName QR")
+            sectionTitle("PAN QR photo", "Photo embedded in your signed PAN QR")
             val photoCard = card()
             photoCard.addView(ImageView(requireContext()).apply {
-                contentDescription = "$qrName QR photo"
+                contentDescription = "PAN QR photo"
                 scaleType = ImageView.ScaleType.CENTER_CROP
                 load(doc.qrPhotoUrl) { crossfade(true) }
             }, LinearLayout.LayoutParams(-1, dp(180)))
             binding.documentsContent.addView(photoCard, marginParams(12))
         }
-        if (doc.type == "PAN") {
+        if (doc.type == "PAN" && doc.status != "VERIFIED") {
             sectionTitle("PAN QR", "Use this if the card text is difficult to read")
             val qrCard = card()
             qrCard.addView(label("Scan only the QR code", 16f, R.color.text_primary, true))
@@ -609,9 +649,15 @@ class MyDocumentsFragment : Fragment() {
             revealContent()
             return
         }
-        if (doc.status != "VERIFIED" && doc.status != "PENDING") {
-            sectionTitle(if (doc.uploadOnly) "Upload image" else "Upload and verify",
-                "Use a clear, well-lit photo with every corner visible")
+        val canReupload = doc.status != "VERIFIED" &&
+            (doc.status != "PENDING" || doc.type == "AADHAAR")
+        if (canReupload) {
+            val uploadTitle = when {
+                doc.status == "PENDING" -> "Retry upload"
+                doc.uploadOnly -> "Upload image"
+                else -> "Upload and verify"
+            }
+            sectionTitle(uploadTitle, "Use a clear, well-lit photo with every corner visible")
             val uploadCard = card()
             uploadCard.addView(label("Document photos", 16f, R.color.text_primary, true))
             uploadCard.addView(label(getString(R.string.document_upload_limits), 13f,
@@ -656,6 +702,14 @@ class MyDocumentsFragment : Fragment() {
             if (bold) setTypeface(typeface, Typeface.BOLD)
         }
 
+    /** One sentence per line in the status/warning card, with readable spacing. */
+    private fun sentenceLines(value: String): String =
+        value.trim()
+            .split(Regex("(?<=[.!?])\\s+"))
+            .map(String::trim)
+            .filter(String::isNotEmpty)
+            .joinToString("\n")
+
     private fun statusColor(status: String) = when (status) {
         "VERIFIED" -> R.color.justitia_teal_success
         "PENDING", "UPLOADED" -> R.color.amber_dark
@@ -676,10 +730,10 @@ class MyDocumentsFragment : Fragment() {
         else -> R.drawable.ic_description
     }
 
-    private fun statusChip(status: String) = label(statusText(status), 12f, statusColor(status), true).apply {
+    private fun statusChip(doc: MyDocument) = label(statusLabel(doc), 12f, statusColor(doc.status), true).apply {
         background = GradientDrawable().apply {
             cornerRadius = dp(100).toFloat()
-            setColor(color(statusBackground(status)))
+            setColor(color(statusBackground(doc.status)))
         }
         setPadding(dp(10), dp(5), dp(10), dp(5))
     }
@@ -853,10 +907,18 @@ class MyDocumentsFragment : Fragment() {
             .withZone(ZoneId.systemDefault()).format(Instant.parse(raw))
     }.getOrDefault(raw)
 
+    /** PENDING is split by reason: re-upload states vs real manual-review conflicts. */
+    private fun statusLabel(doc: MyDocument): String = when (doc.pendingReason) {
+        "AADHAAR_QR_UNREADABLE", "AADHAAR_OCR_UNREADABLE", "PAN_QR_UNREADABLE" -> "Re-upload required"
+        "PAN_WAITING_AADHAAR" -> "Waiting for Aadhaar"
+        "AADHAAR_OCR_MISMATCH", "PAN_MISMATCH", "PAN_DUPLICATE" -> "Manual review"
+        else -> statusText(doc.status)
+    }
+
     private fun statusText(status: String): String = when (status) {
         "VERIFIED" -> "Verified"
         "UPLOADED" -> "Uploaded · Not verified"
-        "PENDING" -> "Verification pending"
+        "PENDING" -> "Manual review"
         "FAILED" -> "Verification failed"
         "REJECTED" -> "Rejected"
         else -> "Not uploaded"
@@ -881,14 +943,7 @@ class MyDocumentsFragment : Fragment() {
     }
 
     private fun launchLiveQrScanner() {
-        val options = ScanOptions()
-            .setDesiredBarcodeFormats(ScanOptions.QR_CODE)
-            .setPrompt("Align the PAN QR inside the frame")
-            .setBeepEnabled(false)
-            .setOrientationLocked(true)
-            .setBarcodeImageEnabled(false)
-            .setCaptureActivity(PortraitCaptureActivity::class.java)
-        liveQrScanner.launch(options)
+        liveQrScanner.launch(Intent(requireContext(), PanQrScanActivity::class.java))
     }
 
     private fun chooseQrPhotoSource() {
@@ -913,8 +968,9 @@ class MyDocumentsFragment : Fragment() {
     private fun submitQrPhoto(uri: Uri) {
         setBusy(true, "Verifying PAN QR", "Reading the QR code from your photo…")
         viewLifecycleOwner.lifecycleScope.launch {
-            val result = runCatching { api.scanPanQr(uri) }
+            val result = runCatching { api.submitPanImage(uri) }
             documentState.discardQrCapture()
+            if (uri.scheme == "file") uri.path?.let { File(it).delete() }
             result.onSuccess { doc -> if (_binding != null) applyPanDocument(doc) }
                 .onFailure { if (_binding != null) message(it.message ?: "Could not verify the PAN QR.") }
             if (_binding != null) setBusy(false)
@@ -955,6 +1011,11 @@ class MyDocumentsFragment : Fragment() {
         renderDetail(doc)
         when (doc.status) {
             "VERIFIED" -> message("PAN verified successfully.", ToastType.SUCCESS)
+            "PENDING" -> message(when (doc.pendingReason) {
+                "PAN_WAITING_AADHAAR" -> "PAN QR verified. Verify your Aadhaar to finish."
+                "PAN_QR_UNREADABLE" -> "PAN QR could not be read. Retry with a clearer photo or e-PAN."
+                else -> "PAN sent for manual review."
+            }, ToastType.INFO)
             "FAILED", "REJECTED" -> scrollToStatusError()
         }
     }
@@ -990,6 +1051,17 @@ class MyDocumentsFragment : Fragment() {
                         scrollToStatusError()
                     } else if (it.status == "VERIFIED") {
                         message("${it.title} verified successfully.", ToastType.SUCCESS)
+                    } else if (it.status == "PENDING") {
+                        message(when (it.pendingReason) {
+                            "AADHAAR_QR_UNREADABLE" ->
+                                "Aadhaar QR could not be read. Upload e-Aadhaar or retry with a clear photo."
+                            "AADHAAR_OCR_UNREADABLE" ->
+                                "Printed Aadhaar details could not be read. Retry with a clearer photo."
+                            "PAN_WAITING_AADHAAR" -> "PAN QR verified. Verify your Aadhaar to finish."
+                            "PAN_QR_UNREADABLE" ->
+                                "PAN QR could not be read. Retry with a clearer photo or e-PAN."
+                            else -> "${it.title} sent for manual review."
+                        }, ToastType.INFO)
                     } else if (it.uploadOnly) {
                         message("${it.title} uploaded. Verification is not available yet.", ToastType.SUCCESS)
                     }
@@ -1083,6 +1155,8 @@ class MyDocumentsFragment : Fragment() {
         loadingAnimator?.cancel()
         skeletonAnimator?.cancel()
         submitProgressAnimator?.cancel()
+        submitPercentJob?.cancel()
+        submitPercentJob = null
         super.onDestroyView()
         _binding = null
         aadhaarValueView = null
