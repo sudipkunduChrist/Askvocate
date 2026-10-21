@@ -44,16 +44,27 @@ class MainActivity : AppCompatActivity() {
         drawerLayout = findViewById(R.id.drawer_layout)
         val bottomNavContainer: View = findViewById(R.id.bottom_nav_container)
         val navView: NavigationView = findViewById(R.id.nav_view)
+        navView.getHeaderView(0).findViewById<View>(R.id.btn_close_drawer)
+            .setOnClickListener { animateDrawer(open = false) }
         val fabAsk: View = findViewById(R.id.fab_center_ask)
         val centerNavSlot: View = findViewById(R.id.center_nav_slot)
 
         fun updateRoleNavigation() {
-            val isClient = com.example.askvocate.util.SessionManager
-                .getUserRole(this)
-                .equals("CLIENT", ignoreCase = true)
+            val role = com.example.askvocate.util.SessionManager.getUserRole(this)
+            val isClient = role.equals("CLIENT", ignoreCase = true)
+            val isLawyer = role.startsWith("LAWYER", ignoreCase = true)
+            findViewById<TextView>(R.id.label_cases).text =
+                if (isLawyer) getString(R.string.lawyer_schedule_tab) else getString(R.string.tab_cases)
+            findViewById<ImageView>(R.id.icon_cases).apply {
+                setImageResource(if (isLawyer) R.drawable.ic_onboard_lawyer_schedule else R.drawable.ic_case_work)
+                contentDescription = if (isLawyer) getString(R.string.lawyer_schedule_tab)
+                    else getString(R.string.tab_cases)
+            }
             fabAsk.visibility = if (isClient) View.VISIBLE else View.GONE
             centerNavSlot.visibility = if (isClient) View.VISIBLE else View.GONE
             navView.menu.findItem(R.id.nav_find_lawyers)?.isVisible = isClient
+            navView.menu.findItem(R.id.nav_search_history)?.isVisible = isClient
+            navView.menu.findItem(R.id.nav_chat_history)?.isVisible = isClient
         }
 
         val navHostFragment = supportFragmentManager
@@ -78,12 +89,12 @@ class MainActivity : AppCompatActivity() {
             findViewById<View>(tabId).setOnClickListener { selectTab(destId) }
         }
 
-        // Floating center "ask / find your lawyer" button.
+        // Floating center AI chat button.
         fabAsk.setOnClickListener {
             val options = NavOptions.Builder()
                 .setLaunchSingleTop(true)
                 .build()
-            navController.navigate(R.id.nav_find_lawyers, null, options)
+            navController.navigate(R.id.nav_chat_history, null, options)
         }
 
         // Drawer navigation.
@@ -101,7 +112,8 @@ class MainActivity : AppCompatActivity() {
                 R.id.nav_get_started,
                 R.id.nav_sign_in,
                 R.id.nav_sign_up,
-                R.id.nav_lawyer_sign_up -> false
+                R.id.nav_lawyer_sign_up,
+                R.id.nav_legal_assistant -> false
                 else -> true
             }
             val barWasShown = bottomNavContainer.visibility == View.VISIBLE
@@ -151,9 +163,27 @@ class MainActivity : AppCompatActivity() {
     /** Opens the navigation drawer from the top-left hamburger icon. */
     fun openDrawer() {
         if (drawerLayout.isDrawerOpen(GravityCompat.START)) {
-            drawerLayout.closeDrawer(GravityCompat.START)
+            animateDrawer(open = false)
         } else {
-            drawerLayout.openDrawer(GravityCompat.START)
+            animateDrawer(open = true)
+        }
+    }
+
+    private fun animateDrawer(open: Boolean) {
+        val drawer = findViewById<NavigationView>(R.id.nav_view)
+        val distance = (drawer.width.takeIf { it > 0 }
+            ?: resources.getDimensionPixelSize(R.dimen.nav_drawer_width)).toFloat()
+        drawer.animate().cancel()
+        if (open) {
+            drawerLayout.openDrawer(drawer, false)
+            drawer.translationX = -distance
+            drawer.animate().translationX(0f).setDuration(180L).start()
+        } else {
+            drawer.animate().translationX(-distance).setDuration(180L)
+                .withEndAction {
+                    drawerLayout.closeDrawer(drawer, false)
+                    drawer.translationX = 0f
+                }.start()
         }
     }
 

@@ -67,7 +67,7 @@
     <dimen name="chat_bubble_radius">16dp</dimen>
 
     <!-- Nav Drawer -->
-    <dimen name="nav_drawer_width">300dp</dimen>
+    <dimen name="nav_drawer_width">264dp</dimen>
     <dimen name="nav_header_height">180dp</dimen>
 
     <!-- Lawyer Card -->

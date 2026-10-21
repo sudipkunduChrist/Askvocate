@@ -11,13 +11,16 @@ import android.widget.LinearLayout
 import android.widget.TextView
 import androidx.appcompat.widget.Toolbar
 import androidx.core.content.getSystemService
+import androidx.core.view.ViewCompat
+import androidx.core.view.WindowInsetsCompat
 import androidx.core.view.isVisible
+import androidx.core.view.updatePadding
 import androidx.fragment.app.Fragment
 import androidx.fragment.app.viewModels
 import androidx.navigation.NavOptions
 import androidx.navigation.fragment.findNavController
 import androidx.recyclerview.widget.RecyclerView
-import com.example.askvocate.MainActivity
+import androidx.core.widget.NestedScrollView
 import com.example.askvocate.R
 import com.example.askvocate.ui.adapters.LawyerAdapter
 import com.example.askvocate.util.AnimationUtils
@@ -25,6 +28,7 @@ import com.example.askvocate.util.SessionManager
 import com.example.askvocate.util.ToastType
 import com.example.askvocate.util.applyStatusBarInset
 import com.example.askvocate.util.showCustomToast
+import com.example.askvocate.util.AppToast as Toast
 import com.google.android.material.button.MaterialButton
 import com.google.android.material.floatingactionbutton.FloatingActionButton
 import com.google.android.material.textfield.TextInputEditText
@@ -52,10 +56,10 @@ class FindLawyersFragment : Fragment() {
         view.findViewById<View>(R.id.find_lawyers_app_bar).applyStatusBarInset()
 
         view.findViewById<Toolbar>(R.id.toolbar).setNavigationOnClickListener {
-            (requireActivity() as? MainActivity)?.openDrawer()
+            if (!findNavController().navigateUp()) findNavController().navigate(R.id.nav_home)
         }
         view.findViewById<View>(R.id.btn_notifications).setOnClickListener {
-            android.widget.Toast.makeText(requireContext(), "Notifications coming soon!", android.widget.Toast.LENGTH_SHORT).show()
+            Toast.makeText(requireContext(), "Notifications coming soon!", Toast.LENGTH_SHORT).show()
         }
 
         val caseDescription = view.findViewById<EditText>(R.id.et_case_description)
@@ -67,6 +71,28 @@ class FindLawyersFragment : Fragment() {
         val clarificationAnswerLayout = view.findViewById<TextInputLayout>(R.id.til_clarification_answer)
         val clarificationAnswer = view.findViewById<TextInputEditText>(R.id.et_clarification_answer)
         val clarificationSubmit = view.findViewById<MaterialButton>(R.id.btn_submit_clarification)
+        val scroll = view.findViewById<NestedScrollView>(R.id.find_lawyers_scroll)
+        val baseBottomPadding = scroll.paddingBottom
+        fun showClarificationAboveKeyboard() {
+            scroll.post {
+                if (clarification.isVisible) {
+                    val visibleHeight = scroll.height - scroll.paddingBottom
+                    val margin = (16 * resources.displayMetrics.density).toInt()
+                    scroll.smoothScrollTo(0, (clarification.bottom - visibleHeight + margin).coerceAtLeast(0))
+                }
+            }
+        }
+        ViewCompat.setOnApplyWindowInsetsListener(scroll) { target, insets ->
+            val keyboard = insets.getInsets(WindowInsetsCompat.Type.ime()).bottom
+            val navigation = insets.getInsets(WindowInsetsCompat.Type.navigationBars()).bottom
+            target.updatePadding(bottom = baseBottomPadding + maxOf(keyboard, navigation))
+            if (keyboard > 0) showClarificationAboveKeyboard()
+            insets
+        }
+        ViewCompat.requestApplyInsets(scroll)
+        clarificationAnswer.setOnFocusChangeListener { _, hasFocus ->
+            if (hasFocus) showClarificationAboveKeyboard()
+        }
         val results = view.findViewById<LinearLayout>(R.id.results_container)
         val error = view.findViewById<TextView>(R.id.tv_error)
         val domain = view.findViewById<TextView>(R.id.tv_detected_domain)
@@ -133,25 +159,6 @@ class FindLawyersFragment : Fragment() {
                     lawyerAdapter.submitList(state.lawyers)
                     AnimationUtils.runLayoutAnimation(lawyerList)
 
-                    // Auto-save this search session to Saved Advocates
-                    val savedAdvocates = state.lawyers.map { lawyer ->
-                        com.example.askvocate.data.model.SavedAdvocate(
-                            lawyerId = lawyer.id,
-                            name = lawyer.name,
-                            specialty = lawyer.specialty,
-                            location = lawyer.location,
-                            rating = lawyer.rating,
-                            yearsExperience = lawyer.yearsExperience,
-                            consultationFee = lawyer.consultationFee,
-                            isVerified = lawyer.isVerified
-                        )
-                    }
-                    val repo = com.example.askvocate.data.repository.SavedAdvocatesRepository(requireContext())
-                    repo.saveSearch(
-                        domain = state.detectedDomain,
-                        query = caseDescription.text.toString(),
-                        advocates = savedAdvocates
-                    )
                 }
                 is FindLawyersViewModel.UiState.Error -> {
                     error.text = state.message
@@ -162,6 +169,7 @@ class FindLawyersFragment : Fragment() {
                     clarificationAnswerLayout.error = null
                     clarificationAnswer.text?.clear()
                     clarificationAnswer.requestFocus()
+                    showClarificationAboveKeyboard()
                 }
                 else -> Unit
             }

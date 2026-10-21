@@ -51,6 +51,8 @@ public class LawyerFresherProfile {
     private Integer graduationYear = 0;
     @Builder.Default
     private String specialization = "";
+    @Builder.Default
+    private String barCouncilId = "";
 
     // --- Verification ---
     @Builder.Default

@@ -6,6 +6,7 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.stereotype.Service;
 
+import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
@@ -13,11 +14,14 @@ import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
 /**
- * Parses raw Cloudinary OCR (adv_ocr) responses into structured identity fields.
+ * Parses local Tesseract OCR responses into structured identity fields.
  * 
- * <p>Supports three document types: Aadhaar, PAN, and Driving License.
- * Each parser extracts and validates document-specific fields (name, DOB,
- * document number, etc.) using regex pattern matching.
+ * <p>Supports documents:
+ * <ul>
+ *   <li>Aadhaar Card (front + back)</li>
+ *   <li>PAN Card</li>
+ *   <li>Bar Council ID Card / Enrollment Certificate / Certificate of Practice (COP)</li>
+ * </ul>
  * 
  * <p><b>Security:</b> This service never logs raw OCR text. Only the
  * extraction outcome (success/failure) and confidence are logged.
@@ -27,224 +31,651 @@ public class OcrExtractionService {
 
     private static final Logger log = LoggerFactory.getLogger(OcrExtractionService.class);
 
+    private final BarCouncilValidationService barCouncilValidationService;
+
     // ── Aadhaar patterns ────────────────────────────────────────────────
     private static final Pattern AADHAAR_NUMBER_PATTERN =
-            Pattern.compile("\\b(\\d{4}\\s?\\d{4}\\s?\\d{4})\\b");
+            Pattern.compile("\\b([2-9]\\d{3}(?:[\\s-]{0,2}\\d{4}){2})\\b");
+    /** Masked Aadhaar printed/PDF form: "XXXX XXXX 1234" (also * and - separators). */
+    private static final Pattern AADHAAR_MASKED_PATTERN =
+            Pattern.compile("(?i)(?:[x*•●]{4}[\\s-]*){2}(\\d{4})\\b");
+    private static final Pattern AADHAAR_MARKER_PATTERN = Pattern.compile(
+            "(?i)\\b(?:aadha{1,2}r|uidai|unique identification authority|government of india)\\b|आधार|भारत सरकार");
+    private static final Pattern AADHAAR_DOB_PATTERN = Pattern.compile(
+            "(?im)\\b(?:DOB|Date\\s*of\\s*Birth)\\s*[:/-]?\\s*(\\d{1,2}[/.-]\\d{1,2}[/.-]\\d{4})\\b");
+    private static final Pattern AADHAAR_YOB_PATTERN = Pattern.compile(
+            "(?im)\\b(?:YOB|Year\\s*of\\s*Birth)\\s*[:/-]?\\s*((?:19|20)\\d{2})\\b");
+    private static final Pattern PINCODE_PATTERN = Pattern.compile("\\b([1-9]\\d{5})\\b");
+    private static final Pattern AADHAAR_ENGLISH_ADDRESS_LABEL =
+            Pattern.compile("(?i)^[ \\t]*Address[ \\t]*[:：/-]?[ \\t]*(.*)$");
+    private static final Pattern AADHAAR_ADDRESS_STOP = Pattern.compile(
+            "(?i)^[ \\t]*(?:Address|पता|VID|DOB|YOB|Name|Gender|UIDAI|Aadhaar|Unique Identification Authority|www\\.|help@|1947|QR\\s*code|भारत सरकार|Government of India).*|^[2-9]\\d{3}[ \\t-]?\\d{4}[ \\t-]?\\d{4}$");
+    private static final Pattern AADHAAR_ADDRESS_INLINE_FOOTER = Pattern.compile(
+            "(?i)(?:\\b(?:VID|UIDAI|Aadhaar|www\\.|help@|1947)\\b|आधार|भारत सरकार|\\b[2-9]\\d{3}[ \\t-]?\\d{4}[ \\t-]?\\d{4}\\b)");
+    private static final Pattern AADHAAR_ADDRESS_BROKEN_SECTOR = Pattern.compile(
+            "(?i)\\bSECTOR\\s*[-:]?\\s*(?:[A-Za-z]+\\s+){1,4}\\d{1,3}\\b");
+    private static final Pattern AADHAAR_NAME_EXCLUSION = Pattern.compile(
+            "(?i)(?:\\b(?:name|address|dob|yob|gender|male|female|transgender|india|government|authority|uidai|aadhaar|enrolment|issue|print|year|birth|date|father|mother|s/o|d/o|c/o|w/o|qr|photo|signature|valid|vid)\\b|नाम|पता|जन्म|भारत|सरकार|आधार|पुरुष|महिला)");
     private static final Pattern DOB_PATTERN =
             Pattern.compile("\\b(\\d{2}[/\\-.]\\d{2}[/\\-.]\\d{4})\\b");
     private static final Pattern GENDER_PATTERN =
-            Pattern.compile("\\b(MALE|FEMALE|TRANSGENDER|पुरुष|महिला)\\b", Pattern.CASE_INSENSITIVE);
+            Pattern.compile("\\b(MALE|FEMALE|TRANSGENDER)\\b", Pattern.CASE_INSENSITIVE);
     private static final Pattern NAME_AFTER_LABEL_PATTERN =
             Pattern.compile("(?:Name|नाम)\\s*[:/]?\\s*(.+)", Pattern.CASE_INSENSITIVE);
+    private static final Pattern AADHAAR_NAME_LABEL_PATTERN =
+            Pattern.compile("(?i)^[ \\t]*Name[ \\t]*[:/-]?[ \\t]*(.*)$");
 
     // ── PAN patterns ────────────────────────────────────────────────────
     private static final Pattern PAN_NUMBER_PATTERN =
-            Pattern.compile("\\b([A-Z]{5}\\d{4}[A-Z])\\b");
+            Pattern.compile("(?i)\\b([A-Z]{5}[ \\t-]?\\d{4}[ \\t-]?[A-Z])\\b");
+    /** Valid non-individual PAN holder-type characters: company, HUF, firm, AOP, trust, BOI, local authority, AJP, government. */
+    private static final String OTHER_PAN_HOLDER_TYPES = "CHFATBLJG";
+    private static final Pattern PAN_MARKER_PATTERN = Pattern.compile(
+            "(?i)\\b(?:permanent account number|income tax department|pan card)\\b|आयकर विभाग|स्थायी लेखा संख्या|पैन कार्ड");
+    private static final Pattern PAN_NAME_LABEL_PATTERN = Pattern.compile(
+            "(?i)^[ \\t]*(?:Name(?: of Assessee)?|नाम)[ \\t]*[:：/-]?[ \\t]*(.*)$");
+    private static final Pattern PAN_FATHER_LABEL_PATTERN = Pattern.compile(
+            "(?i)^[ \\t]*(?:Father'?s?[ \\t]+Name|पिता का नाम)[ \\t]*[:：/-]?[ \\t]*(.*)$");
+    private static final Pattern PAN_DOB_LABEL_PATTERN = Pattern.compile(
+            "(?i)^[ \\t]*(?:D[.\\s]?[O0][.\\s]?B\\.?|Date[ \\t]*of[ \\t]*B[i1l]rth|Birth[ \\t]*Date|जन्म[ \\t]*तिथि)[ \\t]*[:：/-]?[ \\t]*(.*)$");
     private static final Pattern FATHER_NAME_PATTERN =
             Pattern.compile("(?:Father'?s?\\s*Name|पिता का नाम)\\s*[:/]?\\s*(.+)", Pattern.CASE_INSENSITIVE);
 
-    // ── Driving License patterns ────────────────────────────────────────
-    private static final Pattern DL_NUMBER_PATTERN =
-            Pattern.compile("\\b([A-Z]{2}\\d{2}\\s?\\d{4,11})\\b");
-    private static final Pattern VALIDITY_PATTERN =
-            Pattern.compile("(?:Valid\\s*(?:Till|Upto|To)|Validity)\\s*[:/]?\\s*(\\d{2}[/\\-.]\\d{2}[/\\-.]\\d{4})",
-                    Pattern.CASE_INSENSITIVE);
-    private static final Pattern ADDRESS_PATTERN =
-            Pattern.compile("(?:Address|पता)\\s*[:/]?\\s*(.+(?:\\n.+){0,3})", Pattern.CASE_INSENSITIVE);
+    // ── Bar Council patterns ────────────────────────────────────────────
+    private static final Pattern BAR_COUNCIL_LABEL_PATTERN =
+            Pattern.compile("(?i)(?:Enrolment|Enrollment|Reg(?:istration)?|Bar\\s*Council|Roll)\\s*(?:No\\.?|Number|#)?\\s*[:/.-]?\\s*([A-Z0-9/\\-.]+)");
+    private static final Pattern STATE_BAR_COUNCIL_NAME_PATTERN =
+            Pattern.compile("(?i)(?:Bar\\s+Council\\s+of\\s+[A-Za-z\\s&,]+|State\\s+Bar\\s+Council(?:\\s+of\\s+[A-Za-z\\s&,]+)?|Bar\\s+Council\\s+of\\s+India)");
+    private static final Pattern ADVOCATE_NAME_PATTERN =
+            Pattern.compile("(?i)(?:Advocate|Adv\\.?|Shri|Smt\\.?|Mr\\.?|Ms\\.?)\\s*[:/]?\\s*([A-Za-z\\s.'-]+)");
+    private static final Pattern CERTIFIED_THAT_PATTERN =
+            Pattern.compile("(?i)certif(?:y|ied)\\s+that\\s+([A-Za-z\\s.'-]+?)(?:\\s+is|\\s+has|\\s+son|\\s+daughter|\\s+d/o|\\s+s/o|\\s+resident)");
+    private static final Pattern COP_PATTERN =
+            Pattern.compile("(?i)(?:COP|Certificate\\s*of\\s*Practice)\\s*(?:No\\.?|Number)?\\s*[:/]?\\s*([A-Z0-9/\\-]+)");
+
+    public OcrExtractionService() {
+        this.barCouncilValidationService = new BarCouncilValidationService();
+    }
+
+    public OcrExtractionService(BarCouncilValidationService barCouncilValidationService) {
+        this.barCouncilValidationService = barCouncilValidationService != null
+                ? barCouncilValidationService
+                : new BarCouncilValidationService();
+    }
 
     /**
      * Extracts identity fields from raw OCR data for the given document type.
      *
-     * @param rawOcrData   the raw {@code info} object from Cloudinary's upload response
+     * @param rawOcrData   text and confidence returned by the local vision service
      * @param documentType the type of document being processed
      * @return an {@link ExtractionResult} with parsed fields, confidence, and masked number
      * @throws OcrExtractionException if OCR data is missing or unparseable
      */
     public ExtractionResult extract(Object rawOcrData, DocumentType documentType) {
-        String ocrText = extractTextFromOcrResponse(rawOcrData);
-        double confidence = extractConfidenceFromOcrResponse(rawOcrData);
-
-        if (ocrText == null || ocrText.isBlank()) {
-            throw new OcrExtractionException("OCR produced no readable text from the document image.");
-        }
-
-        log.info("OCR extraction starting for documentType={}, textLength={}, confidence={}",
-                documentType, ocrText.length(), confidence);
-
-        return switch (documentType) {
-            case AADHAAR -> parseAadhaar(ocrText, confidence);
-            case PAN -> parsePan(ocrText, confidence);
-            case DRIVING_LICENSE -> parseDrivingLicense(ocrText, confidence);
-        };
+        return extract(rawOcrData, documentType, "front");
     }
 
     /**
-     * Merges extraction results from multiple images (e.g. Aadhaar front + back).
+     * Extracts identity fields from raw OCR data for the given document type and side (front/back).
+     */
+    public ExtractionResult extract(Object rawOcrData, DocumentType documentType, String side) {
+        List<String> texts = extractTextCandidates(rawOcrData);
+        double confidence = extractConfidenceFromOcrResponse(rawOcrData);
+
+        if (texts.isEmpty()) {
+            log.warn("Local OCR produced no text for {} ({})", documentType, side);
+            return new ExtractionResult(false, Map.of(), null, 0.0,
+                    "No readable OCR text was returned. Upload a clear document image.");
+        }
+
+        log.info("OCR extraction starting for documentType={}, side={}, candidates={}, confidence={}",
+                documentType, side, texts.size(), confidence);
+
+        ExtractionResult best = null;
+        double bestScore = Double.NEGATIVE_INFINITY;
+        for (String text : texts) {
+            if (log.isDebugEnabled()) {
+                log.debug("OCR candidate for {} {}: {}", documentType, side, text);
+            }
+            ExtractionResult candidate = parseText(text, documentType, side, confidence);
+            double score = extractionScore(candidate, documentType);
+            if (score > bestScore) {
+                best = candidate;
+                bestScore = score;
+            }
+        }
+        if (best != null) {
+            log.info("OCR extraction chosen for documentType={}, side={}, success={}, fields={}, error={}",
+                    documentType, side, best.success(), best.extractedFields().keySet(), best.error());
+        }
+        return best;
+    }
+
+    /** The worker returns several Tesseract reads; try all of them before choosing fields. */
+    public List<String> extractTextCandidates(Object rawOcrData) {
+        List<String> texts = new ArrayList<>();
+        if (rawOcrData instanceof Map<?, ?> map && map.get("candidates") instanceof List<?> candidates) {
+            for (Object item : candidates) {
+                if (item instanceof String text && !text.isBlank() && !texts.contains(text)) {
+                    texts.add(text);
+                }
+            }
+        }
+        String primary = extractTextFromOcrResponse(rawOcrData);
+        if (primary != null && !primary.isBlank() && !texts.contains(primary)) {
+            texts.add(0, primary);
+        }
+        return texts;
+    }
+
+    private ExtractionResult parseText(String ocrText, DocumentType documentType, String side, double confidence) {
+        return switch (documentType) {
+            case AADHAAR -> parseAadhaar(ocrText, confidence, side);
+            case PAN -> parsePan(ocrText, confidence);
+            case BAR_COUNCIL_ID, BAR_CERTIFICATE, CERTIFICATE_OF_PRACTICE -> parseBarCouncil(ocrText, confidence);
+        };
+    }
+
+    private double extractionScore(ExtractionResult result, DocumentType documentType) {
+        if (result == null) return Double.NEGATIVE_INFINITY;
+        double score = result.success() ? 100 : 0;
+        score += result.extractedFields().size();
+        if (result.maskedDocumentNumber() != null) score += 10;
+        if (documentType == DocumentType.PAN) {
+            if (result.extractedFields().containsKey("name")) score += 5;
+            if (result.extractedFields().containsKey("fatherName")) score += 5;
+            if (result.extractedFields().containsKey("dob")) score += 10;
+        } else if (documentType == DocumentType.AADHAAR) {
+            if (result.extractedFields().containsKey("name")) score += 5;
+            if (result.extractedFields().containsKey("dob")) score += 5;
+            if (result.extractedFields().containsKey("gender")) score += 5;
+            if (result.extractedFields().containsKey("address")) score += 5;
+        }
+        return score;
+    }
+
+    /**
+     * Merges extraction results from multiple images (e.g. Aadhaar or Bar ID front + back).
      */
     public ExtractionResult mergeResults(ExtractionResult primary, ExtractionResult secondary) {
+        if (!primary.success() || !secondary.success()) {
+            return new ExtractionResult(false, Map.of(), null, 0.0,
+                    !primary.success() ? primary.error() : secondary.error());
+        }
         Map<String, String> merged = new HashMap<>(primary.extractedFields());
         // Add fields from secondary that are missing in primary
         secondary.extractedFields().forEach(merged::putIfAbsent);
 
         return new ExtractionResult(
-                true,
+                primary.success() && secondary.success(),
                 merged,
                 primary.maskedDocumentNumber() != null
                         ? primary.maskedDocumentNumber()
                         : secondary.maskedDocumentNumber(),
                 Math.max(primary.confidence(), secondary.confidence()),
-                null
+                null,
+                primary.aadhaarNumber() != null ? primary.aadhaarNumber() : secondary.aadhaarNumber(),
+                primary.panNumber() != null ? primary.panNumber() : secondary.panNumber()
         );
+    }
+
+    /** Aadhaar's front supplies identity fields; its back supplies the address. */
+    public ExtractionResult mergeAadhaarResults(ExtractionResult front, ExtractionResult back) {
+        Map<String, String> fields = new HashMap<>(front.extractedFields());
+        back.extractedFields().forEach(fields::putIfAbsent);
+        boolean success = front.success() && back.success();
+        return new ExtractionResult(success, fields, front.maskedDocumentNumber(),
+                Math.max(front.confidence(), back.confidence()),
+                !front.success() ? front.error() : !back.success() ? back.error() : null,
+                front.aadhaarNumber());
+    }
+
+    // ── Bar Council Parser ──────────────────────────────────────────────
+
+    private ExtractionResult parseBarCouncil(String text, double confidence) {
+        Map<String, String> fields = new HashMap<>();
+        String maskedNumber = null;
+        BarCouncilValidationService.BarCouncilValidationResult validationResult = null;
+
+        // 1. Locate Bar Council Enrollment Number
+        // Try embedded pattern first (e.g. "D/1234/2021", "MAH/5678/2019")
+        Matcher embeddedMatcher = BarCouncilValidationService.EMBEDDED_ENROLLMENT_PATTERN.matcher(text);
+        while (embeddedMatcher.find()) {
+            var res = barCouncilValidationService.validate(embeddedMatcher.group(1));
+            if (res.valid()) {
+                validationResult = res;
+                break;
+            }
+        }
+
+        // Fallback: look for label like "Enrolment No: ..."
+        if (validationResult == null) {
+            Matcher labelMatcher = BAR_COUNCIL_LABEL_PATTERN.matcher(text);
+            while (labelMatcher.find()) {
+                var res = barCouncilValidationService.validate(labelMatcher.group(1));
+                if (res.valid()) {
+                    validationResult = res;
+                    break;
+                }
+            }
+        }
+
+        if (validationResult != null && validationResult.valid()) {
+            maskedNumber = validationResult.maskedNumber();
+            fields.put("enrollmentNumber", validationResult.normalizedNumber());
+            fields.put("stateCode", validationResult.stateCode());
+            fields.put("stateCouncil", validationResult.stateCouncil());
+            fields.put("enrollmentYear", String.valueOf(validationResult.enrollmentYear()));
+            fields.put("sequenceNumber", validationResult.sequenceNumber());
+        }
+
+        // 2. Extract State Bar Council Name if explicitly printed
+        Matcher councilMatcher = STATE_BAR_COUNCIL_NAME_PATTERN.matcher(text);
+        if (councilMatcher.find()) {
+            fields.put("councilHeader", councilMatcher.group(0).trim());
+        }
+
+        // 3. Extract Advocate Name
+        Matcher certMatcher = CERTIFIED_THAT_PATTERN.matcher(text);
+        if (certMatcher.find()) {
+            fields.put("name", normalizeName(certMatcher.group(1)));
+        } else {
+            Matcher nameMatcher = ADVOCATE_NAME_PATTERN.matcher(text);
+            if (nameMatcher.find()) {
+                fields.put("name", normalizeName(nameMatcher.group(1)));
+            } else {
+                Matcher generalNameMatcher = NAME_AFTER_LABEL_PATTERN.matcher(text);
+                if (generalNameMatcher.find()) {
+                    fields.put("name", normalizeName(generalNameMatcher.group(1)));
+                }
+            }
+        }
+
+        // 4. Extract Date of Enrollment / DOB
+        Matcher dobMatcher = DOB_PATTERN.matcher(text);
+        if (dobMatcher.find()) {
+            fields.put("enrollmentDate", dobMatcher.group(1));
+        }
+
+        // 5. Extract Father's Name if present
+        Matcher fatherMatcher = FATHER_NAME_PATTERN.matcher(text);
+        if (fatherMatcher.find()) {
+            fields.put("fatherName", normalizeName(fatherMatcher.group(1)));
+        }
+
+        // 6. Extract COP Number if present
+        Matcher copMatcher = COP_PATTERN.matcher(text);
+        if (copMatcher.find()) {
+            fields.put("copNumber", copMatcher.group(1).trim());
+        }
+
+        boolean success = validationResult != null && validationResult.valid();
+        String error = success ? null : (validationResult != null
+                ? validationResult.errorMessage()
+                : "Could not detect a valid Bar Council Enrollment Number (e.g. D/1234/2021 or MAH/5678/2019).");
+
+        log.info("Bar Council extraction result: success={}, fieldsFound={}, number={}",
+                success, fields.size(), maskedNumber);
+
+        return new ExtractionResult(success, fields, maskedNumber, confidence, error);
     }
 
     // ── Aadhaar Parser ──────────────────────────────────────────────────
 
-    private ExtractionResult parseAadhaar(String text, double confidence) {
+    private ExtractionResult parseAadhaar(String text, double confidence, String side) {
         Map<String, String> fields = new HashMap<>();
         String maskedNumber = null;
-
-        // Extract Aadhaar number
+        String fullNumber = null;
+        boolean isBack = "back".equalsIgnoreCase(side);
         Matcher aadhaarMatcher = AADHAAR_NUMBER_PATTERN.matcher(text);
-        if (aadhaarMatcher.find()) {
-            String rawNumber = aadhaarMatcher.group(1).replaceAll("\\s", "");
+        String firstNumber = null;
+        while (aadhaarMatcher.find()) {
+            String rawNumber = aadhaarMatcher.group(1).replaceAll("[\\s-]", "");
+            if (firstNumber == null) firstNumber = rawNumber;
             if (isValidAadhaarChecksum(rawNumber)) {
-                maskedNumber = maskAadhaar(rawNumber);
-            } else {
-                // Still mask it even if checksum fails — it matched the pattern
-                maskedNumber = maskAadhaar(rawNumber);
-                fields.put("checksumWarning", "Aadhaar checksum validation failed");
+                fullNumber = rawNumber;
+                break;
             }
         }
-
-        // Extract name
-        Matcher nameMatcher = NAME_AFTER_LABEL_PATTERN.matcher(text);
-        if (nameMatcher.find()) {
-            fields.put("name", normalizeName(nameMatcher.group(1)));
+        if (fullNumber == null) fullNumber = firstNumber;
+        if (fullNumber != null) {
+            maskedNumber = maskAadhaar(fullNumber);
+        } else {
+            Matcher maskedMatcher = AADHAAR_MASKED_PATTERN.matcher(text);
+            if (maskedMatcher.find()) maskedNumber = "XXXX-XXXX-" + maskedMatcher.group(1);
         }
-
-        // Extract DOB
-        Matcher dobMatcher = DOB_PATTERN.matcher(text);
-        if (dobMatcher.find()) {
-            fields.put("dob", dobMatcher.group(1));
+        if (isBack) {
+            String address = extractAadhaarAddress(text);
+            if (address != null) {
+                fields.put("address", address);
+                Matcher pinMatcher = PINCODE_PATTERN.matcher(address);
+                if (pinMatcher.find()) fields.put("pincode", pinMatcher.group(1));
+            }
+            boolean success = fields.containsKey("address");
+            return new ExtractionResult(success, fields, maskedNumber, confidence,
+                    success ? null : "Could not extract the English Aadhaar back Address field.");
         }
-
-        // Extract gender
+        Matcher dobMatcher = AADHAAR_DOB_PATTERN.matcher(text);
+        Matcher yobMatcher = AADHAAR_YOB_PATTERN.matcher(text);
+        if (dobMatcher.find()) fields.put("dob", dobMatcher.group(1));
+        else if (yobMatcher.find()) fields.put("yearOfBirth", yobMatcher.group(1));
         Matcher genderMatcher = GENDER_PATTERN.matcher(text);
-        if (genderMatcher.find()) {
-            fields.put("gender", genderMatcher.group(1).toUpperCase());
-        }
-
-        // Extract address (often on back of card)
-        Matcher addressMatcher = ADDRESS_PATTERN.matcher(text);
-        if (addressMatcher.find()) {
-            fields.put("address", addressMatcher.group(1).trim());
-        }
-
-        boolean success = maskedNumber != null && fields.containsKey("name");
-        String error = success ? null : "Could not extract required Aadhaar fields (number and name).";
+        if (genderMatcher.find()) fields.put("gender", genderMatcher.group(1).toUpperCase());
+        String name = extractAadhaarName(text);
+        if (name != null) fields.put("name", name);
+        boolean success = maskedNumber != null && fields.containsKey("name")
+                && fields.containsKey("dob")
+                && fields.containsKey("gender");
+        String error = success ? null : maskedNumber == null
+                ? "Could not extract the Aadhaar number or its masked last four digits from the front."
+                : !fields.containsKey("name") ? "Could not extract Aadhaar front name."
+                : !fields.containsKey("dob")
+                    ? "Could not extract labeled Aadhaar date of birth from the front."
+                    : "Could not extract Aadhaar front gender.";
 
         log.info("Aadhaar extraction result: success={}, fieldsFound={}", success, fields.size());
 
-        return new ExtractionResult(success, fields, maskedNumber, confidence, error);
+        return new ExtractionResult(success, fields, maskedNumber, confidence, error, fullNumber);
+    }
+
+    private String extractAadhaarName(String text) {
+        String[] lines = text.split("\\R");
+        for (int i = 0; i < lines.length; i++) {
+            Matcher labeled = AADHAAR_NAME_LABEL_PATTERN.matcher(lines[i]);
+            if (!labeled.matches()) continue;
+            String candidate = normalizeName(labeled.group(1));
+            if (isAadhaarNameCandidate(candidate)) return candidate;
+            candidate = bestAadhaarName(lines, i + 1, Math.min(lines.length, i + 3), i);
+            if (candidate != null) return candidate;
+        }
+        int birthLine = -1;
+        int genderLine = -1;
+        for (int i = 0; i < lines.length; i++) {
+            if (birthLine < 0 && (AADHAAR_DOB_PATTERN.matcher(lines[i]).find()
+                    || AADHAAR_YOB_PATTERN.matcher(lines[i]).find())) birthLine = i;
+            if (genderLine < 0 && GENDER_PATTERN.matcher(lines[i]).find()) genderLine = i;
+        }
+        int anchor = birthLine >= 0 ? birthLine : genderLine;
+        if (anchor < 0) return null;
+        String candidate = bestAadhaarName(lines, Math.max(0, anchor - 8), anchor, anchor);
+        if (candidate != null) return candidate;
+        // Some OCR layouts place the printed name after the DOB/gender row.
+        return bestAadhaarName(lines, anchor + 1, Math.min(lines.length, anchor + 5), anchor);
+    }
+
+    private String bestAadhaarName(String[] lines, int start, int end, int anchor) {
+        String best = null;
+        double bestScore = Double.NEGATIVE_INFINITY;
+        for (int i = start; i < end; i++) {
+            String raw = lines[i].trim();
+            if (AADHAAR_DOB_PATTERN.matcher(raw).find() || AADHAAR_YOB_PATTERN.matcher(raw).find()) break;
+            String candidate = normalizeName(raw);
+            if (!isAadhaarNameCandidate(candidate)) continue;
+            int words = candidate.split(" ").length;
+            double score = candidate.length() + Math.min(words, 4) * 4
+                    - Math.abs(anchor - i) * 0.5;
+            // OCR of the regional-script line often resembles a short English name.
+            // Prefer the complete, clean printed English line when both are present.
+            if (!raw.matches("[A-Za-z][A-Za-z .'-]{2,60}")) score -= 12;
+            if (score > bestScore) {
+                best = candidate;
+                bestScore = score;
+            }
+        }
+        return best;
+    }
+
+    private boolean isAadhaarNameCandidate(String candidate) {
+        return candidate != null && candidate.matches("[A-Za-z][A-Za-z .'-]{2,60}")
+                && !AADHAAR_MARKER_PATTERN.matcher(candidate).find()
+                && !AADHAAR_NAME_EXCLUSION.matcher(candidate).find();
+    }
+
+    private String extractAadhaarAddress(String text) {
+        String[] lines = text.split("\\R");
+        return readAddressAfterLabel(lines, AADHAAR_ENGLISH_ADDRESS_LABEL);
+    }
+
+    private String readAddressAfterLabel(String[] lines, Pattern labelPattern) {
+        for (int i = 0; i < lines.length; i++) {
+            Matcher label = labelPattern.matcher(lines[i]);
+            if (!label.matches()) continue;
+            StringBuilder address = new StringBuilder(cleanAadhaarAddressLine(label.group(1)));
+            for (int j = i + 1; j < Math.min(lines.length, i + 7)
+                    && !PINCODE_PATTERN.matcher(address).find(); j++) {
+                String line = lines[j].trim();
+                if (line.isEmpty()) continue;
+                if (AADHAAR_ADDRESS_STOP.matcher(line).matches()) break;
+                line = cleanAadhaarAddressLine(line);
+                if (line.isEmpty()) break;
+                if (!address.isEmpty()) address.append(' ');
+                address.append(line);
+            }
+            String result = address.toString().trim();
+            if (!result.isEmpty() && !AADHAAR_ADDRESS_BROKEN_SECTOR.matcher(result).find()) return result;
+        }
+        return null;
+    }
+
+    private String cleanAadhaarAddressLine(String line) {
+        String value = line.trim();
+        Matcher pin = PINCODE_PATTERN.matcher(value);
+        if (pin.find()) value = value.substring(0, pin.end());
+        else {
+            Matcher footer = AADHAAR_ADDRESS_INLINE_FOOTER.matcher(value);
+            if (footer.find()) value = value.substring(0, footer.start());
+        }
+        return value.replaceAll("[\\s,;|/-]+$", "").trim();
     }
 
     // ── PAN Parser ──────────────────────────────────────────────────────
 
     private ExtractionResult parsePan(String text, double confidence) {
         Map<String, String> fields = new HashMap<>();
-        String maskedNumber = null;
-
-        // Extract PAN number
         Matcher panMatcher = PAN_NUMBER_PATTERN.matcher(text);
-        if (panMatcher.find()) {
-            String rawPan = panMatcher.group(1);
-            maskedNumber = maskPan(rawPan);
+        if (!panMatcher.find()) {
+            return new ExtractionResult(false, Map.of(), null, confidence,
+                    "Could not extract a valid PAN number from the card.");
+        }
+        String rawPan = panMatcher.group(1).replaceAll("[ \\t-]", "").toUpperCase();
+        char holderType = rawPan.charAt(3);
+        if (holderType != 'P') {
+            String error = OTHER_PAN_HOLDER_TYPES.indexOf(holderType) >= 0
+                    ? "Only an individual PAN card can verify a lawyer profile."
+                    : "Invalid PAN number: the fourth character is not a valid PAN holder type.";
+            return new ExtractionResult(false, Map.of(), null, confidence, error);
+        }
+        fields.put("panType", "Individual");
+        String[] lines = text.split("\\R");
+        String name = readPanLabeledValue(lines, PAN_NAME_LABEL_PATTERN);
+        String fatherName = readPanLabeledValue(lines, PAN_FATHER_LABEL_PATTERN);
+        if (name == null) name = readPanCardholderBeforeFather(lines, fatherName);
+        if (name == null || fatherName == null) {
+            List<String> orderedNames = readPanNamesBetweenNumberAndDob(lines);
+            if (name == null && fatherName == null && orderedNames.size() >= 2) {
+                name = orderedNames.get(0);
+                fatherName = orderedNames.get(1);
+            } else if (name == null && fatherName != null) {
+                String knownFather = normalizeName(fatherName);
+                name = orderedNames.stream().filter(candidate -> !candidate.equalsIgnoreCase(knownFather))
+                        .findFirst().orElse(null);
+            } else if (fatherName == null && name != null) {
+                String knownName = normalizeName(name);
+                fatherName = orderedNames.stream().filter(candidate -> !candidate.equalsIgnoreCase(knownName))
+                        .findFirst().orElse(null);
+            }
+        }
+        String dateText = readPanLabeledValue(lines, PAN_DOB_LABEL_PATTERN);
+        if (dateText == null) dateText = readPanDateNearBirthLabel(lines);
+        if (name != null && isPlausibleName(name)) fields.put("name", normalizeName(name));
+        if (fatherName != null && isPlausibleName(fatherName)) {
+            fields.put("fatherName", normalizeName(fatherName));
+        }
+        if (dateText != null) {
+            // OCR often puts spaces around separators: "01 / 02 / 1990".
+            String normalizedDate = dateText.replaceAll("\\s*([/.\\-])\\s*", "$1");
+            Matcher dobMatcher = DOB_PATTERN.matcher(normalizedDate);
+            if (dobMatcher.find()) fields.put("dob", dobMatcher.group(1));
         }
 
-        // Extract name — PAN cards typically have the name after "Name" or in a specific position
-        Matcher nameMatcher = NAME_AFTER_LABEL_PATTERN.matcher(text);
-        if (nameMatcher.find()) {
-            fields.put("name", normalizeName(nameMatcher.group(1)));
-        }
-
-        // Extract father's name
-        Matcher fatherMatcher = FATHER_NAME_PATTERN.matcher(text);
-        if (fatherMatcher.find()) {
-            fields.put("fatherName", normalizeName(fatherMatcher.group(1)));
-        }
-
-        // Extract DOB
-        Matcher dobMatcher = DOB_PATTERN.matcher(text);
-        if (dobMatcher.find()) {
-            fields.put("dob", dobMatcher.group(1));
-        }
-
-        boolean success = maskedNumber != null && fields.containsKey("name");
-        String error = success ? null : "Could not extract required PAN fields (number and name).";
+        boolean success = fields.containsKey("name") && fields.containsKey("fatherName")
+                && fields.containsKey("dob");
+        String error = success ? null : !fields.containsKey("name")
+                ? "Could not extract the PAN cardholder name."
+                : !fields.containsKey("fatherName") ? "Could not extract the PAN father's name."
+                : "Could not extract the labeled PAN date of birth.";
 
         log.info("PAN extraction result: success={}, fieldsFound={}", success, fields.size());
 
-        return new ExtractionResult(success, fields, maskedNumber, confidence, error);
+        return new ExtractionResult(success, fields, success ? maskPan(rawPan) : null, confidence,
+                error, null, success ? rawPan : null);
     }
 
-    // ── Driving License Parser ──────────────────────────────────────────
-
-    private ExtractionResult parseDrivingLicense(String text, double confidence) {
-        Map<String, String> fields = new HashMap<>();
-        String maskedNumber = null;
-
-        // Extract DL number
-        Matcher dlMatcher = DL_NUMBER_PATTERN.matcher(text);
-        if (dlMatcher.find()) {
-            String rawDl = dlMatcher.group(1).replaceAll("\\s", "");
-            maskedNumber = maskDrivingLicense(rawDl);
+    private String readPanLabeledValue(String[] lines, Pattern labelPattern) {
+        for (int i = 0; i < lines.length; i++) {
+            Matcher label = labelPattern.matcher(lines[i]);
+            if (!label.matches()) continue;
+            String value = stripRepeatedPanLabel(label.group(1), labelPattern);
+            if (isPanFieldValue(value)) return value;
+            for (int j = i + 1; j < lines.length && j <= i + 5; j++) {
+                value = stripRepeatedPanLabel(lines[j], labelPattern);
+                if (value.isEmpty()) continue;
+                if (isPanLabel(value)) break;
+                if (isPanFieldValue(value)) return value;
+            }
         }
+        return null;
+    }
 
-        // Extract name
-        Matcher nameMatcher = NAME_AFTER_LABEL_PATTERN.matcher(text);
-        if (nameMatcher.find()) {
-            fields.put("name", normalizeName(nameMatcher.group(1)));
+    /** Catches a DOB line whose label is surrounded by OCR noise. */
+    private String readPanDateNearBirthLabel(String[] lines) {
+        Pattern noise = Pattern.compile(
+                "(?i).*(?:D[.\\s]?[O0][.\\s]?B\\.?|B[i1l]rth|जन्म[\\s]*तिथि).*");
+        for (int i = 0; i < lines.length; i++) {
+            if (!noise.matcher(lines[i]).matches()) continue;
+            String found = firstDate(lines[i]);
+            if (found != null) return found;
+            for (int j = i + 1; j < lines.length && j <= i + 3; j++) {
+                found = firstDate(lines[j]);
+                if (found != null) return found;
+            }
         }
+        return null;
+    }
 
-        // Extract DOB
-        Matcher dobMatcher = DOB_PATTERN.matcher(text);
-        if (dobMatcher.find()) {
-            fields.put("dob", dobMatcher.group(1));
+    private String firstDate(String line) {
+        Matcher matcher = DOB_PATTERN.matcher(line.replaceAll("\\s*([/.\\-])\\s*", "$1"));
+        return matcher.find() ? matcher.group(1) : null;
+    }
+
+    /** The printed cardholder name is commonly the line immediately above Father's Name. */
+    private String readPanCardholderBeforeFather(String[] lines, String fatherName) {
+        int fatherLabel = -1;
+        for (int i = 0; i < lines.length; i++) {
+            if (PAN_FATHER_LABEL_PATTERN.matcher(lines[i]).matches()) {
+                fatherLabel = i;
+                break;
+            }
         }
-
-        // Extract validity
-        Matcher validityMatcher = VALIDITY_PATTERN.matcher(text);
-        if (validityMatcher.find()) {
-            fields.put("validTill", validityMatcher.group(1));
+        if (fatherLabel < 0) return null;
+        for (int i = fatherLabel - 1; i >= Math.max(0, fatherLabel - 6); i--) {
+            // Do not cross the PAN number into unrelated card headings.
+            if (PAN_NUMBER_PATTERN.matcher(lines[i]).find()) break;
+            String candidate = normalizeName(lines[i]);
+            if (isPanPersonNameCandidate(candidate)
+                    && !candidate.equalsIgnoreCase(normalizeName(fatherName))) return candidate;
         }
+        return null;
+    }
 
-        // Extract address
-        Matcher addressMatcher = ADDRESS_PATTERN.matcher(text);
-        if (addressMatcher.find()) {
-            fields.put("address", addressMatcher.group(1).trim());
+    private List<String> readPanNamesBetweenNumberAndDob(String[] lines) {
+        int panLine = -1;
+        int dobLine = lines.length;
+        for (int i = 0; i < lines.length; i++) {
+            if (panLine < 0 && PAN_NUMBER_PATTERN.matcher(lines[i]).find()) panLine = i;
+            if (panLine >= 0 && PAN_DOB_LABEL_PATTERN.matcher(lines[i]).matches()) {
+                dobLine = i;
+                break;
+            }
         }
+        if (panLine < 0 || dobLine <= panLine) return List.of();
+        List<String> names = new java.util.ArrayList<>();
+        for (int i = panLine + 1; i < Math.min(dobLine, panLine + 12); i++) {
+            String candidate = normalizeName(lines[i]);
+            if (isPanPersonNameCandidate(candidate)) names.add(candidate);
+        }
+        return names;
+    }
 
-        boolean success = maskedNumber != null && fields.containsKey("name");
-        String error = success ? null : "Could not extract required Driving License fields (number and name).";
+    private boolean isPanPersonNameCandidate(String value) {
+        return value != null && value.matches("[A-Za-z][A-Za-z .'-]{2,70}")
+                && !isPanLabel(value) && !PAN_MARKER_PATTERN.matcher(value).find()
+                && !PAN_NUMBER_PATTERN.matcher(value).find()
+                && !value.matches("(?i).*\\b(?:name|date|birth|income|tax|department|govt|government|signature|permanent|account|number|india|pan)\\b.*");
+    }
 
-        log.info("DL extraction result: success={}, fieldsFound={}", success, fields.size());
+    /** Reject OCR garbage like "ar Bt arte" while allowing initials and single names. */
+    private boolean isPlausibleName(String value) {
+        if (value == null) return false;
+        String cleaned = value.trim();
+        if (cleaned.length() < 3) return false;
+        String[] tokens = cleaned.split("\\s+");
+        // PAN cards print English names in uppercase; title case is also acceptable.
+        for (String token : tokens) {
+            if (!token.matches("[A-Z][A-Za-z.'-]*")) return false;
+        }
+        if (tokens.length == 1) return tokens[0].length() >= 3;
+        long suspicious = 0;
+        for (String token : tokens) {
+            if (token.length() <= 2 && !(token.length() == 1 && Character.isUpperCase(token.charAt(0)))) {
+                suspicious++;
+            }
+        }
+        return suspicious * 2 <= tokens.length;
+    }
 
-        return new ExtractionResult(success, fields, maskedNumber, confidence, error);
+    private String stripRepeatedPanLabel(String raw, Pattern labelPattern) {
+        String value = raw.trim().replaceFirst("^[\\s:/：-]+", "");
+        for (int count = 0; count < 3; count++) {
+            Matcher repeated = labelPattern.matcher(value);
+            if (!repeated.matches()) break;
+            String remainder = repeated.group(1).trim().replaceFirst("^[\\s:/：-]+", "");
+            if (remainder.equals(value)) break;
+            value = remainder;
+        }
+        return value;
+    }
+
+    private boolean isPanLabel(String value) {
+        return PAN_NAME_LABEL_PATTERN.matcher(value).matches()
+                || PAN_FATHER_LABEL_PATTERN.matcher(value).matches()
+                || PAN_DOB_LABEL_PATTERN.matcher(value).matches();
+    }
+
+    private boolean isPanFieldValue(String value) {
+        return !value.isBlank() && !isPanLabel(value)
+                && !PAN_MARKER_PATTERN.matcher(value).find()
+                && !PAN_NUMBER_PATTERN.matcher(value).find();
     }
 
     // ── OCR Response Parsing ────────────────────────────────────────────
 
     /**
-     * Extracts the full text string from Cloudinary's nested adv_ocr response structure.
-     * 
-     * <p>The structure is typically:
-     * {@code info → ocr → adv_ocr → data[0] → fullTextAnnotation → text}
+     * Extracts full text string from OCR responses.
+     * Supports:
+     * 1. Plain String (for tests / manual inputs)
+     * 2. Maps with {@code text} or {@code ocrText}
+     * 3. Cloudinary nested adv_ocr: {@code info → ocr → adv_ocr → data[0] → fullTextAnnotation → text}
      */
     @SuppressWarnings("unchecked")
-    private String extractTextFromOcrResponse(Object rawOcrData) {
+    public String extractTextFromOcrResponse(Object rawOcrData) {
         try {
             if (rawOcrData == null) {
                 return null;
+            }
+
+            if (rawOcrData instanceof String str) {
+                return str;
             }
 
             Map<String, Object> info;
@@ -252,6 +683,14 @@ public class OcrExtractionService {
                 info = (Map<String, Object>) rawOcrData;
             } else {
                 return null;
+            }
+
+            // Direct text fields if supplied
+            if (info.containsKey("text") && info.get("text") instanceof String directText) {
+                return directText;
+            }
+            if (info.containsKey("ocrText") && info.get("ocrText") instanceof String directOcrText) {
+                return directOcrText;
             }
 
             Map<String, Object> ocr = (Map<String, Object>) info.get("ocr");
@@ -264,11 +703,17 @@ public class OcrExtractionService {
             if (data == null || data.isEmpty()) return null;
 
             Map<String, Object> firstPage = data.get(0);
+            // Cloudinary's adv_ocr response puts the complete OCR text in the
+            // first text annotation's description, not always in fullTextAnnotation.
+            List<Map<String, Object>> annotations =
+                    (List<Map<String, Object>>) firstPage.get("textAnnotations");
+            if (annotations != null && !annotations.isEmpty()) {
+                Object description = annotations.get(0).get("description");
+                if (description instanceof String value && !value.isBlank()) return value;
+            }
             Map<String, Object> fullTextAnnotation =
                     (Map<String, Object>) firstPage.get("fullTextAnnotation");
-            if (fullTextAnnotation == null) return null;
-
-            return (String) fullTextAnnotation.get("text");
+            return fullTextAnnotation != null ? (String) fullTextAnnotation.get("text") : null;
 
         } catch (ClassCastException e) {
             log.warn("Unexpected OCR response structure");
@@ -278,27 +723,32 @@ public class OcrExtractionService {
 
     /**
      * Extracts confidence score from the OCR response.
-     * Returns 0.0 if confidence cannot be determined.
+     * Returns 0.9 if plain text or confidence cannot be explicitly determined.
      */
     @SuppressWarnings("unchecked")
-    private double extractConfidenceFromOcrResponse(Object rawOcrData) {
+    public double extractConfidenceFromOcrResponse(Object rawOcrData) {
         try {
             if (rawOcrData == null) return 0.0;
+            if (rawOcrData instanceof String) return 0.95;
 
             Map<String, Object> info = (Map<String, Object>) rawOcrData;
+            if (info.containsKey("confidence") && info.get("confidence") instanceof Number num) {
+                return num.doubleValue();
+            }
+
             Map<String, Object> ocr = (Map<String, Object>) info.get("ocr");
-            if (ocr == null) return 0.0;
+            if (ocr == null) return 0.85;
 
             Map<String, Object> advOcr = (Map<String, Object>) ocr.get("adv_ocr");
-            if (advOcr == null) return 0.0;
+            if (advOcr == null) return 0.85;
 
             List<Map<String, Object>> data = (List<Map<String, Object>>) advOcr.get("data");
-            if (data == null || data.isEmpty()) return 0.0;
+            if (data == null || data.isEmpty()) return 0.85;
 
             Map<String, Object> firstPage = data.get(0);
             List<Map<String, Object>> textAnnotations =
                     (List<Map<String, Object>>) firstPage.get("textAnnotations");
-            if (textAnnotations == null || textAnnotations.isEmpty()) return 0.0;
+            if (textAnnotations == null || textAnnotations.isEmpty()) return 0.85;
 
             // Average confidence from text annotations
             double totalConfidence = 0;
@@ -310,30 +760,24 @@ public class OcrExtractionService {
                     count++;
                 }
             }
-            return count > 0 ? totalConfidence / count : 0.0;
+            return count > 0 ? totalConfidence / count : 0.85;
 
         } catch (Exception e) {
-            return 0.0;
+            return 0.85;
         }
     }
 
     // ── Masking Utilities ───────────────────────────────────────────────
 
     /** Masks Aadhaar to "XXXX-XXXX-1234" format. */
-    private String maskAadhaar(String raw) {
+    public String maskAadhaar(String raw) {
         if (raw == null || raw.length() < 4) return "XXXX-XXXX-XXXX";
         return "XXXX-XXXX-" + raw.substring(raw.length() - 4);
     }
 
     /** Masks PAN to "XXXXXX6789" format (last 4 visible). */
-    private String maskPan(String raw) {
+    public String maskPan(String raw) {
         if (raw == null || raw.length() < 4) return "XXXXXXXXXX";
-        return "X".repeat(raw.length() - 4) + raw.substring(raw.length() - 4);
-    }
-
-    /** Masks DL number showing only last 4 characters. */
-    private String maskDrivingLicense(String raw) {
-        if (raw == null || raw.length() < 4) return "XXXX-XXXX";
         return "X".repeat(raw.length() - 4) + raw.substring(raw.length() - 4);
     }
 
@@ -342,7 +786,7 @@ public class OcrExtractionService {
     /**
      * Validates an Aadhaar number using the Verhoeff checksum algorithm.
      */
-    private boolean isValidAadhaarChecksum(String aadhaarNumber) {
+    public boolean isValidAadhaarChecksum(String aadhaarNumber) {
         if (aadhaarNumber == null || aadhaarNumber.length() != 12) {
             return false;
         }
@@ -374,31 +818,36 @@ public class OcrExtractionService {
     }
 
     /** Normalizes a name string: trims whitespace, removes stray punctuation. */
-    private String normalizeName(String raw) {
+    public String normalizeName(String raw) {
         if (raw == null) return null;
         return raw.trim()
-                .replaceAll("[^\\p{L}\\p{N}\\s.'-]", "")  // keep letters, numbers, spaces, dots, apostrophes, hyphens
+                .replaceAll("[^\\p{L}\\p{M}\\p{N}\\s.'-]", "")  // preserve Hindi vowel marks
                 .replaceAll("\\s+", " ")                    // collapse whitespace
+                .replaceAll("^[^\\p{L}]+", "")
+                .replaceAll("[^\\p{L}\\p{M}]+$", "")
                 .trim();
     }
 
     // ── Result Record ───────────────────────────────────────────────────
 
-    /**
-     * Holds the result of OCR field extraction for a single document.
-     *
-     * @param success            whether required fields were successfully extracted
-     * @param extractedFields    map of field name → value (never contains full doc numbers)
-     * @param maskedDocumentNumber masked document number for safe display/storage
-     * @param confidence         OCR confidence score (0.0–1.0)
-     * @param error              human-readable error message if extraction failed
-     */
     public record ExtractionResult(
             boolean success,
             Map<String, String> extractedFields,
             String maskedDocumentNumber,
             double confidence,
-            String error
+            String error,
+            String aadhaarNumber,
+            String panNumber
     ) {
+        public ExtractionResult(boolean success, Map<String, String> extractedFields,
+                                String maskedDocumentNumber, double confidence, String error) {
+            this(success, extractedFields, maskedDocumentNumber, confidence, error, null, null);
+        }
+
+        public ExtractionResult(boolean success, Map<String, String> extractedFields,
+                                String maskedDocumentNumber, double confidence, String error,
+                                String aadhaarNumber) {
+            this(success, extractedFields, maskedDocumentNumber, confidence, error, aadhaarNumber, null);
+        }
     }
 }

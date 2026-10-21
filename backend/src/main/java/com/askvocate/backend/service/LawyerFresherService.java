@@ -17,6 +17,9 @@ public class LawyerFresherService {
     @Autowired
     private LawyerFresherProfileRepository lawyerFresherProfileRepository;
 
+    @Autowired
+    private DocumentVerificationService documentVerificationService;
+
     private final BCryptPasswordEncoder passwordEncoder = new BCryptPasswordEncoder();
 
     /**
@@ -41,6 +44,7 @@ public class LawyerFresherService {
                 .university(dto.getUniversity() != null ? dto.getUniversity() : "")
                 .graduationYear(dto.getGraduationYear() != null ? dto.getGraduationYear() : 0)
                 .specialization(dto.getSpecialization() != null ? dto.getSpecialization() : "")
+                .barCouncilId(dto.getBarCouncilId() != null ? dto.getBarCouncilId() : "")
                 .createdAt(java.time.Instant.now().toString())
                 .build();   // verificationStatus defaults to PENDING via @Builder.Default
 
@@ -69,6 +73,13 @@ public class LawyerFresherService {
     public LawyerFresherProfile approve(String id) {
         LawyerFresherProfile profile = lawyerFresherProfileRepository.findById(id)
                 .orElseThrow(() -> new IllegalArgumentException("Lawyer fresher profile not found: " + id));
+
+        if (!documentVerificationService.areAllMandatoryDocumentsVerified(id)) {
+            profile.setVerificationStatus(Verification_Status.PENDING);
+            profile.setVerifiedAt(null);
+            lawyerFresherProfileRepository.save(profile);
+            throw new IllegalArgumentException("Aadhaar, PAN, and a Bar Council document must all be verified before approval.");
+        }
 
         profile.setVerificationStatus(Verification_Status.VERIFIED);
         profile.setVerifiedAt(System.currentTimeMillis());
@@ -105,6 +116,7 @@ public class LawyerFresherService {
         if (dto.getSpecialization() != null) profile.setSpecialization(dto.getSpecialization());
         if (dto.getUniversity() != null) profile.setUniversity(dto.getUniversity());
         if (dto.getGraduationYear() != null) profile.setGraduationYear(dto.getGraduationYear());
+        if (dto.getBarCouncilId() != null) profile.setBarCouncilId(dto.getBarCouncilId());
 
         return lawyerFresherProfileRepository.save(profile);
     }

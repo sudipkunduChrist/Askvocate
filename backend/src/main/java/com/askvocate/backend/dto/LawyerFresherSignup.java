@@ -11,4 +11,5 @@ public class LawyerFresherSignup extends BaseSignup {
     private String university;
     private Integer graduationYear;
     private String specialization;
+    private String barCouncilId;
 }

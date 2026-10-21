@@ -48,7 +48,10 @@ class SplashFragment : Fragment() {
             if (isAdded && _binding != null) {
                 val navController = NavHostFragment.findNavController(this@SplashFragment)
                 val sessionResult = validation.await()
-                if (sessionResult == SessionManager.ValidationResult.INVALID) {
+                val needsNewAppSession = SessionManager.getUserRole(requireContext())
+                    .equals("CLIENT", ignoreCase = true) &&
+                    SessionManager.getAppToken(requireContext()).isBlank()
+                if (sessionResult == SessionManager.ValidationResult.INVALID || needsNewAppSession) {
                     SessionManager.setLoggedIn(requireContext(), false)
                 }
 

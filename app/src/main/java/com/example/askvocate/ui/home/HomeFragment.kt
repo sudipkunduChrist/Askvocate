@@ -5,7 +5,7 @@ import android.text.Html
 import android.view.LayoutInflater
 import android.view.View
 import android.view.ViewGroup
-import android.widget.Toast
+import com.example.askvocate.util.AppToast as Toast
 import androidx.core.text.HtmlCompat
 import androidx.core.view.isVisible
 import androidx.fragment.app.Fragment
@@ -20,6 +20,7 @@ import com.example.askvocate.ui.adapters.KnowledgeHubAdapter
 import com.example.askvocate.ui.adapters.LawyerAdapter
 import com.example.askvocate.util.AnimationUtils
 import com.example.askvocate.util.SessionManager
+import com.example.askvocate.util.applyStatusBarInset
 
 class HomeFragment : Fragment() {
 
@@ -48,14 +49,14 @@ class HomeFragment : Fragment() {
         setupAppointments()
         setupKnowledgeHub()
         setupHeroSection()
+        setupLegalAssistant()
         configureRoleSpecificUi()
 
         observeViewModel()
     }
 
     private fun configureRoleSpecificUi() {
-        val isClient = SessionManager.getUserRole(requireContext())
-            .equals("CLIENT", ignoreCase = true)
+        val isClient = !isLawyerRole()
 
         binding.btnFindLawyerHero.isVisible = isClient
         binding.searchContainer.isVisible = isClient
@@ -64,14 +65,36 @@ class HomeFragment : Fragment() {
         binding.rvCategories.isVisible = isClient
         binding.topLawyersHeader.isVisible = isClient
         binding.rvTopLawyers.isVisible = isClient
-        binding.quickActionsGrid.columnCount = if (isClient) 3 else 2
+        binding.assistantCard.isVisible = isClient
+        binding.quickActionsGrid.isVisible = isClient
+        binding.tvToolbarHeading.isVisible = !isClient
+        binding.tvLawyerEyebrow.isVisible = !isClient
+        binding.root.findViewById<View>(R.id.lawyer_workspace).isVisible = !isClient
         if (!isClient) {
-            binding.quickActionsGrid.removeView(binding.actionFindLawyer)
             binding.tvHeroSubtitle.setText(R.string.lawyer_hero_subtitle)
+            binding.btnFindLawyerHero.setText(R.string.lawyer_view_appointments)
+            binding.btnFindLawyerHero.isVisible = true
+            binding.btnFindLawyerHero.setOnClickListener {
+                findNavController().navigate(R.id.nav_appointments)
+            }
+            binding.knowledgeHubTitle.setText(R.string.lawyer_insights_title)
+            binding.root.findViewById<View>(R.id.lawyer_action_appointments).setOnClickListener {
+                findNavController().navigate(R.id.nav_appointments)
+            }
+            binding.root.findViewById<View>(R.id.lawyer_action_messages).setOnClickListener {
+                findNavController().navigate(R.id.nav_chat_list)
+            }
+            binding.root.findViewById<View>(R.id.lawyer_action_profile).setOnClickListener {
+                findNavController().navigate(R.id.nav_client_profile)
+            }
+            binding.root.findViewById<View>(R.id.lawyer_action_insights).setOnClickListener {
+                binding.nestedScrollView.smoothScrollTo(0, binding.knowledgeHubTitle.top)
+            }
         }
     }
 
     private fun setupToolbar() {
+        binding.toolbar.applyStatusBarInset()
         binding.toolbar.setNavigationOnClickListener {
             (requireActivity() as? MainActivity)?.openDrawer()
         }
@@ -94,6 +117,12 @@ class HomeFragment : Fragment() {
 
         binding.btnFindLawyerHero.setOnClickListener {
             findNavController().navigate(R.id.nav_find_lawyers)
+        }
+    }
+
+    private fun setupLegalAssistant() {
+        binding.assistantCard.setOnClickListener {
+            findNavController().navigate(R.id.action_home_to_legal_assistant)
         }
     }
 
@@ -122,9 +151,6 @@ class HomeFragment : Fragment() {
         }
         binding.actionAppointments.setOnClickListener {
             findNavController().navigate(R.id.nav_appointments)
-        }
-        binding.actionDocuments.setOnClickListener {
-            Toast.makeText(requireContext(), "Legal Documents coming soon!", Toast.LENGTH_SHORT).show()
         }
     }
 
@@ -176,7 +202,7 @@ class HomeFragment : Fragment() {
         }
 
         viewModel.upcomingAppointments.observe(viewLifecycleOwner) { appointments ->
-            binding.upcomingConsultationsContainer.isVisible = appointments.isNotEmpty()
+            binding.upcomingConsultationsContainer.isVisible = !isLawyerRole() && appointments.isNotEmpty()
             (binding.rvAppointments.adapter as? AppointmentAdapter)?.submitList(appointments)
         }
 
@@ -184,6 +210,9 @@ class HomeFragment : Fragment() {
             (binding.rvKnowledgeHub.adapter as? KnowledgeHubAdapter)?.submitList(items)
         }
     }
+
+    private fun isLawyerRole(): Boolean = SessionManager.getUserRole(requireContext())
+        .startsWith("LAWYER", ignoreCase = true)
 
     override fun onDestroyView() {
         super.onDestroyView()

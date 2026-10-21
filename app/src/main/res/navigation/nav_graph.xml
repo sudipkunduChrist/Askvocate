@@ -195,13 +195,46 @@
             app:exitAnim="@anim/slide_out_left"
             app:popEnterAnim="@anim/slide_in_left"
             app:popExitAnim="@anim/slide_out_right" />
+        <action
+            android:id="@+id/action_home_to_legal_assistant"
+            app:destination="@id/nav_legal_assistant"
+            app:enterAnim="@anim/slide_in_right"
+            app:exitAnim="@anim/slide_out_left"
+            app:popEnterAnim="@anim/slide_in_left"
+            app:popExitAnim="@anim/slide_out_right" />
     </fragment>
+
+    <fragment
+        android:id="@+id/nav_legal_assistant"
+        android:name="com.example.askvocate.ui.legalassistant.LegalAssistantFragment"
+        android:label="@string/ask_ai"
+        tools:layout="@layout/fragment_legal_assistant">
+        <argument
+            android:name="chatId"
+            app:argType="string"
+            android:defaultValue="" />
+        <action
+            android:id="@+id/action_legal_assistant_to_lawyer_profile"
+            app:destination="@id/nav_lawyer_profile"
+            app:enterAnim="@anim/slide_in_right"
+            app:exitAnim="@anim/slide_out_left" />
+    </fragment>
+
+    <fragment
+        android:id="@+id/nav_chat_history"
+        android:name="com.example.askvocate.ui.legalassistant.ChatHistoryFragment"
+        android:label="@string/chat_history_title"
+        tools:layout="@layout/fragment_chat_history" />
 
     <fragment
         android:id="@+id/nav_find_lawyers"
         android:name="com.example.askvocate.ui.findlawyers.FindLawyersFragment"
         android:label="@string/nav_find_lawyers"
         tools:layout="@layout/fragment_find_lawyers">
+        <argument
+            android:name="searchQuery"
+            app:argType="string"
+            android:defaultValue="" />
         <action
             android:id="@+id/action_find_lawyers_to_lawyer_profile"
             app:destination="@id/nav_lawyer_profile"
@@ -210,6 +243,12 @@
             app:popEnterAnim="@anim/slide_in_left"
             app:popExitAnim="@anim/slide_out_right" />
     </fragment>
+
+    <fragment
+        android:id="@+id/nav_search_history"
+        android:name="com.example.askvocate.ui.searchhistory.SearchHistoryFragment"
+        android:label="@string/search_history_title"
+        tools:layout="@layout/fragment_search_history" />
 
     <fragment
         android:id="@+id/nav_chat_list"
@@ -230,6 +269,10 @@
         android:name="com.example.askvocate.ui.clientprofile.ClientProfileFragment"
         android:label="@string/nav_profile"
         tools:layout="@layout/fragment_client_profile">
+        <action android:id="@+id/action_client_profile_to_my_documents"
+            app:destination="@id/nav_my_documents"
+            app:enterAnim="@anim/slide_in_right" app:exitAnim="@anim/slide_out_left"
+            app:popEnterAnim="@anim/slide_in_left" app:popExitAnim="@anim/slide_out_right" />
         <action
             android:id="@+id/action_client_profile_to_personal_info"
             app:destination="@id/nav_personal_info"
@@ -245,6 +288,10 @@
             app:popEnterAnim="@anim/slide_in_left"
             app:popExitAnim="@anim/slide_out_right" />
     </fragment>
+
+    <fragment android:id="@+id/nav_my_documents"
+        android:name="com.example.askvocate.ui.documents.MyDocumentsFragment"
+        android:label="My Documents" tools:layout="@layout/fragment_my_documents" />
 
     <fragment
         android:id="@+id/nav_saved_advocates"

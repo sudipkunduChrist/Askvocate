@@ -29,6 +29,7 @@ object SessionManager {
     private const val KEY_USER_ROLE = "user_role"
     private const val KEY_AUTH_PROVIDER = "auth_provider"
     private const val KEY_PROFILE_IMAGE_URL = "profile_image_url"
+    private const val KEY_APP_TOKEN = "app_token"
 
     fun isLoggedIn(context: Context): Boolean =
         prefs(context).getBoolean(KEY_LOGGED_IN, false)
@@ -50,7 +51,8 @@ object SessionManager {
         emailOrPhone: String,
         role: String,
         authProvider: String? = null,
-        profileImageUrl: String? = null
+        profileImageUrl: String? = null,
+        appToken: String? = null
     ) {
         val editor = prefs(context).edit()
             .putString(KEY_USER_ID, userId)
@@ -59,6 +61,8 @@ object SessionManager {
             .putString(KEY_USER_ROLE, role)
         if (authProvider != null) editor.putString(KEY_AUTH_PROVIDER, authProvider)
         if (profileImageUrl != null) editor.putString(KEY_PROFILE_IMAGE_URL, profileImageUrl)
+        if (appToken != null) editor.putString(KEY_APP_TOKEN, appToken)
+        else editor.remove(KEY_APP_TOKEN)
         editor.apply()
     }
 
@@ -80,6 +84,9 @@ object SessionManager {
     fun getProfileImageUrl(context: Context): String =
         prefs(context).getString(KEY_PROFILE_IMAGE_URL, "") ?: ""
 
+    fun getAppToken(context: Context): String =
+        prefs(context).getString(KEY_APP_TOKEN, "") ?: ""
+
     fun clearUser(context: Context) {
         prefs(context).edit()
             .remove(KEY_USER_ID)
@@ -88,6 +95,7 @@ object SessionManager {
             .remove(KEY_USER_ROLE)
             .remove(KEY_AUTH_PROVIDER)
             .remove(KEY_PROFILE_IMAGE_URL)
+            .remove(KEY_APP_TOKEN)
             .apply()
     }
 

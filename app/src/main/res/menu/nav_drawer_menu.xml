@@ -13,6 +13,14 @@
             android:icon="@drawable/ic_search"
             android:title="@string/nav_find_lawyers" />
         <item
+            android:id="@+id/nav_search_history"
+            android:icon="@drawable/ic_history"
+            android:title="@string/search_history_title" />
+        <item
+            android:id="@+id/nav_chat_history"
+            android:icon="@drawable/ic_chat"
+            android:title="@string/chat_history_title" />
+        <item
             android:id="@+id/nav_appointments"
             android:icon="@drawable/ic_home"
             android:title="@string/nav_appointments" />

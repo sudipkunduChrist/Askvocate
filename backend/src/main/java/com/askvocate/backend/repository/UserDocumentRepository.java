@@ -24,4 +24,13 @@ public interface UserDocumentRepository extends MongoRepository<UserDocument, St
 
     /** Check whether a user already has a verification record for a given document type. */
     boolean existsByUserIdAndDocumentType(String userId, DocumentType documentType);
+
+    /** Find a document by its keyed PAN digest for duplicate detection. */
+    Optional<UserDocument> findByPanNumberHash(String panNumberHash);
+
+    /** List documents that are waiting for manual review. */
+    List<UserDocument> findByRequiresManualReviewTrue();
+
+    /** List manual-review documents of one type. */
+    List<UserDocument> findByRequiresManualReviewTrueAndDocumentType(DocumentType documentType);
 }

@@ -28,6 +28,9 @@ public class VerificationController {
     @Autowired
     private LawyerExperiencedService lawyerExperiencedService;
 
+    @Autowired
+    private com.askvocate.backend.service.DocumentVerificationService documentVerificationService;
+
     // ─── Status Queries ──────────────────────────────────────────────────────
 
     /**

@@ -26,22 +26,27 @@ public class GlobalExceptionHandler {
     @ExceptionHandler(DocumentVerificationException.class)
     public ResponseEntity<Map<String, Object>> handleDocumentVerification(DocumentVerificationException ex) {
         log.warn("Document verification failed: {}", ex.getMessage());
-        return buildResponse(HttpStatus.BAD_REQUEST, ex.getMessage());
+        ResponseEntity<Map<String, Object>> response = buildResponse(HttpStatus.OK, ex.getMessage());
+        response.getBody().put("file", ex.getFile());
+        return response;
     }
 
     @ExceptionHandler(OcrExtractionException.class)
     public ResponseEntity<Map<String, Object>> handleOcrExtraction(OcrExtractionException ex) {
         // Log internally but never expose OCR details to client
         log.error("OCR extraction error (details withheld from client)");
-        return buildResponse(HttpStatus.UNPROCESSABLE_ENTITY,
+        return buildResponse(HttpStatus.OK,
                 "Unable to extract information from the uploaded document. "
                 + "Please ensure the image is clear and try again.");
     }
 
     @ExceptionHandler(MaxUploadSizeExceededException.class)
-    public ResponseEntity<Map<String, Object>> handleMaxUploadSize(MaxUploadSizeExceededException ex) {
-        return buildResponse(HttpStatus.PAYLOAD_TOO_LARGE,
-                "File size exceeds the maximum allowed limit of 10 MB per file.");
+    public ResponseEntity<Map<String, Object>> handleMaxUploadSize(MaxUploadSizeExceededException ex,
+            jakarta.servlet.http.HttpServletRequest request) {
+        log.warn("Upload rejected by multipart limit: method={}, path={}, exception={}",
+                request.getMethod(), request.getRequestURI(), ex.getClass().getSimpleName());
+        return buildResponse(HttpStatus.OK,
+                "File size exceeds the 30 MB upload limit. Images below this limit are automatically compressed before processing.");
     }
 
     @ExceptionHandler(org.springframework.web.bind.MethodArgumentNotValidException.class)
@@ -59,8 +64,10 @@ public class GlobalExceptionHandler {
     }
 
     @ExceptionHandler(Exception.class)
-    public ResponseEntity<Map<String, Object>> handleGeneral(Exception ex) {
-        log.error("Unhandled exception", ex);
+    public ResponseEntity<Map<String, Object>> handleGeneral(Exception ex,
+            jakarta.servlet.http.HttpServletRequest request) {
+        log.error("Unhandled request exception: method={}, path={}, exception={}",
+                request.getMethod(), request.getRequestURI(), ex.getClass().getSimpleName(), ex);
         return buildResponse(HttpStatus.OK, ex.getMessage() != null ? ex.getMessage() : "An unexpected error occurred.");
     }
 
@@ -72,6 +79,7 @@ public class GlobalExceptionHandler {
         body.put("timestamp", Instant.now().toString());
         body.put("status", status.value());
         body.put("error", message);
+        body.put("file", null);
         return ResponseEntity.ok(body);
     }
 }

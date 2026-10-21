@@ -174,7 +174,7 @@ object GoogleAuthHelper {
             val responseCode = conn.responseCode
             val stream = if (responseCode in 200..299) conn.inputStream else conn.errorStream
             val responseText = stream?.bufferedReader(Charsets.UTF_8)?.readText() ?: ""
-            Log.d("GoogleAuth", "[$responseCode] /auth/google → $responseText")
+            Log.d("GoogleAuth", "[$responseCode] /auth/google")
 
             val json = runCatching { JSONObject(responseText) }.getOrNull()
             val isSuccess = responseCode in 200..299 && json?.optBoolean("success", false) == true
@@ -190,7 +190,8 @@ object GoogleAuthHelper {
                             emailOrPhone = userObj.optString("email", ""),
                             role = json.optString("role", ""),
                             authProvider = "GOOGLE",
-                            profileImageUrl = json.optString("profileImageUrl", "")
+                            profileImageUrl = json.optString("profileImageUrl", ""),
+                            appToken = json.optString("appToken", "")
                         )
                     }
                     val message = json?.optString("message", "Signed in with Google") ?: "Signed in with Google"

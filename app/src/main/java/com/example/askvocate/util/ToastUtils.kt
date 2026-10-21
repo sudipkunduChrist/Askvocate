@@ -13,7 +13,6 @@ import android.view.animation.DecelerateInterpolator
 import android.widget.FrameLayout
 import android.widget.ImageView
 import android.widget.TextView
-import android.widget.Toast
 import androidx.core.content.ContextCompat
 import com.example.askvocate.R
 
@@ -41,7 +40,7 @@ object ToastUtils {
     /**
      * Shows an INSTANT custom snackbar/banner toast directly attached to the Activity view tree.
      * Unlike standard Android system Toasts, this has ZERO queueing delay and overrides previous notifications instantly!
-     * Falls back to standard Android Toast if Activity context or root content view is unavailable.
+     * Notifications are drawn in the Activity so Android does not add the app icon.
      */
     fun showToast(context: Context, message: String, type: ToastType = ToastType.INFO) {
         if (Looper.myLooper() != Looper.getMainLooper()) {
@@ -51,13 +50,11 @@ object ToastUtils {
 
         val activity = findActivity(context)
         if (activity == null || activity.isFinishing || activity.isDestroyed) {
-            Toast.makeText(context, message, Toast.LENGTH_LONG).show()
             return
         }
 
         val rootContent = activity.findViewById<ViewGroup>(android.R.id.content)
         if (rootContent == null) {
-            Toast.makeText(context, message, Toast.LENGTH_LONG).show()
             return
         }
 
@@ -71,7 +68,6 @@ object ToastUtils {
         val toastView = try {
             LayoutInflater.from(activity).inflate(R.layout.layout_custom_toast, rootContent, false)
         } catch (e: Exception) {
-            Toast.makeText(context, message, Toast.LENGTH_LONG).show()
             return
         }
 
@@ -82,8 +78,8 @@ object ToastUtils {
 
         val (iconRes, tintColor) = when (type) {
             ToastType.SUCCESS -> Pair(R.drawable.ic_check_circle, ContextCompat.getColor(activity, R.color.success_green))
-            ToastType.ERROR -> Pair(R.drawable.ic_eye_off_filled, ContextCompat.getColor(activity, R.color.error_red))
-            ToastType.INFO -> Pair(R.drawable.ic_check_circle, ContextCompat.getColor(activity, R.color.amber_accent))
+            ToastType.ERROR -> Pair(R.drawable.ic_close, ContextCompat.getColor(activity, R.color.error_red))
+            ToastType.INFO -> Pair(R.drawable.ic_description, ContextCompat.getColor(activity, R.color.amber_accent))
         }
 
         ivIcon.setImageResource(iconRes)
@@ -91,11 +87,13 @@ object ToastUtils {
 
         // Layout params for top-floating banner
         val params = FrameLayout.LayoutParams(
-            FrameLayout.LayoutParams.WRAP_CONTENT,
+            FrameLayout.LayoutParams.MATCH_PARENT,
             FrameLayout.LayoutParams.WRAP_CONTENT
         ).apply {
             gravity = Gravity.TOP or Gravity.CENTER_HORIZONTAL
             topMargin = (64 * activity.resources.displayMetrics.density).toInt()
+            marginStart = (20 * activity.resources.displayMetrics.density).toInt()
+            marginEnd = (20 * activity.resources.displayMetrics.density).toInt()
         }
 
         toastView.layoutParams = params
@@ -128,8 +126,26 @@ object ToastUtils {
         }
 
         dismissRunnable = runnable
-        mainHandler.postDelayed(runnable, 2500)
+        mainHandler.postDelayed(runnable, if (type == ToastType.ERROR) 4000 else 2500)
     }
+}
+
+/** Small compatibility adapter for existing Toast call sites. */
+class AppToast private constructor(
+    private val context: Context,
+    private val message: String,
+    private val type: ToastType
+) {
+    companion object {
+        const val LENGTH_SHORT = 0
+        const val LENGTH_LONG = 1
+
+        fun makeText(context: Context, message: CharSequence?, duration: Int,
+                     type: ToastType = ToastType.INFO): AppToast =
+            AppToast(context, message?.toString().orEmpty(), type)
+    }
+
+    fun show() = ToastUtils.showToast(context, message, type)
 }
 
 fun Context.showCustomToast(message: String, type: ToastType = ToastType.INFO) {

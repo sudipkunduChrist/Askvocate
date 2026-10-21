@@ -19,9 +19,13 @@ class KnowledgeHubAdapter(private val onClick: (KnowledgeItem) -> Unit) :
             binding.tvTitle.text = item.title
             binding.tvDesc.text = item.description
             binding.tvCategory.text = item.category.uppercase()
-            binding.ivThumbnail.load(item.imageUrl) {
-                placeholder(R.drawable.bg_journey_hero)
-                error(R.drawable.bg_journey_hero)
+            if (item.imageUrl.isNullOrBlank()) {
+                binding.ivThumbnail.setImageResource(R.drawable.ic_description)
+            } else {
+                binding.ivThumbnail.load(item.imageUrl) {
+                    placeholder(R.drawable.ic_description)
+                    error(R.drawable.ic_description)
+                }
             }
             binding.root.setOnClickListener { onClick(item) }
         }

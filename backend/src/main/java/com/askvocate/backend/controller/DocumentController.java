@@ -3,6 +3,7 @@ package com.askvocate.backend.controller;
 import com.askvocate.backend.entity.DocType;
 import com.askvocate.backend.model.UserDoc;
 import com.askvocate.backend.service.DocumentService;
+import com.askvocate.backend.service.AppSessionService;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
@@ -18,14 +19,33 @@ public class DocumentController {
 
     @Autowired
     private DocumentService documentService;
+    @Autowired
+    private AppSessionService sessions;
+
+    private void requireOwner(String authorization, String userId) {
+        AppSessionService.Account account = sessions.requireAccount(authorization);
+        if (!account.userId().equals(userId)) {
+            throw new org.springframework.web.server.ResponseStatusException(HttpStatus.FORBIDDEN, "Document account mismatch");
+        }
+        if (!"LAWYER_FRESHER".equals(account.role()) && !"LAWYER_EXPERIENCED".equals(account.role())) {
+            throw new org.springframework.web.server.ResponseStatusException(HttpStatus.FORBIDDEN,
+                    "Document uploads and verification are only available for lawyer accounts.");
+        }
+    }
 
     // ✅ Upload document
     @PostMapping("/upload")
     public ResponseEntity<?> uploadDocument(
+            @RequestHeader("Authorization") String authorization,
             @RequestParam String userId,
             @RequestParam DocType docType,
             @RequestParam("file") MultipartFile file) {
+        requireOwner(authorization, userId);
         try {
+            if (docType == DocType.SELFIE) {
+                return ResponseEntity.ok(Map.of("success", false,
+                        "error", "Use /api/documents/selfie/challenge and /api/documents/selfie/verify for live selfie verification."));
+            }
             UserDoc doc = documentService.uploadDocument(userId, docType, file);
             return ResponseEntity.ok(Map.of(
                     "success", true,
@@ -44,8 +64,10 @@ public class DocumentController {
     // ✅ Get signed URL (1 hour)
     @GetMapping("/{userId}/{docType}/signed-url")
     public ResponseEntity<?> getSignedUrl(
+            @RequestHeader("Authorization") String authorization,
             @PathVariable String userId,
             @PathVariable DocType docType) {
+        requireOwner(authorization, userId);
         try {
             String signedUrl = documentService.getDocumentSignedUrl(userId, docType);
             return ResponseEntity.ok(Map.of(
@@ -71,7 +93,9 @@ public class DocumentController {
 
     // ✅ Get all documents for a user
     @GetMapping("/user/{userId}")
-    public ResponseEntity<?> getUserDocuments(@PathVariable String userId) {
+    public ResponseEntity<?> getUserDocuments(@RequestHeader("Authorization") String authorization,
+            @PathVariable String userId) {
+        requireOwner(authorization, userId);
         try {
             List<UserDoc> documents = documentService.getUserDocuments(userId);
             return ResponseEntity.ok(Map.of(
@@ -91,8 +115,10 @@ public class DocumentController {
     // ✅ Get specific document
     @GetMapping("/{userId}/{docType}")
     public ResponseEntity<?> getDocument(
+            @RequestHeader("Authorization") String authorization,
             @PathVariable String userId,
             @PathVariable DocType docType) {
+        requireOwner(authorization, userId);
         try {
             var doc = documentService.getDocument(userId, docType);
             if (doc.isEmpty()) {
@@ -118,8 +144,10 @@ public class DocumentController {
     // ✅ Delete document
     @DeleteMapping("/{userId}/{docType}")
     public ResponseEntity<?> deleteDocument(
+            @RequestHeader("Authorization") String authorization,
             @PathVariable String userId,
             @PathVariable DocType docType) {
+        requireOwner(authorization, userId);
         try {
             documentService.deleteDocument(userId, docType);
             return ResponseEntity.ok(Map.of(

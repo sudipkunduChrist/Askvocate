@@ -154,6 +154,11 @@
                         android:layout_width="match_parent" android:layout_height="56dp"
                         android:text="Edit personal information" app:icon="@drawable/ic_edit_pencil"
                         app:iconGravity="textStart" />
+                    <com.google.android.material.button.MaterialButton
+                        android:id="@+id/btn_live_selfie" style="@style/Widget.Askvocate.Button.Primary"
+                        android:layout_width="match_parent" android:layout_height="56dp"
+                        android:layout_marginTop="@dimen/spacing_sm"
+                        android:text="Verify live selfie" android:visibility="gone" />
                 </LinearLayout>
 
                 <LinearLayout android:id="@+id/layout_edit_mode" android:layout_width="match_parent"

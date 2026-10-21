@@ -1,0 +1,191 @@
+<?xml version="1.0" encoding="utf-8"?>
+<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:app="http://schemas.android.com/apk/res-auto"
+    xmlns:tools="http://schemas.android.com/tools"
+    android:layout_width="match_parent"
+    android:layout_height="wrap_content"
+    android:gravity="top"
+    android:orientation="horizontal"
+    android:paddingEnd="12dp"
+    android:paddingBottom="@dimen/spacing_lg">
+
+    <FrameLayout
+        android:layout_width="32dp"
+        android:layout_height="32dp"
+        android:background="@drawable/bg_legal_assistant_avatar">
+
+        <ImageView
+            android:layout_width="18dp"
+            android:layout_height="18dp"
+            android:layout_gravity="center"
+            android:contentDescription="@string/ask_ai"
+            android:src="@drawable/ic_sparkle"
+            app:tint="@color/white" />
+    </FrameLayout>
+
+    <LinearLayout
+        android:layout_width="0dp"
+        android:layout_height="wrap_content"
+        android:layout_marginStart="10dp"
+        android:layout_weight="1"
+        android:orientation="vertical">
+
+        <TextView
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:layout_marginBottom="5dp"
+            android:text="@string/legal_guide_short"
+            android:textColor="@color/home_blue"
+            android:textSize="12sp"
+            android:textStyle="bold" />
+
+        <com.google.android.material.card.MaterialCardView
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            app:cardBackgroundColor="#FFF3F7FC"
+            app:cardCornerRadius="16dp"
+            app:cardElevation="0dp"
+            app:strokeColor="#FFD6E3F3"
+            app:strokeWidth="1dp">
+
+            <LinearLayout
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:orientation="vertical"
+                android:padding="@dimen/spacing_lg">
+
+                <TextView
+                    android:id="@+id/tv_assistant_response"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:lineSpacingExtra="3dp"
+                    android:textColor="#FF172033"
+                    android:textIsSelectable="true"
+                    android:textSize="15sp"
+                    tools:text="Main aapki situation samajhne mein madad karunga. Challan kis city mein aur kis date ko issue hua tha?" />
+
+                <com.google.android.material.button.MaterialButton
+                    android:id="@+id/btn_inline_find_advocates"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:layout_marginTop="@dimen/spacing_lg"
+                    android:minHeight="48dp"
+                    android:text="@string/find_matching_advocates"
+                    android:textAllCaps="false"
+                    android:textColor="@color/white"
+                    android:textStyle="bold"
+                    android:visibility="gone"
+                    app:backgroundTint="@color/home_blue"
+                    app:cornerRadius="12dp" />
+
+                <LinearLayout
+                    android:id="@+id/inline_matching_loading"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:layout_marginTop="@dimen/spacing_sm"
+                    android:gravity="center_vertical"
+                    android:orientation="horizontal"
+                    android:visibility="gone">
+                    <ProgressBar
+                        style="?android:attr/progressBarStyleSmall"
+                        android:layout_width="24dp"
+                        android:layout_height="24dp" />
+                    <TextView
+                        android:layout_width="wrap_content"
+                        android:layout_height="wrap_content"
+                        android:layout_marginStart="@dimen/spacing_sm"
+                        android:text="@string/assistant_matching_loading"
+                        android:textColor="@color/text_secondary" />
+                </LinearLayout>
+
+                <TextView
+                    android:id="@+id/inline_matching_error"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:layout_marginTop="@dimen/spacing_sm"
+                    android:textColor="@color/text_secondary"
+                    android:visibility="gone" />
+
+                <LinearLayout
+                    android:id="@+id/inline_matching_clarification"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:layout_marginTop="@dimen/spacing_lg"
+                    android:orientation="vertical"
+                    android:visibility="gone">
+                    <TextView
+                        android:id="@+id/inline_clarification_question"
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        android:textColor="@color/navy_primary"
+                        android:textSize="15sp" />
+                    <com.google.android.material.textfield.TextInputLayout
+                        android:id="@+id/inline_clarification_answer_layout"
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        android:layout_marginTop="@dimen/spacing_sm"
+                        android:hint="@string/assistant_matching_answer">
+                        <com.google.android.material.textfield.TextInputEditText
+                            android:id="@+id/inline_clarification_answer"
+                            android:layout_width="match_parent"
+                            android:layout_height="wrap_content"
+                            android:inputType="textCapSentences|textMultiLine"
+                            android:imeOptions="actionSend"
+                            android:maxLength="1000" />
+                    </com.google.android.material.textfield.TextInputLayout>
+                    <com.google.android.material.button.MaterialButton
+                        android:id="@+id/inline_clarification_submit"
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        android:text="@string/assistant_matching_continue"
+                        android:textAllCaps="false" />
+                </LinearLayout>
+
+                <LinearLayout
+                    android:id="@+id/inline_matching_results"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:layout_marginTop="@dimen/spacing_lg"
+                    android:orientation="vertical"
+                    android:visibility="gone">
+                    <TextView
+                        android:id="@+id/inline_matching_domain"
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        android:textColor="@color/home_blue"
+                        android:textStyle="bold"
+                        android:textSize="16sp" />
+                    <TextView
+                        android:id="@+id/inline_matching_count"
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        android:layout_marginTop="@dimen/spacing_xs"
+                        android:layout_marginBottom="@dimen/spacing_sm"
+                        android:textColor="@color/text_secondary" />
+                    <TextView
+                        android:id="@+id/inline_matching_empty"
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        android:text="@string/assistant_matching_empty"
+                        android:textColor="@color/text_secondary"
+                        android:visibility="gone" />
+                    <androidx.recyclerview.widget.RecyclerView
+                        android:id="@+id/inline_matching_lawyers"
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        android:nestedScrollingEnabled="false"
+                        app:layoutManager="androidx.recyclerview.widget.LinearLayoutManager" />
+                </LinearLayout>
+            </LinearLayout>
+        </com.google.android.material.card.MaterialCardView>
+
+        <TextView
+            android:id="@+id/tv_assistant_response_time"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="3dp"
+            android:textColor="@color/text_tertiary"
+            android:textSize="11sp"
+            tools:text="9:15 PM" />
+    </LinearLayout>
+</LinearLayout>
