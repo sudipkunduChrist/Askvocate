@@ -220,6 +220,20 @@ public class VisionVerificationClient {
                 && !"auto".equalsIgnoreCase(pythonExecutable)) {
             return List.of(List.of(pythonExecutable));
         }
+        List<Path> venvCandidates = List.of(
+                Path.of("verification", ".venv", "bin", "python3"),
+                Path.of("verification", ".venv", "bin", "python"),
+                Path.of("backend", "verification", ".venv", "bin", "python3"),
+                Path.of("backend", "verification", ".venv", "bin", "python"),
+                Path.of("verification", ".venv", "Scripts", "python.exe"),
+                Path.of("backend", "verification", ".venv", "Scripts", "python.exe")
+        );
+        for (Path venv : venvCandidates) {
+            Path resolved = venv.toAbsolutePath().normalize();
+            if (Files.isRegularFile(resolved)) {
+                return List.of(List.of(resolved.toString()));
+            }
+        }
         if (!System.getProperty("os.name").toLowerCase().contains("win")) {
             return List.of(List.of("python3"), List.of("python"));
         }

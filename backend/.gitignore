@@ -81,3 +81,5 @@ surefire-reports/
 #
 # Rerun the adb reverse command after reconnecting the device or restarting
 # the emulator, since the forwarding is cleared when the connection drops.
+.venv/
+*/.venv/
