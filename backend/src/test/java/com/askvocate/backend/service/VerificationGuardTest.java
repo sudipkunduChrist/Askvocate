@@ -271,7 +271,7 @@ class VerificationGuardTest {
     }
 
     @Test
-    void aadhaarQrMismatchRequiresManualReview() throws Exception {
+    void aadhaarQrVerifiedIgnoresPrintedMismatch() throws Exception {
         var profile = new LawyerFresherProfile();
         profile.setId("fresher-id");
         profile.setName("Test Lawyer");
@@ -299,17 +299,17 @@ class VerificationGuardTest {
 
         var response = service.verifyDocument("fresher-id", DocumentType.AADHAAR, front, back);
 
-        assertEquals(com.askvocate.backend.model.VerificationStatus.PENDING, response.getVerificationStatus());
+        assertEquals(com.askvocate.backend.model.VerificationStatus.VERIFIED, response.getVerificationStatus());
         assertEquals(Boolean.TRUE, stored.get().getIsQrVerified());
-        assertEquals(Boolean.TRUE, stored.get().getQrPrintedMismatch());
-        assertEquals(List.of("name"), stored.get().getQrMismatchFields());
-        assertTrue(stored.get().getRequiresManualReview());
-        assertEquals("AADHAAR_OCR_MISMATCH", stored.get().getPendingReason());
-        assertFalse(stored.get().getAutoApproved());
-        assertTrue(stored.get().getManualReviewReason().contains("name"));
-        assertNull(stored.get().getVerifiedAt());
+        assertEquals(Boolean.FALSE, stored.get().getQrPrintedMismatch());
+        assertNull(stored.get().getQrMismatchFields());
+        assertFalse(stored.get().getRequiresManualReview());
+        assertNull(stored.get().getPendingReason());
+        assertTrue(stored.get().getAutoApproved());
+        assertNotNull(stored.get().getVerifiedAt());
         assertNotNull(stored.get().getQrText());
         assertEquals("Tampered Name", stored.get().getQrData().getName());
+        assertEquals("Tampered Name", stored.get().getExtractedData().get("name"));
     }
 
     @Test
@@ -851,7 +851,7 @@ class VerificationGuardTest {
     }
 
     @Test
-    void aadhaarQrVerifiedButPrintedFieldsUnreadableRequiresReupload() throws Exception {
+    void aadhaarQrVerifiedWithUnreadablePrintIsVerified() throws Exception {
         var profile = new LawyerFresherProfile();
         profile.setId("fresher-id");
         when(freshers.findById("fresher-id")).thenReturn(Optional.of(profile));
@@ -875,11 +875,13 @@ class VerificationGuardTest {
 
         var response = service.verifyDocument("fresher-id", DocumentType.AADHAAR, front, back);
 
-        assertEquals(com.askvocate.backend.model.VerificationStatus.PENDING, response.getVerificationStatus());
+        assertEquals(com.askvocate.backend.model.VerificationStatus.VERIFIED, response.getVerificationStatus());
         assertFalse(stored.get().getRequiresManualReview());
-        assertEquals("AADHAAR_OCR_UNREADABLE", stored.get().getPendingReason());
+        assertNull(stored.get().getPendingReason());
         assertEquals(Boolean.TRUE, stored.get().getIsQrVerified());
+        assertEquals(Boolean.FALSE, stored.get().getQrPrintedMismatch());
         assertFalse(stored.get().getCloudinaryReferences().isEmpty());
+        assertEquals("Test Lawyer", stored.get().getExtractedData().get("name"));
     }
 
     @Test

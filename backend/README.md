@@ -58,17 +58,17 @@ which calls for retaining only the last four digits and redacting stored card co
 
 #### Aadhaar
 
-- Upload `front` **and** `back` to `POST /api/my-documents/AADHAAR`. Local Tesseract OCR reads the printed fields; OCR text is transient and never stored raw.
-- The **signed UIDAI Secure QR** is the trust anchor. It must verify (signature + embedded photo) for any automatic outcome. Versioned V2/V3/V4 and legacy 16-field payloads are decoded. Masked cards/PDFs are accepted: the last four digits are matched against the QR.
+- Upload a single **QR-side image** to `POST /api/my-documents/AADHAAR` (multipart `front`): a photo of the card's QR side or a free **e-Aadhaar** screenshot.
+- The **signed UIDAI Secure QR** is the sole authority (signature + embedded photo). OCR is no longer required and printed fields are not compared. Versioned V2/V3/V4 and legacy 16-field payloads are decoded.
 - Outcomes:
-  - `VERIFIED` — QR verifies, OCR succeeds, and printed fields match the QR (name, DOB, gender, pincode, address, last 4 digits). QR demographics are stored as `qrData`; the QR-embedded photo is **not** stored.
-  - `PENDING` + `AADHAAR_OCR_MISMATCH` — QR verifies but printed fields differ. **Manual review.** Approval adopts the signed QR data, clears the mismatch, and keeps PAN/selfie usable.
-  - `PENDING` + `AADHAAR_QR_UNREADABLE` / `AADHAAR_OCR_UNREADABLE` — quality failure. **No manual review**: the user must retry with a clearer photo or e-Aadhaar (same QR). Approval of a QR-less Aadhaar is rejected.
-- Aadhaar images are retained because live selfie verification re-reads the QR from them.
+  - `VERIFIED` — QR verifies. Demographics (name, DOB, gender, address, pincode) and the last 4 digits come from the QR and are stored in `qrData`/`extractedData`; the image is stored for selfie matching.
+  - `PENDING` + `AADHAAR_QR_UNREADABLE` — QR unreadable. Re-upload a clearer QR photo or e-Aadhaar; no manual review.
+- The full 12-digit Aadhaar number is not present in the QR; only the last 4 are available/displayed.
+- The app offers **Upload QR photo** and **Scan QR live**, plus a “Can’t scan? Get e-documents” help screen with e-Aadhaar/e-PAN links.
 
 #### PAN
 
-- Upload the card photo/QR image to `POST /api/my-documents/PAN` (or scan the QR and send the text to `/api/my-documents/PAN/qr-text`). The signed PAN QR (ECDSA P-384/SHA-384) is unpacked into PII + photo and verified against the issuer key. **OCR alone never auto-verifies PAN.**
+- Upload a single QR-side image to `POST /api/my-documents/PAN`, or use the app's live scanner (ML Kit captures a still and submits it). `/api/my-documents/PAN/qr-text` remains for text-only clients. The signed PAN QR (ECDSA P-384/SHA-384) is unpacked into PII + photo and verified against the issuer key. **OCR alone never auto-verifies PAN.**
 - A verified PAN must be an **Individual** PAN, structurally valid, not a duplicate of another account, and must match the verified Aadhaar QR (name, DOB).
 - Outcomes:
   - `VERIFIED` — all checks pass; the submitted image is stored.
@@ -183,9 +183,10 @@ accounts are rejected. `GET /api/my-documents` returns the lawyer verification c
 `GET /api/my-documents/{type}` returns one document's status and details;
 `POST /api/my-documents/{type}` accepts multipart `front` and optional `back` images;
 `GET /api/my-documents/{type}/media/{side}` serves account-scoped images for
-preview and download. Aadhaar needs both images. Live selfie uses the existing
-challenge and verify endpoints. Degree and AIBE certificates support upload and
-view only; they are labeled unverified until a verification backend is added.
+preview and download. Aadhaar and PAN accept a single QR-side image (upload or live scan).
+Live selfie uses the existing challenge and verify endpoints. The app also links to a
+“Get e-documents” help screen with official e-Aadhaar/e-PAN and DigiLocker links.
+Bar/COP/Degree/AIBE uploads are OCR-extracted and queued for manual review.
 `PENDING` items expose `requiresManualReview`, `pendingReason` and `required`
 (`AADHAAR_QR_UNREADABLE`, `AADHAAR_OCR_UNREADABLE`, `AADHAAR_OCR_MISMATCH`,
 `PAN_QR_UNREADABLE`, `PAN_MISMATCH`, `PAN_DUPLICATE`, `PAN_WAITING_AADHAAR`,

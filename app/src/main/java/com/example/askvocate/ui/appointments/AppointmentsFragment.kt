@@ -6,6 +6,7 @@ import android.view.View
 import android.view.ViewGroup
 import androidx.appcompat.widget.Toolbar
 import androidx.fragment.app.Fragment
+import androidx.navigation.fragment.findNavController
 import androidx.recyclerview.widget.RecyclerView
 import com.example.askvocate.MainActivity
 import com.example.askvocate.R
@@ -33,7 +34,7 @@ class AppointmentsFragment : Fragment() {
             (requireActivity() as? MainActivity)?.openDrawer()
         }
         view.findViewById<View>(R.id.btn_notifications).setOnClickListener {
-            Toast.makeText(requireContext(), "Notifications coming soon!", Toast.LENGTH_SHORT).show()
+            findNavController().navigate(R.id.nav_notifications)
         }
 
         val rvAppointments = view.findViewById<RecyclerView>(R.id.rv_appointments)

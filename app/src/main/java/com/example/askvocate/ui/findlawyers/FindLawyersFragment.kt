@@ -59,7 +59,7 @@ class FindLawyersFragment : Fragment() {
             if (!findNavController().navigateUp()) findNavController().navigate(R.id.nav_home)
         }
         view.findViewById<View>(R.id.btn_notifications).setOnClickListener {
-            Toast.makeText(requireContext(), "Notifications coming soon!", Toast.LENGTH_SHORT).show()
+            findNavController().navigate(R.id.nav_notifications)
         }
 
         val caseDescription = view.findViewById<EditText>(R.id.et_case_description)

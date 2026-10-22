@@ -24,6 +24,23 @@
             app:layout_constraintTop_toTopOf="parent"
             app:navGraph="@navigation/nav_graph" />
 
+        <TextView
+            android:id="@+id/offline_banner"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:layout_marginBottom="8dp"
+            android:background="@drawable/bg_offline_banner"
+            android:elevation="4dp"
+            android:paddingHorizontal="14dp"
+            android:paddingVertical="8dp"
+            android:text="Offline · showing saved data"
+            android:textColor="@color/navy_primary"
+            android:textSize="12sp"
+            android:visibility="gone"
+            app:layout_constraintBottom_toTopOf="@id/bottom_nav_container"
+            app:layout_constraintEnd_toEndOf="parent"
+            app:layout_constraintStart_toStartOf="parent" />
+
         <!-- Bottom bar: Home | Cases | (center ask button) | Messages | Profile -->
         <FrameLayout
             android:id="@+id/bottom_nav_container"

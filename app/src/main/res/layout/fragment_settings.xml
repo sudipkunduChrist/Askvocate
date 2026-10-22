@@ -47,20 +47,7 @@
                     android:text="@string/edit_profile"
                     android:textAppearance="@style/TextAppearance.Askvocate.BodyLarge" />
 
-                <View
-                    android:layout_width="match_parent"
-                    android:layout_height="1dp"
-                    android:background="@color/divider" />
-
-                <TextView
-                    android:layout_width="match_parent"
-                    android:layout_height="wrap_content"
-                    android:background="?attr/selectableItemBackground"
-                    android:clickable="true"
-                    android:focusable="true"
-                    android:padding="16dp"
-                    android:text="@string/notifications"
-                    android:textAppearance="@style/TextAppearance.Askvocate.BodyLarge" />
+                
 
             </LinearLayout>
         </com.google.android.material.card.MaterialCardView>
@@ -94,20 +81,7 @@
                     android:text="@string/language"
                     android:textAppearance="@style/TextAppearance.Askvocate.BodyLarge" />
 
-                <View
-                    android:layout_width="match_parent"
-                    android:layout_height="1dp"
-                    android:background="@color/divider" />
-
-                <TextView
-                    android:layout_width="match_parent"
-                    android:layout_height="wrap_content"
-                    android:background="?attr/selectableItemBackground"
-                    android:clickable="true"
-                    android:focusable="true"
-                    android:padding="16dp"
-                    android:text="@string/dark_mode"
-                    android:textAppearance="@style/TextAppearance.Askvocate.BodyLarge" />
+                
 
                 <View
                     android:layout_width="match_parent"

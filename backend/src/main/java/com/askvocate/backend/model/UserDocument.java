@@ -4,6 +4,7 @@ import com.fasterxml.jackson.annotation.JsonIgnore;
 import lombok.Getter;
 import lombok.Setter;
 import org.springframework.data.annotation.Id;
+import org.springframework.data.mongodb.core.index.CompoundIndex;
 import org.springframework.data.mongodb.core.index.Indexed;
 import org.springframework.data.mongodb.core.mapping.Document;
 
@@ -23,6 +24,7 @@ import java.util.Map;
  */
 @Getter
 @Document(collection = "documents")
+@CompoundIndex(name = "user_document_type", def = "{'userId': 1, 'documentType': 1}")
 public class UserDocument {
 
     @Setter

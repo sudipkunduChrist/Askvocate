@@ -100,8 +100,7 @@ class HomeFragment : Fragment() {
         }
 
         binding.btnNotifications.setOnClickListener {
-            // Navigate to notifications if available
-            Toast.makeText(requireContext(), "Notifications coming soon!", Toast.LENGTH_SHORT).show()
+            findNavController().navigate(R.id.nav_notifications)
         }
     }
 

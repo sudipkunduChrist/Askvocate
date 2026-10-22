@@ -67,7 +67,10 @@ public class CloudinaryService {
      */
     public UploadResult uploadWithOcr(MultipartFile file, String folder, String tag) throws IOException {
         byte[] image = file.getBytes();
-        Map<String, Object> ocrData = visionVerificationClient.localOcr(
+        // Aadhaar and PAN are QR-only now: the signed QR carries the data, so the
+        // Tesseract pass (and its extra Python worker startup) is skipped.
+        boolean qrOnly = folder.endsWith("/AADHAAR") || folder.endsWith("/PAN");
+        Map<String, Object> ocrData = qrOnly ? Map.of() : visionVerificationClient.localOcr(
                 image, folder.endsWith("/AADHAAR") ? tag : folder.endsWith("/PAN") ? "pan" : "");
         Map<String, Object> options = ObjectUtils.asMap(
                 "folder", folder,

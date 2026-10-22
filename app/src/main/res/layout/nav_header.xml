@@ -24,7 +24,7 @@
             android:id="@+id/user_name"
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
-            android:text="Amit Patel"
+            android:text="@string/nav_user_name_placeholder"
             android:textAppearance="@style/TextAppearance.Askvocate.Title"
             android:textColor="@color/text_on_primary" />
 
@@ -32,7 +32,7 @@
             android:id="@+id/user_email"
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
-            android:text="amit.patel@example.com"
+            android:text=""
             android:textAppearance="@style/TextAppearance.Askvocate.Body"
             android:textColor="#E0E0E0" />
     </LinearLayout>

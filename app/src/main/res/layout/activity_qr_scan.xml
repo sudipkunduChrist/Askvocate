@@ -30,7 +30,7 @@
         android:gravity="center"
         android:paddingHorizontal="18dp"
         android:paddingVertical="10dp"
-        android:text="@string/pan_qr_scan_prompt"
+        android:text="@string/qr_scan_prompt"
         android:textColor="@color/white"
         android:textSize="14sp" />
 

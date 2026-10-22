@@ -35,6 +35,29 @@ data class MyDocument(
     val requiresManualReview: Boolean = false, val pendingReason: String? = null,
     val required: Boolean = false, val requirementGroup: String? = null
 ) {
+    fun toJson(): JSONObject = JSONObject().apply {
+        put("type", type)
+        put("title", title)
+        put("status", status)
+        put("note", note ?: JSONObject.NULL)
+        put("maskedNumber", maskedNumber ?: JSONObject.NULL)
+        put("details", JSONObject(details))
+        put("submittedAt", submittedAt ?: JSONObject.NULL)
+        put("verifiedAt", verifiedAt ?: JSONObject.NULL)
+        put("media", JSONArray(media))
+        put("requiresBack", requiresBack)
+        put("uploadOnly", uploadOnly)
+        put("liveCapture", liveCapture)
+        put("aadhaarNumber", aadhaarNumber ?: JSONObject.NULL)
+        put("panNumber", panNumber ?: JSONObject.NULL)
+        put("qrDetails", JSONObject(qrDetails))
+        put("qrPhotoUrl", qrPhotoUrl ?: JSONObject.NULL)
+        put("requiresManualReview", requiresManualReview)
+        put("pendingReason", pendingReason ?: JSONObject.NULL)
+        put("required", required)
+        put("requirementGroup", requirementGroup ?: JSONObject.NULL)
+    }
+
     companion object {
         fun from(json: JSONObject): MyDocument {
             val fields = json.optJSONObject("details")
@@ -135,7 +158,7 @@ class MyDocumentsApi(private val context: Context) {
     }
 
     suspend fun revealAadhaarNumber(): String = withContext(Dispatchers.IO) {
-        val conn = connection("/AADHAAR")
+        val conn = connection("/AADHAAR/number")
         try {
             JSONObject(response(conn)).optionalText("aadhaarNumber")
                 ?.takeIf { it.length == 12 && it.all(Char::isDigit) }
@@ -144,7 +167,7 @@ class MyDocumentsApi(private val context: Context) {
     }
 
     suspend fun revealPanNumber(): String = withContext(Dispatchers.IO) {
-        val conn = connection("/PAN")
+        val conn = connection("/PAN/number")
         try {
             JSONObject(response(conn)).optionalText("panNumber")
                 ?.takeIf { it.matches(Regex("[A-Z]{5}[0-9]{4}[A-Z]")) }
@@ -170,16 +193,20 @@ class MyDocumentsApi(private val context: Context) {
         }
     }
 
+    suspend fun submitPanImage(image: Uri): MyDocument = submitImage("/PAN", "pan.jpg", image)
+
+    suspend fun submitAadhaarImage(image: Uri): MyDocument = submitImage("/AADHAAR", "aadhaar.jpg", image)
+
     /**
-     * Submits a PAN card/QR photo. The backend stores the image (replacing any previous
-     * submission), decodes the signed QR when possible, and routes images without a
-     * readable QR to manual review as evidence.
+     * Submits a single QR-side image. The backend stores it (replacing any previous
+     * submission), decodes the signed QR, and routes an unreadable QR to re-upload.
      */
-    suspend fun submitPanImage(image: Uri): MyDocument = withContext(Dispatchers.IO) {
+    private suspend fun submitImage(path: String, filename: String, image: Uri): MyDocument =
+        withContext(Dispatchers.IO) {
         val file = compressImage(image)
         val boundary = "askvocate-${UUID.randomUUID()}"
         val conn = try {
-            connection("/PAN", "POST").apply {
+            connection(path, "POST").apply {
                 doOutput = true
                 setRequestProperty("Content-Type", "multipart/form-data; boundary=$boundary")
                 setChunkedStreamingMode(64 * 1024)
@@ -191,7 +218,7 @@ class MyDocumentsApi(private val context: Context) {
         try {
             conn.outputStream.buffered().use { out ->
                 out.write(("--$boundary\r\nContent-Disposition: form-data; name=\"front\"; " +
-                    "filename=\"pan.jpg\"\r\nContent-Type: image/jpeg\r\n\r\n").toByteArray())
+                    "filename=\"$filename\"\r\nContent-Type: image/jpeg\r\n\r\n").toByteArray())
                 file.inputStream().use { input -> input.copyTo(out) }
                 out.write("\r\n--$boundary--\r\n".toByteArray())
             }

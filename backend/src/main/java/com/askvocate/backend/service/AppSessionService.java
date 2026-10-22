@@ -2,9 +2,12 @@ package com.askvocate.backend.service;
 
 import com.mongodb.client.MongoCollection;
 import com.mongodb.client.model.Filters;
+import jakarta.annotation.PostConstruct;
 import org.bson.Document;
-import org.springframework.http.HttpStatus;
+import org.springframework.data.domain.Sort;
 import org.springframework.data.mongodb.core.MongoTemplate;
+import org.springframework.data.mongodb.core.index.Index;
+import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
 import org.springframework.web.server.ResponseStatusException;
 
@@ -28,6 +31,18 @@ public class AppSessionService {
 
     private MongoCollection<Document> sessions() {
         return mongo.getDb().getCollection("app_sessions");
+    }
+
+    /** Token lookups and expiry cleanup must not scan the whole sessions collection. */
+    @PostConstruct
+    void ensureSessionIndexes() {
+        try {
+            var indexes = mongo.indexOps("app_sessions");
+            indexes.ensureIndex(new Index().on("tokenDigest", Sort.Direction.ASC).unique());
+            indexes.ensureIndex(new Index().on("expiresAt", Sort.Direction.ASC).expire(0));
+        } catch (Exception error) {
+            // Index creation can be restricted in some deployments; lookups still work.
+        }
     }
 
     public String issue(String userId, String role) {

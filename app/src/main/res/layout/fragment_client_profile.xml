@@ -628,59 +628,7 @@
                         </LinearLayout>
                     </LinearLayout>
 
-                    <View
-                        android:layout_width="match_parent"
-                        android:layout_height="1dp"
-                        android:background="@color/divider" />
-
-                    <!-- Notifications Row -->
-                    <LinearLayout
-                        android:id="@+id/row_notifications"
-                        android:layout_width="match_parent"
-                        android:layout_height="wrap_content"
-                        android:background="?attr/selectableItemBackground"
-                        android:clickable="true"
-                        android:focusable="true"
-                        android:gravity="center_vertical"
-                        android:orientation="horizontal"
-                        android:padding="@dimen/spacing_lg">
-
-                        <ImageView
-                            android:layout_width="24dp"
-                            android:layout_height="24dp"
-                            android:contentDescription="@null"
-                            android:src="@drawable/ic_notifications"
-                            app:tint="@color/navy_primary" />
-
-                        <LinearLayout
-                            android:layout_width="0dp"
-                            android:layout_height="wrap_content"
-                            android:layout_marginStart="@dimen/spacing_md"
-                            android:layout_weight="1"
-                            android:orientation="vertical">
-
-                            <TextView
-                                android:layout_width="wrap_content"
-                                android:layout_height="wrap_content"
-                                android:text="@string/notifications"
-                                android:textAppearance="@style/TextAppearance.Askvocate.BodyLarge"
-                                android:textColor="@color/text_primary" />
-
-                            <TextView
-                                android:layout_width="wrap_content"
-                                android:layout_height="wrap_content"
-                                android:text="@string/notifications_desc"
-                                android:textAppearance="@style/TextAppearance.Askvocate.Caption"
-                                android:textColor="@color/text_secondary" />
-                        </LinearLayout>
-
-                        <ImageView
-                            android:layout_width="20dp"
-                            android:layout_height="20dp"
-                            android:contentDescription="@null"
-                            android:src="@drawable/ic_chevron_right"
-                            app:tint="@color/text_tertiary" />
-                    </LinearLayout>
+                    
 
                     <View
                         android:layout_width="match_parent"
@@ -737,60 +685,7 @@
                             app:tint="@color/text_tertiary" />
                     </LinearLayout>
 
-                    <View
-                        android:layout_width="match_parent"
-                        android:layout_height="1dp"
-                        android:background="@color/divider" />
-
-                    <!-- Appearance Row -->
-                    <LinearLayout
-                        android:id="@+id/row_appearance"
-                        android:layout_width="match_parent"
-                        android:layout_height="wrap_content"
-                        android:background="?attr/selectableItemBackground"
-                        android:clickable="true"
-                        android:focusable="true"
-                        android:gravity="center_vertical"
-                        android:orientation="horizontal"
-                        android:padding="@dimen/spacing_lg">
-
-                        <ImageView
-                            android:layout_width="24dp"
-                            android:layout_height="24dp"
-                            android:contentDescription="@null"
-                            android:src="@drawable/ic_palette"
-                            app:tint="@color/navy_primary" />
-
-                        <LinearLayout
-                            android:layout_width="0dp"
-                            android:layout_height="wrap_content"
-                            android:layout_marginStart="@dimen/spacing_md"
-                            android:layout_weight="1"
-                            android:orientation="vertical">
-
-                            <TextView
-                                android:layout_width="wrap_content"
-                                android:layout_height="wrap_content"
-                                android:text="@string/appearance"
-                                android:textAppearance="@style/TextAppearance.Askvocate.BodyLarge"
-                                android:textColor="@color/text_primary" />
-
-                            <TextView
-                                android:id="@+id/tv_current_theme"
-                                android:layout_width="wrap_content"
-                                android:layout_height="wrap_content"
-                                android:text="@string/default_theme"
-                                android:textAppearance="@style/TextAppearance.Askvocate.Caption"
-                                android:textColor="@color/text_secondary" />
-                        </LinearLayout>
-
-                        <ImageView
-                            android:layout_width="20dp"
-                            android:layout_height="20dp"
-                            android:contentDescription="@null"
-                            android:src="@drawable/ic_chevron_right"
-                            app:tint="@color/text_tertiary" />
-                    </LinearLayout>
+                    
                 </LinearLayout>
             </com.google.android.material.card.MaterialCardView>
 

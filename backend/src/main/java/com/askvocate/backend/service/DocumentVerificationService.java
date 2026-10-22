@@ -185,12 +185,11 @@ public class DocumentVerificationService {
             // Bar Council, COP, Degree and AIBE are evidenced by the uploaded
             // certificate and reviewed manually; OCR alone never verifies them.
             status = VerificationStatus.PENDING;
-        } else if (qrVerified && !qrMismatch && ocrSuccess) {
-            status = VerificationStatus.VERIFIED;
         } else if (qrVerified) {
-            status = VerificationStatus.PENDING;
+            // The signed UIDAI QR is the authority; printed OCR is no longer a gate.
+            status = VerificationStatus.VERIFIED;
         } else {
-            // No usable signed QR: the admin can review the uploaded card images manually.
+            // QR side unreadable: ask for an e-Aadhaar or a clearer QR photo.
             status = VerificationStatus.PENDING;
         }
 
@@ -207,38 +206,14 @@ public class DocumentVerificationService {
                 }
             }
         }
-        if (documentType == DocumentType.AADHAAR) {
-            if (status == VerificationStatus.PENDING) {
-                if (!qrVerified) {
-                    String qrReason = qrScan != null && qrScan.reason() != null && !qrScan.reason().isBlank()
-                            ? qrScan.reason()
-                            : "Aadhaar Secure QR could not be verified; upload a clear photo of the QR side.";
-                    manualReviewReason = "Aadhaar QR could not be read. Re-upload a clearer photo of the QR side, "
-                            + "or upload your free e-Aadhaar from uidai.gov.in. Manual review is not available "
-                            + "for an unreadable QR. " + qrReason;
-                    if (!ocrSuccess && extractionResult.error() != null) {
-                        manualReviewReason += " " + extractionResult.error();
-                    }
-                } else {
-                    List<String> mismatchFields = qrScan.mismatchFields();
-                    manualReviewReason = qrMismatch
-                            ? "Printed Aadhaar fields do not match the signed QR: "
-                                + String.join(", ", mismatchFields.isEmpty()
-                                    ? List.of("printed fields") : mismatchFields) + "."
-                            : "Signed Aadhaar QR verified, but the printed details could not be read. "
-                                + "Please re-upload a clearer photo. "
-                                + Objects.toString(extractionResult.error(), "OCR extraction failed.");
-                }
-            } else if (status == VerificationStatus.FAILED) {
-                String qrReason = qrScan != null && qrScan.reason() != null && !qrScan.reason().isBlank()
-                        ? qrScan.reason()
-                        : "Aadhaar Secure QR could not be verified; upload a clear photo of the QR side.";
-                aadhaarFailureReason = ocrSuccess || extractionResult.error() == null
-                        ? qrReason : qrReason + " " + extractionResult.error();
-                if (failureFile == null && qrScan != null) {
-                    failureFile = "front".equals(qrScan.side())
-                            ? safeFileName(frontImage) : safeFileName(backImage);
-                }
+        if (documentType == DocumentType.AADHAAR && status == VerificationStatus.PENDING) {
+            String qrReason = qrScan != null && qrScan.reason() != null && !qrScan.reason().isBlank()
+                    ? qrScan.reason()
+                    : "Aadhaar Secure QR could not be verified; upload a clear photo of the QR side.";
+            manualReviewReason = "Aadhaar QR could not be read. Upload a clear photo of the QR side, "
+                    + "or your free e-Aadhaar from uidai.gov.in. " + qrReason;
+            if (!ocrSuccess && extractionResult.error() != null) {
+                manualReviewReason += " " + extractionResult.error();
             }
         }
 
@@ -267,14 +242,8 @@ public class DocumentVerificationService {
         boolean requiresManualReview = false;
         if (status == VerificationStatus.PENDING) {
             if (documentType == DocumentType.AADHAAR) {
-                if (!qrVerified) {
-                    pendingReason = "AADHAAR_QR_UNREADABLE";
-                } else if (qrMismatch) {
-                    pendingReason = "AADHAAR_OCR_MISMATCH";
-                    requiresManualReview = true;
-                } else {
-                    pendingReason = "AADHAAR_OCR_UNREADABLE";
-                }
+                // QR verified is VERIFIED; only an unreadable QR remains pending.
+                pendingReason = "AADHAAR_QR_UNREADABLE";
             } else if (documentType == DocumentType.PAN) {
                 if (panQrScan == null) {
                     pendingReason = "PAN_QR_UNREADABLE";
@@ -361,13 +330,29 @@ public class DocumentVerificationService {
         userDocument.setVerificationStatus(status);
         Map<String, String> panQrFields = documentType == DocumentType.PAN && panQrScan != null
                 ? panQrFields(panQrScan.data()) : null;
+        Map<String, String> aadhaarQrFields = null;
+        if (documentType == DocumentType.AADHAAR && qrData != null) {
+            aadhaarQrFields = new LinkedHashMap<>();
+            putIfPresent(aadhaarQrFields, "name", qrData.getName());
+            putIfPresent(aadhaarQrFields, "dob", qrData.getDob());
+            putIfPresent(aadhaarQrFields, "gender", fullGender(qrData.getGender()));
+            putIfPresent(aadhaarQrFields, "address", qrData.getAddress());
+            putIfPresent(aadhaarQrFields, "pincode", qrData.getPincode());
+            putIfPresent(aadhaarQrFields, "aadhaarLast4", qrData.getAadhaarLast4());
+        }
         userDocument.setExtractedData(documentType == DocumentType.PAN && panQrFields != null
                 ? panQrFields
-                : documentType == DocumentType.AADHAAR || documentType == DocumentType.PAN
-                    || extractionResult.success()
-                    ? extractionResult.extractedFields() : Map.of());
-        userDocument.setMaskedDocumentNumber(documentType == DocumentType.AADHAAR || extractionResult.success()
-                ? extractionResult.maskedDocumentNumber() : null);
+                : aadhaarQrFields != null
+                    ? aadhaarQrFields
+                    : documentType == DocumentType.AADHAAR || documentType == DocumentType.PAN
+                        || extractionResult.success()
+                        ? extractionResult.extractedFields() : Map.of());
+        if (documentType == DocumentType.AADHAAR && qrData != null && qrData.getAadhaarLast4() != null) {
+            userDocument.setMaskedDocumentNumber("XXXX-XXXX-" + qrData.getAadhaarLast4());
+        } else {
+            userDocument.setMaskedDocumentNumber(documentType == DocumentType.AADHAAR || extractionResult.success()
+                    ? extractionResult.maskedDocumentNumber() : null);
+        }
         userDocument.setAadhaarNumber(documentType == DocumentType.AADHAAR
                 ? extractionResult.aadhaarNumber() : null);
         userDocument.setAadhaarNumberHash(documentType == DocumentType.AADHAAR
@@ -430,8 +415,8 @@ public class DocumentVerificationService {
             userDocument.setIsQrVerified(qrVerified);
             userDocument.setQrImageSide(qrScan == null ? null : qrScan.side());
             userDocument.setQrDecodedData(qrDecodedData(qrData));
-            userDocument.setQrPrintedMismatch(qrVerified ? qrMismatch : null);
-            userDocument.setQrMismatchFields(qrMismatch ? qrScan.mismatchFields() : null);
+            userDocument.setQrPrintedMismatch(false);
+            userDocument.setQrMismatchFields(null);
             userDocument.setManualReviewReason(manualReviewReason);
             userDocument.setAutoApproved(status == VerificationStatus.VERIFIED);
             userDocument.setConfidenceScore(extractionResult.confidence());
@@ -1095,6 +1080,16 @@ public class DocumentVerificationService {
         if (value != null && !value.isBlank()) values.put(key, value);
     }
 
+    private String fullGender(String value) {
+        if (value == null) return null;
+        return switch (value.trim().toUpperCase()) {
+            case "M", "MALE" -> "MALE";
+            case "F", "FEMALE" -> "FEMALE";
+            case "T", "TRANSGENDER" -> "TRANSGENDER";
+            default -> value;
+        };
+    }
+
     private String normalizePan(String value) {
         return value == null ? "" : value.replaceAll("[\\s-]", "").toUpperCase();
     }
@@ -1399,11 +1394,6 @@ public class DocumentVerificationService {
                     null, safeFileName(frontImage));
         }
 
-        if (documentType == DocumentType.AADHAAR && (backImage == null || backImage.isEmpty())) {
-            throw new DocumentVerificationException(
-                    "Both front and back images are required for Aadhaar card verification.",
-                    null, safeFileName(backImage));
-        }
         if (documentType == DocumentType.PAN && backImage != null && !backImage.isEmpty()) {
             throw new DocumentVerificationException("PAN verification requires only the front image.",
                     null, safeFileName(backImage));

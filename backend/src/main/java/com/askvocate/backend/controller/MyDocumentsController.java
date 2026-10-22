@@ -116,7 +116,7 @@ public class MyDocumentsController {
         var account = sessions.requireAccount(authorization);
         allow(account, type);
         return ResponseEntity.ok().cacheControl(CacheControl.noStore())
-                .body(item(account.userId(), account.role(), type, true));
+                .body(item(account.userId(), account.role(), type, false));
     }
 
     @GetMapping("/{type}/number")
@@ -157,7 +157,7 @@ public class MyDocumentsController {
         allow(account, "PAN");
         checkImage(image);
         verifier.scanPanQr(account.userId(), image);
-        return item(account.userId(), account.role(), "PAN", true);
+        return item(account.userId(), account.role(), "PAN", false);
     }
 
     public record PanQrTextRequest(String qrText) {}
@@ -171,7 +171,7 @@ public class MyDocumentsController {
             throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "The scanned PAN QR is empty.");
         }
         verifier.scanPanQrText(account.userId(), request.qrText().trim());
-        return item(account.userId(), account.role(), "PAN", true);
+        return item(account.userId(), account.role(), "PAN", false);
     }
 
     private Item item(String userId, String role, String type, boolean includeSensitiveNumbers) {
@@ -196,7 +196,7 @@ public class MyDocumentsController {
         }
         var found = verifiedDocs.findByUserIdAndDocumentType(userId, DocumentType.valueOf(type));
         if (found.isEmpty()) return new Item(type, title(type), "NOT_UPLOADED", null, null,
-                Map.of(), null, null, List.of(), "AADHAAR".equals(type), false, false, null, null,
+                Map.of(), null, null, List.of(), false, false, false, null, null,
                 Map.of(), null, false, null, required(role, type), requirementGroup(type));
         var doc = found.get();
         List<String> media = doc.getCloudinaryReferences() == null ? List.of() : doc.getCloudinaryReferences()
@@ -205,7 +205,7 @@ public class MyDocumentsController {
                 ? null : cleanNote(doc.getFailureReason());
         return new Item(type, title(type), doc.getVerificationStatus().name(), note,
                 doc.getMaskedDocumentNumber(), doc.getExtractedData() == null ? Map.of() : doc.getExtractedData(),
-                doc.getCreatedAt(), doc.getVerifiedAt(), media, "AADHAAR".equals(type), false, false,
+                doc.getCreatedAt(), doc.getVerifiedAt(), media, false, false, false,
                 includeSensitiveNumbers && "AADHAAR".equals(type)
                         && doc.getVerificationStatus() == VerificationStatus.VERIFIED
                         ? doc.getAadhaarNumber() : null,

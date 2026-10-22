@@ -7,6 +7,7 @@ import lombok.Builder;
 import lombok.Data;
 import lombok.NoArgsConstructor;
 import org.springframework.data.annotation.Id;
+import org.springframework.data.mongodb.core.index.CompoundIndex;
 import org.springframework.data.mongodb.core.mapping.Document;
 
 import java.time.Instant;
@@ -19,6 +20,7 @@ import java.util.Map;
 @NoArgsConstructor
 @AllArgsConstructor
 @Document("documents")
+@CompoundIndex(name = "user_doc_type", def = "{'userId': 1, 'docType': 1}")
 public class UserDoc {
     @Id
     private String id;                    // can hold string ObjectId or custom id (e.g., docType.name())

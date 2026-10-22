@@ -3,6 +3,7 @@ package com.askvocate.backend.model;
 import com.askvocate.backend.entity.DocType;
 import lombok.Data;
 import org.springframework.data.annotation.Id;
+import org.springframework.data.mongodb.core.index.CompoundIndex;
 import org.springframework.data.mongodb.core.index.Indexed;
 import org.springframework.data.mongodb.core.mapping.Document;
 
@@ -10,6 +11,8 @@ import java.time.Instant;
 
 @Data
 @Document("selfie_verifications")
+@CompoundIndex(name = "selfie_challenge", def = "{'userId': 1, 'challengeId': 1}")
+@CompoundIndex(name = "selfie_aadhaar", def = "{'userId': 1, 'aadhaarDocumentId': 1, 'aadhaarSubmissionToken': 1, 'verificationStatus': 1}")
 public class SelfieVerification {
     @Id private String id;
     @Indexed private String userId;

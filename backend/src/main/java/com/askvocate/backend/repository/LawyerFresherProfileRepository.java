@@ -13,6 +13,9 @@ public interface LawyerFresherProfileRepository extends MongoRepository<LawyerFr
     @Query("{ '$or': [ { 'email': ?0 }, { 'emailOrPhone': ?0 } ] }")
     Optional<LawyerFresherProfile> findByEmail(String email);
 
+    @Query("{ '$or': [ { 'email': { '$regex': ?0, '$options': 'i' } }, { 'emailOrPhone': { '$regex': ?0, '$options': 'i' } } ] }")
+    Optional<LawyerFresherProfile> findByEmailRegex(String regex);
+
     @Query(value = "{ '$or': [ { 'email': ?0 }, { 'emailOrPhone': ?0 } ] }", exists = true)
     boolean existsByEmail(String email);
 }

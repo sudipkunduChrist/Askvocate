@@ -38,7 +38,6 @@ class ClientProfileFragment : Fragment() {
         private const val KEY_PHONE = "user_phone"
         private const val KEY_ADDRESS = "user_address"
         private const val KEY_LANGUAGE = "user_language"
-        private const val KEY_THEME = "user_theme"
         private const val KEY_BIOMETRIC = "user_biometric"
     }
 
@@ -61,8 +60,11 @@ class ClientProfileFragment : Fragment() {
         setupAppVersion()
         setupClickListeners()
         val role = SessionManager.getUserRole(requireContext())
-        binding.actionDocuments.isVisible = role.equals("LAWYER_FRESHER", ignoreCase = true) ||
+        val isLawyer = role.equals("LAWYER_FRESHER", ignoreCase = true) ||
                 role.equals("LAWYER_EXPERIENCED", ignoreCase = true)
+        binding.actionDocuments.isVisible = isLawyer
+        // Saved advocates / saved searches are client-only.
+        binding.actionSavedAdvocates.isVisible = !isLawyer
         updateProfileCompletion()
     }
 
@@ -88,7 +90,6 @@ class ClientProfileFragment : Fragment() {
         val address = prefs.getString(KEY_ADDRESS, null)?.takeIf { it.isNotBlank() }
             ?: getString(R.string.not_set)
         val language = prefs.getString(KEY_LANGUAGE, "English") ?: "English"
-        val theme = prefs.getString(KEY_THEME, "System Default") ?: "System Default"
         val isBiometricEnabled = prefs.getBoolean(KEY_BIOMETRIC, false)
 
         binding.tvClientName.text = name
@@ -103,7 +104,6 @@ class ClientProfileFragment : Fragment() {
         }
         updateAvatar(name)
         binding.tvCurrentLanguage.text = language
-        binding.tvCurrentTheme.text = theme
         binding.switchBiometricLock.isChecked = isBiometricEnabled
     }
 
@@ -176,7 +176,7 @@ class ClientProfileFragment : Fragment() {
         }
 
         binding.btnProfileSettings.setOnClickListener {
-            Toast.makeText(requireContext(), "Notifications coming soon!", Toast.LENGTH_SHORT).show()
+            findNavController().navigate(R.id.nav_notifications)
         }
 
         // Edit Profile Trigger
@@ -189,11 +189,6 @@ class ClientProfileFragment : Fragment() {
         }
         binding.rowPersonalInfo.setOnClickListener(navigateToPersonalInfo)
         binding.btnCompleteProfile.setOnClickListener(navigateToPersonalInfo)
-
-        // Settings / Notifications icon on top right
-        binding.btnProfileSettings.setOnClickListener {
-            showNotificationsDialog()
-        }
 
         // Quick Access Cards
         binding.actionAppointments.setOnClickListener {
@@ -210,14 +205,8 @@ class ClientProfileFragment : Fragment() {
         }
 
         // Account & Preferences
-        binding.rowNotifications.setOnClickListener {
-            showNotificationsDialog()
-        }
         binding.rowLanguage.setOnClickListener {
             showLanguageDialog()
-        }
-        binding.rowAppearance.setOnClickListener {
-            showAppearanceDialog()
         }
 
         // Security & Privacy
@@ -257,22 +246,6 @@ class ClientProfileFragment : Fragment() {
 
 
 
-    private fun showNotificationsDialog() {
-        val options = arrayOf("Appointment Reminders", "Chat Alerts", "Legal Updates", "Promotions")
-        val checked = booleanArrayOf(true, true, true, false)
-
-        MaterialAlertDialogBuilder(requireContext())
-            .setTitle(R.string.notifications)
-            .setMultiChoiceItems(options, checked) { _, which, isChecked ->
-                checked[which] = isChecked
-            }
-            .setPositiveButton(R.string.save) { _, _ ->
-                Toast.makeText(requireContext(), "Notification settings saved", Toast.LENGTH_SHORT).show()
-            }
-            .setNegativeButton(R.string.cancel, null)
-            .show()
-    }
-
     private fun showLanguageDialog() {
         val languages = arrayOf("English", "Hindi (हिंदी)", "Bengali (বাংলা)")
         val currentLang = binding.tvCurrentLanguage.text.toString()
@@ -294,31 +267,6 @@ class ClientProfileFragment : Fragment() {
                 AppCompatDelegate.setApplicationLocales(appLocale)
 
                 Toast.makeText(requireContext(), "Language set to $chosen", Toast.LENGTH_SHORT).show()
-                dialog.dismiss()
-            }
-            .setNegativeButton(R.string.cancel, null)
-            .show()
-    }
-
-    private fun showAppearanceDialog() {
-        val themes = arrayOf("System Default", "Light", "Dark")
-        val currentTheme = binding.tvCurrentTheme.text.toString()
-        val selectedIndex = themes.indexOf(currentTheme).coerceAtLeast(0)
-
-        MaterialAlertDialogBuilder(requireContext())
-            .setTitle(R.string.appearance)
-            .setSingleChoiceItems(themes, selectedIndex) { dialog, which ->
-                val chosen = themes[which]
-                binding.tvCurrentTheme.text = chosen
-                prefs.edit().putString(KEY_THEME, chosen).apply()
-
-                when (which) {
-                    0 -> AppCompatDelegate.setDefaultNightMode(AppCompatDelegate.MODE_NIGHT_FOLLOW_SYSTEM)
-                    1 -> AppCompatDelegate.setDefaultNightMode(AppCompatDelegate.MODE_NIGHT_NO)
-                    2 -> AppCompatDelegate.setDefaultNightMode(AppCompatDelegate.MODE_NIGHT_YES)
-                }
-
-                Toast.makeText(requireContext(), "Appearance set to $chosen", Toast.LENGTH_SHORT).show()
                 dialog.dismiss()
             }
             .setNegativeButton(R.string.cancel, null)

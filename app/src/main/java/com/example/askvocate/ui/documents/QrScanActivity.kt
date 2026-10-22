@@ -18,7 +18,7 @@ import androidx.camera.core.resolutionselector.ResolutionStrategy
 import androidx.camera.lifecycle.ProcessCameraProvider
 import androidx.core.content.ContextCompat
 import com.example.askvocate.R
-import com.example.askvocate.databinding.ActivityPanQrScanBinding
+import com.example.askvocate.databinding.ActivityQrScanBinding
 import com.example.askvocate.util.applyStatusBarInset
 import com.google.mlkit.vision.barcode.BarcodeScanner
 import com.google.mlkit.vision.barcode.BarcodeScannerOptions
@@ -30,19 +30,20 @@ import java.util.concurrent.ExecutorService
 import java.util.concurrent.Executors
 
 /**
- * Live PAN Secure QR scanner.
+ * Live QR scanner for Aadhaar and PAN.
  *
- * CameraX delivers high-resolution analysis frames to ML Kit's on-device barcode
- * scanner. The returned numeric string is unpacked and signature-verified by the
- * backend; this screen only detects the QR and returns its raw text.
+ * ML Kit detects a QR and the screen captures a still of that moment. The still
+ * (and the raw text) are returned to the documents screen; the backend performs
+ * the signature verification and decoding.
  */
-class PanQrScanActivity : ComponentActivity() {
-    private lateinit var binding: ActivityPanQrScanBinding
+class QrScanActivity : ComponentActivity() {
+    private lateinit var binding: ActivityQrScanBinding
     private val analysisExecutor: ExecutorService = Executors.newSingleThreadExecutor()
     private var cameraProvider: ProcessCameraProvider? = null
     private var imageAnalysis: ImageAnalysis? = null
     private var imageCapture: ImageCapture? = null
     private var finished = false
+    private var prompt: String = ""
 
     private val scanner: BarcodeScanner = BarcodeScanning.getClient(
         BarcodeScannerOptions.Builder()
@@ -53,7 +54,7 @@ class PanQrScanActivity : ComponentActivity() {
     private val cameraPermission =
         registerForActivityResult(ActivityResultContracts.RequestPermission()) { granted ->
             if (granted) {
-                binding.qrPrompt.setText(R.string.pan_qr_scan_prompt)
+                binding.qrPrompt.text = prompt
                 startCamera()
             } else {
                 binding.qrPrompt.setText(R.string.pan_qr_permission_required)
@@ -62,11 +63,13 @@ class PanQrScanActivity : ComponentActivity() {
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
-        binding = ActivityPanQrScanBinding.inflate(layoutInflater)
+        binding = ActivityQrScanBinding.inflate(layoutInflater)
         setContentView(binding.root)
         binding.qrTopBar.applyStatusBarInset()
         binding.qrClose.setOnClickListener { finish() }
-        binding.qrPrompt.setText(R.string.pan_qr_scan_prompt)
+        prompt = intent.getStringExtra(EXTRA_PROMPT)
+            ?: getString(R.string.qr_scan_prompt)
+        binding.qrPrompt.text = prompt
 
         if (ContextCompat.checkSelfPermission(this, Manifest.permission.CAMERA)
             == PackageManager.PERMISSION_GRANTED) {
@@ -86,7 +89,7 @@ class PanQrScanActivity : ComponentActivity() {
                 val preview = Preview.Builder().build().also {
                     it.setSurfaceProvider(binding.qrPreview.surfaceProvider)
                 }
-                // Dense PAN QRs need more than the default 640x480 analysis size.
+                // Dense document QRs need more than the default 640x480 analysis size.
                 val resolution = ResolutionSelector.Builder()
                     .setResolutionStrategy(
                         ResolutionStrategy(
@@ -139,7 +142,7 @@ class PanQrScanActivity : ComponentActivity() {
                 .addOnSuccessListener { barcodes ->
                     val value = barcodes.asSequence()
                         .mapNotNull { it.rawValue?.trim() }
-                        .firstOrNull(::looksLikePanQr)
+                        .firstOrNull { it.isNotEmpty() }
                     if (value != null) captureAndFinish(value)
                 }
                 .addOnCompleteListener { proxy.close() }
@@ -148,13 +151,10 @@ class PanQrScanActivity : ComponentActivity() {
         }
     }
 
-    /** Cheap shape check; the signed payload is validated on the backend. */
-    private fun looksLikePanQr(value: String): Boolean =
-        value.isNotEmpty() && value.all(Char::isDigit) && value.length % 4 == 0
-
     /**
-     * Saves a still of the moment the QR was found so every scan leaves reviewable
-     * evidence in Cloudinary. Falls back to the QR text alone if capture fails.
+     * Saves a still of the moment the QR was found so the backend can decode it
+     * and so the image is available for selfie matching. Falls back to the QR
+     * text alone if capture fails.
      */
     private fun captureAndFinish(value: String) {
         if (finished) return
@@ -165,7 +165,7 @@ class PanQrScanActivity : ComponentActivity() {
             finishWithText(value)
             return
         }
-        val file = File.createTempFile("askvocate_pan_qr_", ".jpg", cacheDir)
+        val file = File.createTempFile("askvocate_qr_", ".jpg", cacheDir)
         val options = ImageCapture.OutputFileOptions.Builder(file).build()
         try {
             capture.takePicture(options, ContextCompat.getMainExecutor(this),
@@ -202,7 +202,8 @@ class PanQrScanActivity : ComponentActivity() {
     }
 
     companion object {
-        const val EXTRA_QR_TEXT = "pan_qr_text"
-        const val EXTRA_IMAGE_PATH = "pan_qr_image_path"
+        const val EXTRA_QR_TEXT = "qr_text"
+        const val EXTRA_IMAGE_PATH = "qr_image_path"
+        const val EXTRA_PROMPT = "qr_prompt"
     }
 }
