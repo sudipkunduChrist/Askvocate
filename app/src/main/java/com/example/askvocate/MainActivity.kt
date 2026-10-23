@@ -16,6 +16,7 @@ import androidx.core.content.ContextCompat
 import androidx.core.view.GravityCompat
 import androidx.core.view.ViewCompat
 import androidx.core.view.WindowInsetsCompat
+import androidx.core.view.isVisible
 import androidx.core.view.updatePadding
 import androidx.drawerlayout.widget.DrawerLayout
 import androidx.navigation.NavController
@@ -24,13 +25,28 @@ import androidx.navigation.fragment.NavHostFragment
 import androidx.navigation.ui.setupWithNavController
 import com.google.android.material.navigation.NavigationView
 import androidx.lifecycle.lifecycleScope
+import coil.load
+import com.example.askvocate.network.ApiConfig
+import com.example.askvocate.util.NetworkMonitor
+import com.example.askvocate.util.SessionManager
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.Job
+import kotlinx.coroutines.flow.collect
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
+import org.json.JSONObject
+import java.net.HttpURLConnection
+import java.net.URL
 
 class MainActivity : AppCompatActivity() {
 
     private lateinit var navController: NavController
 
     private lateinit var drawerLayout: DrawerLayout
+    private lateinit var drawerName: TextView
+    private lateinit var drawerEmail: TextView
+    private lateinit var drawerAvatar: ImageView
+    private var sidebarRequest: Job? = null
     private var isCheckingSession = false
 
     override fun onCreate(savedInstanceState: Bundle?) {
@@ -42,9 +58,23 @@ class MainActivity : AppCompatActivity() {
         setContentView(R.layout.activity_main)
 
         drawerLayout = findViewById(R.id.drawer_layout)
+        val offlineBanner: View = findViewById(R.id.offline_banner)
+        NetworkMonitor.start(this)
+        lifecycleScope.launch {
+            NetworkMonitor.online.collect { online ->
+                offlineBanner.isVisible = !online
+            }
+        }
         val bottomNavContainer: View = findViewById(R.id.bottom_nav_container)
         val navView: NavigationView = findViewById(R.id.nav_view)
-        navView.getHeaderView(0).findViewById<View>(R.id.btn_close_drawer)
+        val drawerHeader = navView.getHeaderView(0)
+        drawerName = drawerHeader.findViewById(R.id.user_name)
+        drawerEmail = drawerHeader.findViewById(R.id.user_email)
+        drawerAvatar = drawerHeader.findViewById(R.id.avatar_image)
+        applyDrawerHeaderInset(drawerHeader)
+        bindSidebarCached()
+        refreshSidebarProfile()
+        drawerHeader.findViewById<View>(R.id.btn_close_drawer)
             .setOnClickListener { animateDrawer(open = false) }
         val fabAsk: View = findViewById(R.id.fab_center_ask)
         val centerNavSlot: View = findViewById(R.id.center_nav_slot)
@@ -145,11 +175,15 @@ class MainActivity : AppCompatActivity() {
         )
         if (destination in authDestinations || isCheckingSession) return
 
+        bindSidebarCached()
+        refreshSidebarProfile()
         isCheckingSession = true
         lifecycleScope.launch {
             val result = com.example.askvocate.util.SessionManager.validateWithServer(this@MainActivity)
             isCheckingSession = false
             if (result == com.example.askvocate.util.SessionManager.ValidationResult.INVALID) {
+                com.example.askvocate.ui.documents.DocumentsCache(this@MainActivity).clear()
+                com.example.askvocate.util.SessionManager.clearUser(this@MainActivity)
                 com.example.askvocate.util.SessionManager.setLoggedIn(this@MainActivity, false)
                 navController.navigate(
                     R.id.nav_role_selection,
@@ -160,8 +194,91 @@ class MainActivity : AppCompatActivity() {
         }
     }
 
+    /** Keeps the drawer header clear of the status bar and shifts it slightly downward. */
+    private fun applyDrawerHeaderInset(header: View) {
+        val baseHeight = resources.getDimensionPixelSize(R.dimen.nav_header_height)
+        val extra = (8 * resources.displayMetrics.density).toInt()
+        ViewCompat.setOnApplyWindowInsetsListener(header) { view, insets ->
+            val top = insets.getInsets(WindowInsetsCompat.Type.statusBars()).top
+            view.updatePadding(top = top + extra)
+            (view.layoutParams as? android.view.ViewGroup.LayoutParams)?.let { params ->
+                params.height = baseHeight + top + extra
+                view.layoutParams = params
+            }
+            insets
+        }
+        ViewCompat.requestApplyInsets(header)
+    }
+
+    private fun bindSidebarCached() {
+        if (!::drawerName.isInitialized) return
+        drawerName.text = SessionManager.getUserName(this).ifBlank { "User" }
+        drawerEmail.text = SessionManager.getUserEmail(this)
+        val imageUrl = SessionManager.getProfileImageUrl(this)
+        if (imageUrl.isNotBlank()) {
+            drawerAvatar.load(imageUrl) {
+                placeholder(R.drawable.ic_profile)
+                error(R.drawable.ic_profile)
+            }
+        } else {
+            drawerAvatar.setImageResource(R.drawable.ic_profile)
+        }
+    }
+
+    /** Pulls the latest name/email from the role-specific profile endpoint. */
+    private fun refreshSidebarProfile() {
+        if (!SessionManager.isLoggedIn(this)) return
+        val userId = SessionManager.getUserId(this)
+        val role = SessionManager.getUserRole(this)
+        if (userId.isBlank()) return
+        val path = when {
+            role.equals("LAWYER_FRESHER", true) -> "/api/users/lawyer/fresher/$userId"
+            role.equals("LAWYER_EXPERIENCED", true) -> "/api/users/lawyer/experienced/$userId"
+            else -> "/api/users/client/$userId"
+        }
+        sidebarRequest?.cancel()
+        sidebarRequest = lifecycleScope.launch {
+            val user = withContext(Dispatchers.IO) { fetchProfile(path) } ?: return@launch
+            val name = user.optString("name").ifBlank { SessionManager.getUserName(this@MainActivity) }
+            val email = user.optString("email").ifBlank { SessionManager.getUserEmail(this@MainActivity) }
+            drawerName.text = name
+            drawerEmail.text = email
+            SessionManager.saveUser(
+                this@MainActivity,
+                userId,
+                name,
+                email,
+                role,
+                SessionManager.getAuthProvider(this@MainActivity),
+                SessionManager.getProfileImageUrl(this@MainActivity).ifBlank { null },
+                SessionManager.getAppToken(this@MainActivity).ifBlank { null }
+            )
+        }
+    }
+
+    private fun fetchProfile(path: String): JSONObject? {
+        return try {
+            val conn = (URL("${ApiConfig.BASE_URL}$path").openConnection() as HttpURLConnection).apply {
+                requestMethod = "GET"
+                connectTimeout = 10_000
+                readTimeout = 15_000
+                val token = SessionManager.getAppToken(this@MainActivity)
+                if (token.isNotBlank()) setRequestProperty("Authorization", "Bearer $token")
+            }
+            val code = conn.responseCode
+            val body = (if (code in 200..299) conn.inputStream else conn.errorStream)
+                ?.bufferedReader(Charsets.UTF_8)?.use { it.readText() }.orEmpty()
+            conn.disconnect()
+            if (code !in 200..299) null else JSONObject(body).optJSONObject("user")
+        } catch (_: Exception) {
+            null
+        }
+    }
+
     /** Opens the navigation drawer from the top-left hamburger icon. */
     fun openDrawer() {
+        bindSidebarCached()
+        refreshSidebarProfile()
         if (drawerLayout.isDrawerOpen(GravityCompat.START)) {
             animateDrawer(open = false)
         } else {
@@ -219,6 +336,11 @@ class MainActivity : AppCompatActivity() {
             label.setTextColor(if (selected) selectedColor else unselectedColor)
             label.typeface = if (selected) Typeface.DEFAULT_BOLD else Typeface.DEFAULT
         }
+    }
+
+    override fun onDestroy() {
+        NetworkMonitor.stop(this)
+        super.onDestroy()
     }
 
     @SuppressLint("GestureBackNavigation")

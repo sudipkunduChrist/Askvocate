@@ -35,7 +35,15 @@ CERTIFICATES = (
 )
 YUNET_MODEL = ROOT / "models/face_detection_yunet_2023mar.onnx"
 SFACE_MODEL = ROOT / "models/face_recognition_sface_2021dec.onnx"
+PAD_MODEL = ROOT / "models/minifasnet_v2.onnx"
 FACE_THRESHOLD = 0.363  # OpenCV Zoo SFace cosine baseline; calibrate on real QR photos.
+PAD_THRESHOLD = 0.5  # MiniFASNet live-class probability; calibrate on real spoof samples.
+PAD_CROP_SCALE = 2.7  # Matches the 2.7_80x80 training crop.
+MIN_FACE_RATIO = 0.12
+MIN_FACE_PIXELS = 80
+MIN_BLUR_VARIANCE = 30.0
+MIN_BRIGHTNESS = 40.0
+MAX_BRIGHTNESS = 220.0
 MAX_IMAGE_BYTES = 10 * 1024 * 1024
 MAX_QR_BYTES = 128 * 1024
 TESSDATA = ROOT / "tessdata"
@@ -840,33 +848,111 @@ def _yaw(face: np.ndarray) -> float:
     return float((nose[0] - midpoint[0]) / span)
 
 
+def _quality_reason(image: np.ndarray) -> str | None:
+    """Reject obviously unusable captures before face/liveness work."""
+    gray = cv2.cvtColor(image, cv2.COLOR_BGR2GRAY)
+    brightness = float(gray.mean())
+    if brightness < MIN_BRIGHTNESS:
+        return "The selfie is too dark. Move to a brighter place."
+    if brightness > MAX_BRIGHTNESS:
+        return "The selfie is too bright. Avoid strong light or glare."
+    sharpness = float(cv2.Laplacian(gray, cv2.CV_64F).var())
+    if sharpness < MIN_BLUR_VARIANCE:
+        return "The selfie is blurry. Hold the phone steady."
+    return None
+
+
+def _face_size_reason(image: np.ndarray, face: np.ndarray) -> str | None:
+    height, width = image.shape[:2]
+    side = min(float(face[2]), float(face[3]))
+    required = max(MIN_FACE_PIXELS, MIN_FACE_RATIO * min(width, height))
+    if side < required:
+        return "Move closer so your face fills more of the frame."
+    return None
+
+
+def _pad_crop(image: np.ndarray, face: np.ndarray, scale: float = PAD_CROP_SCALE) -> np.ndarray:
+    height, width = image.shape[:2]
+    x, y, w, h = float(face[0]), float(face[1]), float(face[2]), float(face[3])
+    center_x, center_y = x + w / 2, y + h / 2
+    side = max(w, h) * scale
+    left = max(0, int(center_x - side / 2))
+    top = max(0, int(center_y - side / 2))
+    right = min(width, int(center_x + side / 2))
+    bottom = min(height, int(center_y + side / 2))
+    if right - left < 8 or bottom - top < 8:
+        raise VerificationError("Face crop is too small for the liveness check.")
+    crop = image[top:bottom, left:right]
+    return cv2.resize(crop, (80, 80), interpolation=cv2.INTER_LINEAR)
+
+
+def _pad_live_probability(net, image: np.ndarray, face: np.ndarray) -> float:
+    """MiniFASNetV2 probability that the face crop is a live person (class 1)."""
+    crop = _pad_crop(image, face)
+    # The model was trained on raw 0-255 BGR crops (no mean/std normalisation).
+    blob = cv2.dnn.blobFromImage(crop, 1.0, (80, 80), (0, 0, 0), swapRB=False, crop=False)
+    net.setInput(blob)
+    logits = np.asarray(net.forward()).reshape(-1)
+    if logits.size < 3:
+        raise VerificationError("Liveness model returned an unexpected result.")
+    shifted = logits - logits.max()
+    probabilities = np.exp(shifted) / np.exp(shifted).sum()
+    return float(probabilities[1])
+
+
 def match_live_selfie(qr: SignedQr, frames: list[bytes], expected_turn: str) -> dict:
     if len(frames) != 3 or expected_turn not in ("left", "right"):
         raise VerificationError("A three-frame center, turn, center capture is required.")
     if not YUNET_MODEL.is_file() or not SFACE_MODEL.is_file():
         raise VerificationError("Free local face models are not installed.")
+    if not PAD_MODEL.is_file():
+        raise VerificationError("Liveness model is not installed.")
     detector = cv2.FaceDetectorYN.create(str(YUNET_MODEL), "", (320, 320), 0.6, 0.3, 5000)
     recognizer = cv2.FaceRecognizerSF.create(str(SFACE_MODEL), "")
     images = [_face_size(_image(frame)) for frame in frames]
+    for image in images:
+        reason = _quality_reason(image)
+        if reason:
+            raise VerificationError(reason)
     faces = [_single_face(image, detector) for image in images]
+    for image, face in zip(images, faces):
+        reason = _face_size_reason(image, face)
+        if reason:
+            raise VerificationError(reason)
     yaw = [_yaw(face) for face in faces]
     turn = yaw[1] - (yaw[0] + yaw[2]) / 2
     # Saved front-camera JPEGs are not mirrored; a user turn to their left moves the nose right in image coordinates.
     direction_ok = turn >= 0.12 if expected_turn == "left" else turn <= -0.12
     centered = abs(yaw[0] - yaw[2]) <= 0.13 and abs(yaw[0]) <= 0.18 and abs(yaw[2]) <= 0.18
-    liveness_passed = bool(direction_ok and centered)
+    pad_net = cv2.dnn.readNetFromONNX(str(PAD_MODEL))
+    pad_scores = [_pad_live_probability(pad_net, image, face) for image, face in zip(images, faces)]
+    pad_score = min(pad_scores)
+    pad_passed = pad_score >= PAD_THRESHOLD
+    liveness_passed = bool(direction_ok and centered and pad_passed)
     qr_photo = _qr_photo(qr)
-    reference_face = _single_face(qr_photo, detector)
+    try:
+        reference_face = _single_face(qr_photo, detector)
+    except VerificationError as exc:
+        raise VerificationError(
+            "The signed Aadhaar QR photo could not be used for face matching. "
+            "Re-upload a clearer Aadhaar QR side."
+        ) from exc
     reference_feature = recognizer.feature(recognizer.alignCrop(qr_photo, reference_face))
     selfie_feature = recognizer.feature(recognizer.alignCrop(images[0], faces[0]))
     similarity = float(recognizer.match(reference_feature, selfie_feature, cv2.FaceRecognizerSF_FR_COSINE))
+    reason = None
+    if not liveness_passed:
+        reason = ("Head-turn challenge was not completed."
+                  if not (direction_ok and centered)
+                  else "Liveness check failed. Use your live camera, not a photo or screen.")
+    elif similarity < FACE_THRESHOLD:
+        reason = "Selfie face did not match the signed Aadhaar QR photograph."
     return {
         "faceMatchScore": round(max(0.0, min(1.0, similarity)), 4),
         "faceMatchThreshold": FACE_THRESHOLD,
         "livenessPassed": liveness_passed,
         "livenessScore": round(min(1.0, abs(turn) / 0.25), 4),
+        "padScore": round(pad_score, 4),
         "matched": bool(liveness_passed and similarity >= FACE_THRESHOLD),
-        "reason": None if liveness_passed and similarity >= FACE_THRESHOLD else
-                  ("Head-turn challenge was not completed." if not liveness_passed
-                   else "Selfie face did not match the signed Aadhaar QR photograph."),
+        "reason": reason,
     }

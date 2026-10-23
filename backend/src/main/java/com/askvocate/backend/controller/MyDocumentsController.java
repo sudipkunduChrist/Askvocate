@@ -44,12 +44,36 @@ public class MyDocumentsController {
             Map<String, String> details, Instant submittedAt, Instant verifiedAt,
             List<String> media, boolean requiresBack, boolean uploadOnly, boolean liveCapture,
             String aadhaarNumber, String panNumber,
-            Map<String, String> qrDetails, String qrPhotoUrl) {}
+            Map<String, String> qrDetails, String qrPhotoUrl,
+            boolean requiresManualReview, String pendingReason, boolean required,
+            String requirementGroup) {}
 
     private List<String> types(String role) {
         if ("CLIENT".equals(role)) return List.of();
-        return List.of("AADHAAR", "PAN", "BAR_COUNCIL_ID", "BAR_CERTIFICATE",
-                "CERTIFICATE_OF_PRACTICE", "DEGREE_CERTIFICATE", "AIBE_CERTIFICATE", "SELFIE");
+        if ("LAWYER_EXPERIENCED".equals(role)) {
+            return List.of("AADHAAR", "PAN", "BAR_CERTIFICATE", "BAR_COUNCIL_ID",
+                    "CERTIFICATE_OF_PRACTICE", "AIBE_CERTIFICATE", "SELFIE");
+        }
+        return List.of("AADHAAR", "PAN", "BAR_CERTIFICATE", "BAR_COUNCIL_ID",
+                "DEGREE_CERTIFICATE", "AIBE_CERTIFICATE", "SELFIE");
+    }
+
+    /** Role-based mandatory set: experienced needs COP + AIBE, freshers need the LL.B. degree. */
+    private boolean required(String role, String type) {
+        if (Set.of("AADHAAR", "PAN", "SELFIE").contains(type)) return true;
+        if ("LAWYER_EXPERIENCED".equals(role)) {
+            return Set.of("BAR_CERTIFICATE", "CERTIFICATE_OF_PRACTICE", "AIBE_CERTIFICATE")
+                    .contains(type);
+        }
+        return Set.of("BAR_CERTIFICATE", "DEGREE_CERTIFICATE").contains(type);
+    }
+
+    /** Bar enrollment can be proven by the certificate (preferred) or the Bar Council ID card. */
+    private String requirementGroup(String type) {
+        return switch (type) {
+            case "BAR_CERTIFICATE", "BAR_COUNCIL_ID" -> "BAR_ENROLLMENT";
+            default -> null;
+        };
     }
 
     private String title(String type) {
@@ -82,7 +106,7 @@ public class MyDocumentsController {
         var account = sessions.requireAccount(authorization);
         requireLawyer(account);
         log.info("My documents list requested for role={}", account.role());
-        List<Item> items = types(account.role()).stream().map(type -> item(account.userId(), type, false)).toList();
+        List<Item> items = types(account.role()).stream().map(type -> item(account.userId(), account.role(), type, false)).toList();
         log.info("My documents list returned: role={}, count={}", account.role(), items.size());
         return items;
     }
@@ -92,7 +116,7 @@ public class MyDocumentsController {
         var account = sessions.requireAccount(authorization);
         allow(account, type);
         return ResponseEntity.ok().cacheControl(CacheControl.noStore())
-                .body(item(account.userId(), type, true));
+                .body(item(account.userId(), account.role(), type, false));
     }
 
     @GetMapping("/{type}/number")
@@ -133,7 +157,7 @@ public class MyDocumentsController {
         allow(account, "PAN");
         checkImage(image);
         verifier.scanPanQr(account.userId(), image);
-        return item(account.userId(), "PAN", true);
+        return item(account.userId(), account.role(), "PAN", false);
     }
 
     public record PanQrTextRequest(String qrText) {}
@@ -147,34 +171,33 @@ public class MyDocumentsController {
             throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "The scanned PAN QR is empty.");
         }
         verifier.scanPanQrText(account.userId(), request.qrText().trim());
-        return item(account.userId(), "PAN", true);
+        return item(account.userId(), account.role(), "PAN", false);
     }
 
-    private Item item(String userId, String type, boolean includeSensitiveNumbers) {
+    private Item item(String userId, String role, String type, boolean includeSensitiveNumbers) {
         if ("SELFIE".equals(type)) {
             var latest = selfies.findByUserIdOrderByCreatedAtDesc(userId).stream().findFirst();
             if (latest.isEmpty()) return new Item(type, title(type), "NOT_UPLOADED", "Complete the live camera check.",
-                    null, Map.of(), null, null, List.of(), false, false, true, null, null, Map.of(), null);
+                    null, Map.of(), null, null, List.of(), false, false, true, null, null, Map.of(), null,
+                    false, null, required(role, type), requirementGroup(type));
             var selfie = latest.get();
             String status = selfie.getVerificationStatus() == null ? "PENDING" : selfie.getVerificationStatus().name();
             List<String> media = selfie.getSelfieImageUrl() == null ? List.of() : List.of("selfie");
+            String note = "VERIFIED".equals(status) ? null : cleanNote(selfie.getFailureReason());
+            if (note == null && !"VERIFIED".equals(status)) {
+                note = "PENDING".equals(status)
+                        ? "Complete the live camera check to verify your selfie."
+                        : "Selfie verification failed. Try again from the live selfie screen.";
+            }
             return new Item(type, title(type), status,
-                    "VERIFIED".equals(status) ? null : cleanNote(selfie.getFailureReason()), null, Map.of(),
-                    selfie.getCreatedAt(), selfie.getVerifiedAt(), media, false, false, true, null, null, Map.of(), null);
-        }
-        if ("DEGREE_CERTIFICATE".equals(type) || "AIBE_CERTIFICATE".equals(type)) {
-            var latest = uploadedDocs.findByUserIdAndDocType(userId, DocType.valueOf(type));
-            if (latest.isEmpty()) return new Item(type, title(type), "NOT_UPLOADED",
-                    "Upload available. Automatic verification is not available yet.", null,
-                    Map.of(), null, null, List.of(), false, true, false, null, null, Map.of(), null);
-            var doc = latest.get();
-            return new Item(type, title(type), "UPLOADED", "Uploaded; verification is not available yet.",
-                    null, Map.of(), Instant.ofEpochMilli(doc.getUploadedAt()), null,
-                    doc.getFileUrl() == null ? List.of() : List.of("front"), false, true, false, null, null, Map.of(), null);
+                    note, null, Map.of(),
+                    selfie.getCreatedAt(), selfie.getVerifiedAt(), media, false, false, true, null, null,
+                    Map.of(), null, false, null, required(role, type), requirementGroup(type));
         }
         var found = verifiedDocs.findByUserIdAndDocumentType(userId, DocumentType.valueOf(type));
         if (found.isEmpty()) return new Item(type, title(type), "NOT_UPLOADED", null, null,
-                Map.of(), null, null, List.of(), "AADHAAR".equals(type), false, false, null, null, Map.of(), null);
+                Map.of(), null, null, List.of(), false, false, false, null, null,
+                Map.of(), null, false, null, required(role, type), requirementGroup(type));
         var doc = found.get();
         List<String> media = doc.getCloudinaryReferences() == null ? List.of() : doc.getCloudinaryReferences()
                 .stream().map(CloudinaryRef::getLabel).filter(Objects::nonNull).distinct().toList();
@@ -182,19 +205,20 @@ public class MyDocumentsController {
                 ? null : cleanNote(doc.getFailureReason());
         return new Item(type, title(type), doc.getVerificationStatus().name(), note,
                 doc.getMaskedDocumentNumber(), doc.getExtractedData() == null ? Map.of() : doc.getExtractedData(),
-                doc.getCreatedAt(), doc.getVerifiedAt(), media, "AADHAAR".equals(type), false, false,
+                doc.getCreatedAt(), doc.getVerifiedAt(), media, false, false, false,
                 includeSensitiveNumbers && "AADHAAR".equals(type)
                         && doc.getVerificationStatus() == VerificationStatus.VERIFIED
                         ? doc.getAadhaarNumber() : null,
                 includeSensitiveNumbers && "PAN".equals(type)
                         && doc.getVerificationStatus() == VerificationStatus.VERIFIED
                         ? doc.getPanNumber() : null,
-                qrDetails(doc), qrPhotoUrl(doc));
+                qrDetails(doc), qrPhotoUrl(doc),
+                Boolean.TRUE.equals(doc.getRequiresManualReview()), doc.getPendingReason(),
+                required(role, type), requirementGroup(type));
     }
 
     private String qrPhotoUrl(UserDocument doc) {
-        QrData qr = doc.getQrData();
-        if (qr != null && qr.getPhotoUrl() != null) return qr.getPhotoUrl();
+        // Only the PAN QR photo is shown in the app; the Aadhaar QR photo is not stored.
         return doc.getDocumentType() == DocumentType.PAN ? doc.getPanQrPhotoUrl() : null;
     }
 
@@ -235,12 +259,8 @@ public class MyDocumentsController {
         log.info("Document upload started: role={}, type={}, frontBytes={}, backBytes={}",
                 account.role(), type, front.getSize(), backBytes);
         try {
-            if ("DEGREE_CERTIFICATE".equals(type) || "AIBE_CERTIFICATE".equals(type)) {
-                uploads.uploadDocument(account.userId(), DocType.valueOf(type), front);
-            } else {
-                verifier.verifyDocument(account.userId(), DocumentType.valueOf(type), front, back);
-            }
-            Item result = item(account.userId(), type, false);
+            verifier.verifyDocument(account.userId(), DocumentType.valueOf(type), front, back);
+            Item result = item(account.userId(), account.role(), type, false);
             log.info("Document upload finished: type={}, status={}, durationMs={}", type, result.status(),
                     (System.nanoTime() - startedAt) / 1_000_000);
             return result;
@@ -271,11 +291,6 @@ public class MyDocumentsController {
             var doc = selfies.findByUserIdOrderByCreatedAtDesc(account.userId()).stream().findFirst()
                     .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND));
             ref = new CloudinaryRef(doc.getSelfiePublicId(), doc.getSelfieImageUrl(), side);
-        } else if ("DEGREE_CERTIFICATE".equals(type) || "AIBE_CERTIFICATE".equals(type)) {
-            if (!"front".equals(side)) throw new ResponseStatusException(HttpStatus.NOT_FOUND);
-            var doc = uploadedDocs.findByUserIdAndDocType(account.userId(), DocType.valueOf(type))
-                    .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND));
-            ref = new CloudinaryRef(null, doc.getFileUrl(), side);
         } else {
             var doc = verifiedDocs.findByUserIdAndDocumentType(account.userId(), DocumentType.valueOf(type))
                     .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND));

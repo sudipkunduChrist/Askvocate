@@ -34,7 +34,7 @@ class ChatListFragment : Fragment() {
             (requireActivity() as? MainActivity)?.openDrawer()
         }
         view.findViewById<View>(R.id.btn_notifications).setOnClickListener {
-            Toast.makeText(requireContext(), "Notifications coming soon!", Toast.LENGTH_SHORT).show()
+            findNavController().navigate(R.id.nav_notifications)
         }
 
         val rvChatList = view.findViewById<RecyclerView>(R.id.rv_chat_list)

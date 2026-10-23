@@ -40,6 +40,9 @@ public class UserController {
     @Autowired
     private com.askvocate.backend.service.AppSessionService appSessions;
 
+    @Autowired
+    private com.askvocate.backend.service.EmailAccountService emailAccountService;
+
     private String tokenFor(Object user, String role) {
         String id;
         if (user instanceof com.askvocate.backend.model.ClientProfile profile) id = profile.getId();
@@ -108,6 +111,7 @@ public class UserController {
     @PostMapping("/register/client")
     public ResponseEntity<?> registerClient(@Valid @RequestBody ClientSignUp dto) {
         log.info("--> Endpoint Hit: POST /api/users/register/client | Email: {}", dto.getEmail());
+        emailAccountService.requireAvailable(dto.getEmail());
         var profile = clientService.register(dto);
         log.info("<-- Client Successfully Stored in MongoDB | ID: {} | Email: {}", profile.getId(), profile.getEmail());
         return ResponseEntity.ok(Map.of(
@@ -121,6 +125,7 @@ public class UserController {
     @PostMapping("/register/lawyer/fresher")
     public ResponseEntity<?> registerLawyerFresher(@Valid @RequestBody LawyerFresherSignup dto) {
         log.info("--> Endpoint Hit: POST /api/users/register/lawyer/fresher | Email: {}", dto.getEmail());
+        emailAccountService.requireAvailable(dto.getEmail());
         var profile = lawyerFresherService.register(dto);
         log.info("<-- Lawyer Fresher Successfully Stored in MongoDB | ID: {} | Email: {}", profile.getId(), profile.getEmail());
         return ResponseEntity.ok(Map.of(
@@ -134,6 +139,7 @@ public class UserController {
     @PostMapping("/register/lawyer/experienced")
     public ResponseEntity<?> registerLawyerExperienced(@Valid @RequestBody LawyerExperiencedSignup dto) {
         log.info("--> Endpoint Hit: POST /api/users/register/lawyer/experienced | Email: {}", dto.getEmail());
+        emailAccountService.requireAvailable(dto.getEmail());
         var profile = lawyerExperiencedService.register(dto);
         log.info("<-- Lawyer Experienced Successfully Stored in MongoDB | ID: {} | Email: {}", profile.getId(), profile.getEmail());
         return ResponseEntity.ok(Map.of(
@@ -145,6 +151,25 @@ public class UserController {
     }
 
     // ─── Profile Fetch ───────────────────────────────────────────────────────
+
+    /** Validates the app token and confirms the account still exists. */
+    @GetMapping("/session")
+    public ResponseEntity<?> session(
+            @RequestHeader(value = "Authorization", required = false) String authorization) {
+        var account = appSessions.requireAccount(authorization);
+        boolean exists = switch (account.role()) {
+            case "CLIENT" -> clientService.findById(account.userId()).isPresent();
+            case "LAWYER_FRESHER" -> lawyerFresherService.findById(account.userId()).isPresent();
+            case "LAWYER_EXPERIENCED" -> lawyerExperiencedService.findById(account.userId()).isPresent();
+            default -> false;
+        };
+        if (!exists) {
+            return ResponseEntity.status(HttpStatus.NOT_FOUND)
+                    .body(Map.of("success", false, "error", "Account not found"));
+        }
+        return ResponseEntity.ok(Map.of("success", true,
+                "userId", account.userId(), "role", account.role()));
+    }
 
     /** GET /api/users/client/{id} */
     @GetMapping("/client/{id}")
@@ -164,10 +189,16 @@ public class UserController {
     @PutMapping("/client/{id}")
     public ResponseEntity<?> updateClientProfile(@PathVariable String id, @RequestBody com.askvocate.backend.dto.ProfileUpdateRequest dto) {
         try {
+            if (dto.getEmail() != null) {
+                dto.setEmail(com.askvocate.backend.service.EmailAccountService.normalize(dto.getEmail()));
+                emailAccountService.requireEmailChangeAvailable(dto.getEmail(), id);
+            }
             var profile = clientService.updateClientProfile(id, dto);
             return ResponseEntity.ok(Map.of("success", true, "message", "Profile updated successfully", "user", profile));
         } catch (IllegalArgumentException e) {
-            return ResponseEntity.status(HttpStatus.NOT_FOUND).body(Map.of("success", false, "error", e.getMessage()));
+            HttpStatus status = e.getMessage() != null && e.getMessage().contains("already exists")
+                    ? HttpStatus.CONFLICT : HttpStatus.NOT_FOUND;
+            return ResponseEntity.status(status).body(Map.of("success", false, "error", e.getMessage()));
         }
     }
 
@@ -189,10 +220,16 @@ public class UserController {
     @PutMapping("/lawyer/fresher/{id}")
     public ResponseEntity<?> updateLawyerFresherProfile(@PathVariable String id, @RequestBody com.askvocate.backend.dto.ProfileUpdateRequest dto) {
         try {
+            if (dto.getEmail() != null) {
+                dto.setEmail(com.askvocate.backend.service.EmailAccountService.normalize(dto.getEmail()));
+                emailAccountService.requireEmailChangeAvailable(dto.getEmail(), id);
+            }
             var profile = lawyerFresherService.updateLawyerFresherProfile(id, dto);
             return ResponseEntity.ok(Map.of("success", true, "message", "Profile updated successfully", "user", profile));
         } catch (IllegalArgumentException e) {
-            return ResponseEntity.status(HttpStatus.NOT_FOUND).body(Map.of("success", false, "error", e.getMessage()));
+            HttpStatus status = e.getMessage() != null && e.getMessage().contains("already exists")
+                    ? HttpStatus.CONFLICT : HttpStatus.NOT_FOUND;
+            return ResponseEntity.status(status).body(Map.of("success", false, "error", e.getMessage()));
         }
     }
 
@@ -213,10 +250,16 @@ public class UserController {
     @PutMapping("/lawyer/experienced/{id}")
     public ResponseEntity<?> updateLawyerExperiencedProfile(@PathVariable String id, @RequestBody com.askvocate.backend.dto.ProfileUpdateRequest dto) {
         try {
+            if (dto.getEmail() != null) {
+                dto.setEmail(com.askvocate.backend.service.EmailAccountService.normalize(dto.getEmail()));
+                emailAccountService.requireEmailChangeAvailable(dto.getEmail(), id);
+            }
             var profile = lawyerExperiencedService.updateLawyerExperiencedProfile(id, dto);
             return ResponseEntity.ok(Map.of("success", true, "message", "Profile updated successfully", "user", profile));
         } catch (IllegalArgumentException e) {
-            return ResponseEntity.status(HttpStatus.NOT_FOUND).body(Map.of("success", false, "error", e.getMessage()));
+            HttpStatus status = e.getMessage() != null && e.getMessage().contains("already exists")
+                    ? HttpStatus.CONFLICT : HttpStatus.NOT_FOUND;
+            return ResponseEntity.status(status).body(Map.of("success", false, "error", e.getMessage()));
         }
     }
 }

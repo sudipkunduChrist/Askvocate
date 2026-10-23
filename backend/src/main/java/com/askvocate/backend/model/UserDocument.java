@@ -4,6 +4,7 @@ import com.fasterxml.jackson.annotation.JsonIgnore;
 import lombok.Getter;
 import lombok.Setter;
 import org.springframework.data.annotation.Id;
+import org.springframework.data.mongodb.core.index.CompoundIndex;
 import org.springframework.data.mongodb.core.index.Indexed;
 import org.springframework.data.mongodb.core.mapping.Document;
 
@@ -23,6 +24,7 @@ import java.util.Map;
  */
 @Getter
 @Document(collection = "documents")
+@CompoundIndex(name = "user_document_type", def = "{'userId': 1, 'documentType': 1}")
 public class UserDocument {
 
     @Setter
@@ -73,6 +75,12 @@ public class UserDocument {
     @Setter
     @JsonIgnore
     private String panNumber;
+
+    /** Keyed digest of the Bar Council enrollment number for duplicate detection. */
+    @Setter
+    @JsonIgnore
+    @Indexed
+    private String enrollmentNumberHash;
 
     /** Keyed digest of the full PAN for duplicate detection. */
     @Setter
@@ -154,6 +162,9 @@ public class UserDocument {
     private Boolean requiresManualReview;
     @Setter
     private String manualReviewReason;
+    /** Machine-readable reason for a PENDING status, used to drive the app UI. */
+    @Setter
+    private String pendingReason;
     @Setter
     private Instant verifiedAt;
 

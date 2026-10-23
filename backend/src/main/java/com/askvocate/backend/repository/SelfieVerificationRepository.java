@@ -4,11 +4,13 @@ import com.askvocate.backend.model.SelfieVerification;
 import com.askvocate.backend.model.VerificationStatus;
 import org.springframework.data.mongodb.repository.MongoRepository;
 
+import java.time.Instant;
 import java.util.Optional;
 import java.util.List;
 
 public interface SelfieVerificationRepository extends MongoRepository<SelfieVerification, String> {
     Optional<SelfieVerification> findByUserIdAndChallengeId(String userId, String challengeId);
+    long countByUserIdAndCreatedAtAfter(String userId, Instant after);
     boolean existsByUserIdAndAadhaarDocumentIdAndAadhaarSubmissionTokenAndVerificationStatus(
             String userId, String aadhaarDocumentId, String aadhaarSubmissionToken,
             VerificationStatus verificationStatus);

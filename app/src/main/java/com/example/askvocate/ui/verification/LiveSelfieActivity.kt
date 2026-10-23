@@ -66,7 +66,7 @@ class LiveSelfieActivity : ComponentActivity() {
         cacheDir.listFiles()?.filter { it.name.startsWith("askvocate_selfie_") }?.forEach { it.delete() }
         setContentView(R.layout.activity_live_selfie)
         findViewById<View>(R.id.selfie_app_bar).applyStatusBarInset()
-        findViewById<View>(R.id.selfie_back).setOnClickListener { if (!busy) finish() }
+        findViewById<View>(R.id.selfie_back).setOnClickListener { finish() }
         instruction = findViewById(R.id.selfie_instruction)
         step = findViewById(R.id.selfie_step)
         progress = findViewById(R.id.selfie_progress)

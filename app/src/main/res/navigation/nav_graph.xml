@@ -289,6 +289,12 @@
             app:popExitAnim="@anim/slide_out_right" />
     </fragment>
 
+    <fragment
+        android:id="@+id/nav_notifications"
+        android:name="com.example.askvocate.ui.notifications.NotificationsFragment"
+        android:label="Notifications"
+        tools:layout="@layout/fragment_notifications" />
+
     <fragment android:id="@+id/nav_my_documents"
         android:name="com.example.askvocate.ui.documents.MyDocumentsFragment"
         android:label="My Documents" tools:layout="@layout/fragment_my_documents" />

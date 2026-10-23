@@ -61,8 +61,9 @@ object SessionManager {
             .putString(KEY_USER_ROLE, role)
         if (authProvider != null) editor.putString(KEY_AUTH_PROVIDER, authProvider)
         if (profileImageUrl != null) editor.putString(KEY_PROFILE_IMAGE_URL, profileImageUrl)
+        // Only replace the token when one is supplied. Profile edits (which omit it)
+        // must never wipe the session token.
         if (appToken != null) editor.putString(KEY_APP_TOKEN, appToken)
-        else editor.remove(KEY_APP_TOKEN)
         editor.apply()
     }
 
@@ -107,26 +108,23 @@ object SessionManager {
     suspend fun validateWithServer(context: Context): ValidationResult = withContext(Dispatchers.IO) {
         if (!isLoggedIn(context)) return@withContext ValidationResult.INVALID
 
-        val userId = getUserId(context)
-        val path = when (getUserRole(context).uppercase()) {
-            "CLIENT" -> "client"
-            "LAWYER_FRESHER" -> "lawyer/fresher"
-            "LAWYER_EXPERIENCED" -> "lawyer/experienced"
-            else -> return@withContext ValidationResult.INVALID
-        }
-        if (userId.isBlank()) return@withContext ValidationResult.INVALID
+        val token = getAppToken(context)
+        if (token.isBlank()) return@withContext ValidationResult.INVALID
 
         try {
-            val connection = URL("${ApiConfig.BASE_URL}/api/users/$path/$userId")
+            val connection = URL("${ApiConfig.BASE_URL}/api/users/session")
                 .openConnection() as HttpURLConnection
             connection.requestMethod = "GET"
             connection.connectTimeout = 7_000
             connection.readTimeout = 7_000
             connection.setRequestProperty("Accept", "application/json")
+            connection.setRequestProperty("Authorization", "Bearer $token")
 
             try {
                 when (connection.responseCode) {
                     in 200..299 -> ValidationResult.VALID
+                    HttpURLConnection.HTTP_UNAUTHORIZED,
+                    HttpURLConnection.HTTP_FORBIDDEN,
                     HttpURLConnection.HTTP_NOT_FOUND,
                     HttpURLConnection.HTTP_GONE -> ValidationResult.INVALID
                     else -> ValidationResult.UNAVAILABLE

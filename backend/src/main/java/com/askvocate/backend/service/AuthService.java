@@ -28,6 +28,9 @@ public class AuthService {
     @Autowired
     private LawyerExperiencedService lawyerExperiencedService;
 
+    @Autowired
+    private EmailAccountService emailAccountService;
+
     private final BCryptPasswordEncoder passwordEncoder = new BCryptPasswordEncoder();
 
     @org.springframework.beans.factory.annotation.Value("${google.oauth.web-client-id}")
@@ -42,14 +45,13 @@ public class AuthService {
 
     /**
      * Verifies a Google ID token (from Android Credential Manager) and signs the user in.
-     * When targetRole is supplied, account lookup and uniqueness are scoped to that role.
-     * This allows the same Google identity to own separate fresher and experienced profiles.
-     * Without targetRole, the legacy sign-in flow searches all role collections.
+     * One email owns exactly one account across the client, fresher and experienced
+     * collections; requesting a different role with the same email is rejected.
      */
     public Map<String, Object> loginWithGoogle(String idTokenString, String targetRole) {
         GoogleIdToken.Payload payload = verifyGoogleIdToken(idTokenString);
 
-        String email = payload.getEmail();
+        String email = EmailAccountService.normalize(payload.getEmail());
         if (email == null || email.isBlank()) {
             throw new IllegalArgumentException("Google account has no email");
         }
@@ -69,34 +71,15 @@ public class AuthService {
         String existingRole = null;
         Object existingUser = null;
 
-        if (!requestedRole.isEmpty()) {
-            // Sign-up from a role-specific screen must only inspect that role's collection.
-            // An account in another collection is a separate profile, not a conflict.
-            if (requestedRole.equals("CLIENT")) {
-                existingUser = clientService.findByEmail(email).orElse(null);
-            } else if (requestedRole.equals("LAWYER_FRESHER")) {
-                existingUser = lawyerFresherService.findByEmail(email).orElse(null);
-            } else {
-                existingUser = lawyerExperiencedService.findByEmail(email).orElse(null);
-            }
-            if (existingUser != null) {
-                existingRole = requestedRole;
-            }
-        } else {
-            // Generic Google sign-in has no selected role, so retain the existing search order.
-            Optional<ClientProfile> clientOpt = clientService.findByEmail(email);
-            Optional<LawyerFresherProfile> fresherOpt = lawyerFresherService.findByEmail(email);
-            Optional<LawyerExperiencedProfile> expOpt = lawyerExperiencedService.findByEmail(email);
-
-            if (clientOpt.isPresent()) {
-                existingRole = "CLIENT";
-                existingUser = clientOpt.get();
-            } else if (fresherOpt.isPresent()) {
-                existingRole = "LAWYER_FRESHER";
-                existingUser = fresherOpt.get();
-            } else if (expOpt.isPresent()) {
-                existingRole = "LAWYER_EXPERIENCED";
-                existingUser = expOpt.get();
+        // One email = one account across all role collections.
+        var account = emailAccountService.findAccount(email);
+        if (account.isPresent()) {
+            existingRole = account.get().role();
+            existingUser = account.get().user();
+            if (!requestedRole.isEmpty() && !requestedRole.equals(existingRole)) {
+                throw new IllegalArgumentException(
+                        "An account with this email already exists. Sign in with that account, "
+                        + "or use a different email.");
             }
         }
 

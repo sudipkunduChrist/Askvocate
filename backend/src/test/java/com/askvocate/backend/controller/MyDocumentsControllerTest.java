@@ -65,7 +65,7 @@ class MyDocumentsControllerTest {
         assertNull(item.note());
     }
 
-    @Test void fullAadhaarNumberIsOnlyInAuthenticatedDetail() {
+    @Test void fullAadhaarNumberIsOnlyReturnedByRevealEndpoint() {
         when(sessions.requireAccount("Bearer lawyer")).thenReturn(new AppSessionService.Account("owner", "LAWYER_FRESHER"));
         UserDocument aadhaar = new UserDocument();
         aadhaar.setDocumentType(DocumentType.AADHAAR);
@@ -79,10 +79,12 @@ class MyDocumentsControllerTest {
 
         var listed = controller.list("Bearer lawyer").getFirst();
         var detail = controller.detail("Bearer lawyer", "AADHAAR").getBody();
+        var revealed = controller.revealNumber("Bearer lawyer", "AADHAAR").getBody();
 
         assertEquals("XXXX-XXXX-0123", listed.maskedNumber());
         assertNull(listed.aadhaarNumber());
-        assertEquals("234567890123", detail.aadhaarNumber());
+        assertNull(detail.aadhaarNumber());
+        assertEquals("234567890123", revealed.get("aadhaarNumber"));
     }
 
     @Test void verifiedPanDetailIncludesFullPanNumber() {
@@ -101,7 +103,7 @@ class MyDocumentsControllerTest {
         var revealed = controller.revealNumber("Bearer lawyer", "PAN").getBody();
 
         assertNull(listed.panNumber());
-        assertEquals("AAAPL1234C", detail.panNumber());
+        assertNull(detail.panNumber());
         assertEquals("AAAPL1234C", revealed.get("panNumber"));
     }
 
@@ -133,6 +135,7 @@ class MyDocumentsControllerTest {
         qr.setAddress("12 Road, Delhi");
         qr.setPincode("110001");
         qr.setAadhaarLast4("1234");
+        qr.setPhotoUrl("https://res.cloudinary.com/demo/aadhaar-qr.jpg");
         doc.setQrData(qr);
         doc.setIsQrVerified(true);
         when(verifiedDocs.findByUserIdAndDocumentType("owner", DocumentType.AADHAAR)).thenReturn(Optional.of(doc));
@@ -143,5 +146,6 @@ class MyDocumentsControllerTest {
         assertEquals("01-02-1990", item.qrDetails().get("Date of Birth"));
         assertEquals("FEMALE", item.qrDetails().get("Gender"));
         assertEquals("OCR N@me", item.details().get("name"));
+        assertNull(item.qrPhotoUrl());
     }
 }

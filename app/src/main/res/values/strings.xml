@@ -257,6 +257,13 @@
     <string name="my_appointments_desc">View consultations</string>
     <string name="my_documents_desc">Verify your credentials</string>
     <string name="document_upload_limits">JPG, PNG or WebP · Maximum 10 MB per image. Photos are compressed before upload.</string>
+    <string name="pan_qr_scan_prompt">Align the PAN QR inside the frame</string>
+    <string name="aadhaar_qr_scan_prompt">Align the Aadhaar QR inside the frame</string>
+    <string name="qr_scan_prompt">Align the QR code inside the frame</string>
+    <string name="nav_user_name_placeholder">User</string>
+    <string name="pan_qr_permission_required">Camera permission is needed to scan the PAN QR.</string>
+    <string name="pan_qr_camera_unavailable">The camera could not be started. Please try again.</string>
+    <string name="pan_qr_close">Close scanner</string>
     <string name="recent_activity">Recent Activity</string>
     <string name="recent_activity_desc">View recent actions</string>
     <string name="account_and_preferences">Account &amp; Preferences</string>

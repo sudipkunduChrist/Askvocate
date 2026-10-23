@@ -27,6 +27,8 @@ class SettingsFragment : Fragment() {
         super.onViewCreated(view, savedInstanceState)
 
         view.findViewById<View>(R.id.btn_logout).setOnClickListener {
+            com.example.askvocate.ui.documents.DocumentsCache(requireContext()).clear()
+            SessionManager.clearUser(requireContext())
             SessionManager.setLoggedIn(requireContext(), false)
 
             viewLifecycleOwner.lifecycleScope.launch {

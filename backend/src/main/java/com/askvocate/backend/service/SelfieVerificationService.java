@@ -22,6 +22,7 @@ import java.security.SecureRandom;
 @Service
 public class SelfieVerificationService {
     private static final SecureRandom RANDOM = new SecureRandom();
+    private static final int MAX_ATTEMPTS_PER_HOUR = 5;
     private final DocumentVerificationService documents;
     private final UserDocumentRepository documentRepository;
     private final SelfieVerificationRepository selfies;
@@ -46,6 +47,12 @@ public class SelfieVerificationService {
         if (selfies.existsByUserIdAndAadhaarDocumentIdAndAadhaarSubmissionTokenAndVerificationStatus(
                 userId, aadhaar.getId(), aadhaar.getSubmissionToken(), VerificationStatus.VERIFIED)) {
             throw new DocumentVerificationException("Selfie is already verified for this Aadhaar submission.");
+        }
+        long recentAttempts = selfies.countByUserIdAndCreatedAtAfter(
+                userId, Instant.now().minus(1, ChronoUnit.HOURS));
+        if (recentAttempts >= MAX_ATTEMPTS_PER_HOUR) {
+            throw new DocumentVerificationException(
+                    "Too many selfie attempts. Please try again in about an hour.");
         }
         SelfieVerification attempt = new SelfieVerification();
         attempt.setUserId(userId);
@@ -103,6 +110,7 @@ public class SelfieVerificationService {
             attempt.setFaceMatchThreshold(result.faceMatchThreshold());
             attempt.setLivenessPassed(result.livenessPassed());
             attempt.setLivenessScore(result.livenessScore());
+            attempt.setPadScore(result.padScore());
             attempt.setFailureReason(result.reason());
             if (Boolean.TRUE.equals(result.matched())) {
                 CloudinaryRef uploaded = cloudinary.uploadSelfie(center,
@@ -111,8 +119,11 @@ public class SelfieVerificationService {
                 attempt.setSelfiePublicId(uploaded.getPublicId());
                 attempt.setVerificationStatus(VerificationStatus.VERIFIED);
                 attempt.setVerifiedAt(Instant.now());
+            } else {
+                attempt.setVerificationStatus(VerificationStatus.FAILED);
             }
         } catch (Exception e) {
+            attempt.setVerificationStatus(VerificationStatus.FAILED);
             attempt.setFailureReason(e instanceof DocumentVerificationException
                     ? e.getMessage() : "Selfie verification could not complete: " + e.getClass().getSimpleName());
         }

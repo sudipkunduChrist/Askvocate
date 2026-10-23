@@ -24,7 +24,11 @@
         </provider>
         <activity android:name=".ui.verification.LiveSelfieActivity" android:exported="false" />
         <activity
-            android:name=".ui.documents.PortraitCaptureActivity"
+            android:name=".ui.documents.QrScanActivity"
+            android:exported="false"
+            android:screenOrientation="portrait" />
+        <activity
+            android:name=".ui.documents.DocumentHelpActivity"
             android:exported="false"
             android:screenOrientation="portrait" />
         <activity

@@ -93,6 +93,15 @@ public class OcrExtractionService {
     private static final Pattern COP_PATTERN =
             Pattern.compile("(?i)(?:COP|Certificate\\s*of\\s*Practice)\\s*(?:No\\.?|Number)?\\s*[:/]?\\s*([A-Z0-9/\\-]+)");
 
+    // ── Degree / AIBE patterns ──────────────────────────────────────────
+    private static final Pattern CERTIFICATE_YEAR_PATTERN = Pattern.compile("\\b(?:19|20)\\d{2}\\b");
+    private static final Pattern CERTIFICATE_INSTITUTION_PATTERN =
+            Pattern.compile("(?i)(?:University|College|Institute|Board|Bar\\s+Council)[^\\n]*");
+    private static final Pattern AIBE_NUMBER_PATTERN =
+            Pattern.compile("(?i)(?:AIBE|All\\s+India\\s+Bar\\s+Examination)\\s*(?:Roll|Reg(?:istration)?|No\\.?|Number)?\\s*[:/.-]?\\s*([A-Z0-9/\\-]+)");
+    private static final Pattern DEGREE_NUMBER_PATTERN =
+            Pattern.compile("(?i)(?:Degree|Reg(?:istration)?|Roll|Certificate)\\s*(?:No\\.?|Number)?\\s*[:/.-]?\\s*([A-Z0-9/\\-]{4,})");
+
     public OcrExtractionService() {
         this.barCouncilValidationService = new BarCouncilValidationService();
     }
@@ -173,6 +182,7 @@ public class OcrExtractionService {
             case AADHAAR -> parseAadhaar(ocrText, confidence, side);
             case PAN -> parsePan(ocrText, confidence);
             case BAR_COUNCIL_ID, BAR_CERTIFICATE, CERTIFICATE_OF_PRACTICE -> parseBarCouncil(ocrText, confidence);
+            case DEGREE_CERTIFICATE, AIBE_CERTIFICATE -> parseCertificate(ocrText, documentType, confidence);
         };
     }
 
@@ -190,6 +200,11 @@ public class OcrExtractionService {
             if (result.extractedFields().containsKey("dob")) score += 5;
             if (result.extractedFields().containsKey("gender")) score += 5;
             if (result.extractedFields().containsKey("address")) score += 5;
+        } else if (documentType == DocumentType.DEGREE_CERTIFICATE
+                || documentType == DocumentType.AIBE_CERTIFICATE) {
+            if (result.extractedFields().containsKey("name")) score += 5;
+            if (result.extractedFields().containsKey("year")) score += 3;
+            if (result.extractedFields().containsKey("institution")) score += 3;
         }
         return score;
     }
@@ -318,6 +333,32 @@ public class OcrExtractionService {
                 success, fields.size(), maskedNumber);
 
         return new ExtractionResult(success, fields, maskedNumber, confidence, error);
+    }
+
+    // ── Degree / AIBE parser ────────────────────────────────────────────
+
+    private ExtractionResult parseCertificate(String text, DocumentType documentType, double confidence) {
+        Map<String, String> fields = new HashMap<>();
+        Matcher nameMatcher = NAME_AFTER_LABEL_PATTERN.matcher(text);
+        if (nameMatcher.find()) fields.put("name", normalizeName(nameMatcher.group(1)));
+        if (!fields.containsKey("name")) {
+            Matcher certified = CERTIFIED_THAT_PATTERN.matcher(text);
+            if (certified.find()) fields.put("name", normalizeName(certified.group(1)));
+        }
+        Matcher year = CERTIFICATE_YEAR_PATTERN.matcher(text);
+        if (year.find()) fields.put("year", year.group());
+        Matcher institution = CERTIFICATE_INSTITUTION_PATTERN.matcher(text);
+        if (institution.find()) fields.put("institution", institution.group().trim());
+        if (documentType == DocumentType.AIBE_CERTIFICATE) {
+            Matcher aibe = AIBE_NUMBER_PATTERN.matcher(text);
+            if (aibe.find()) fields.put("aibeNumber", aibe.group(1));
+        } else {
+            Matcher degree = DEGREE_NUMBER_PATTERN.matcher(text);
+            if (degree.find()) fields.put("degreeNumber", degree.group(1));
+        }
+        boolean success = fields.containsKey("name");
+        String error = success ? null : "Could not read the holder's name from the certificate.";
+        return new ExtractionResult(success, fields, null, confidence, error);
     }
 
     // ── Aadhaar Parser ──────────────────────────────────────────────────

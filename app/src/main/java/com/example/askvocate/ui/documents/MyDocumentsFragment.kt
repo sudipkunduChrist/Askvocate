@@ -1,11 +1,16 @@
 package com.example.askvocate.ui.documents
 
 import android.content.Intent
+import android.animation.Animator
+import android.animation.AnimatorListenerAdapter
 import android.animation.ValueAnimator
 import android.content.res.ColorStateList
+import android.graphics.Bitmap
 import android.graphics.BitmapFactory
+import android.graphics.Matrix
 import android.graphics.Typeface
 import android.graphics.drawable.GradientDrawable
+import android.media.ExifInterface
 import android.net.Uri
 import android.os.Bundle
 import android.view.Gravity
@@ -36,15 +41,19 @@ import com.example.askvocate.R
 import com.example.askvocate.databinding.FragmentMyDocumentsBinding
 import com.example.askvocate.ui.verification.LiveSelfieActivity
 import com.example.askvocate.util.applyStatusBarInset
+import com.example.askvocate.util.NetworkMonitor
 import com.google.android.material.dialog.MaterialAlertDialogBuilder
 import com.google.android.material.button.MaterialButton
 import com.google.android.material.progressindicator.LinearProgressIndicator
-import com.journeyapps.barcodescanner.ScanContract
-import com.journeyapps.barcodescanner.ScanOptions
 import kotlinx.coroutines.Job
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.cancelChildren
 import kotlinx.coroutines.delay
+import kotlinx.coroutines.flow.collect
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
 import java.io.File
+import java.io.ByteArrayInputStream
 import java.time.Instant
 import java.time.ZoneId
 import java.time.format.DateTimeFormatter
@@ -82,7 +91,12 @@ class MyDocumentsFragment : Fragment() {
     private var loadingStage: Job? = null
     private var skeletonAnimator: ValueAnimator? = null
     private var submitProgressAnimator: ValueAnimator? = null
+    private var submitPercentJob: Job? = null
     private var checkStatusButton: MaterialButton? = null
+    private var qrScanType: String? = null
+    private var qrPhotoType: String? = null
+    private lateinit var docsCache: DocumentsCache
+    private var wasOnline = true
 
     private val chooseImage = registerForActivityResult(ActivityResultContracts.GetContent()) { uri ->
         if (uri != null) runCatching { selectedImage(uri) }
@@ -113,15 +127,27 @@ class MyDocumentsFragment : Fragment() {
             setBusy(false)
         }
     }
-    private val liveQrScanner = registerForActivityResult(ScanContract()) { result ->
-        val contents = result.contents?.trim()
-        if (contents.isNullOrEmpty()) return@registerForActivityResult
-        if (!contents.all(Char::isDigit) || contents.length % 4 != 0) {
-            message("That QR is not the signed Enhanced PAN QR.")
-            return@registerForActivityResult
+    private val liveQrScanner =
+        registerForActivityResult(ActivityResultContracts.StartActivityForResult()) { result ->
+            val type = qrScanType ?: "PAN"
+            qrScanType = null
+            if (result.resultCode != android.app.Activity.RESULT_OK) return@registerForActivityResult
+            val contents = result.data?.getStringExtra(QrScanActivity.EXTRA_QR_TEXT)?.trim()
+            // A still of the scan is saved so the backend can decode it and the image
+            // remains available for selfie matching.
+            val captured = result.data?.getStringExtra(QrScanActivity.EXTRA_IMAGE_PATH)
+                ?.let(::File)?.takeIf { it.isFile }
+            if (captured != null) {
+                submitQrImage(type, Uri.fromFile(captured))
+                return@registerForActivityResult
+            }
+            if (type == "PAN" && contents != null &&
+                contents.all(Char::isDigit) && contents.length % 4 == 0) {
+                scanPanQrText(contents)
+            } else {
+                message("Could not capture the QR image. Use the photo upload option.")
+            }
         }
-        scanPanQrText(contents)
-    }
     private val qrPhotoCameraPermission =
         registerForActivityResult(ActivityResultContracts.RequestPermission()) { granted ->
             if (granted) runCatching { launchQrCamera() }
@@ -130,14 +156,18 @@ class MyDocumentsFragment : Fragment() {
         }
     private val qrPhotoCamera = registerForActivityResult(ActivityResultContracts.TakePicture()) { success ->
         val uri = documentState.qrCameraUri
-        if (success && uri != null) submitQrPhoto(uri)
+        val type = qrPhotoType ?: "PAN"
+        qrPhotoType = null
+        if (success && uri != null) submitQrImage(type, uri)
         else {
             documentState.discardQrCapture()
             message("Photo was not captured. Try again or choose an image from files.")
         }
     }
     private val qrPhotoPicker = registerForActivityResult(ActivityResultContracts.GetContent()) { uri ->
-        if (uri != null) runCatching { submitQrPhoto(uri) }
+        val type = qrPhotoType ?: "PAN"
+        qrPhotoType = null
+        if (uri != null) runCatching { submitQrImage(type, uri) }
             .onFailure { message(it.message ?: "Could not read the selected image.") }
     }
 
@@ -149,6 +179,7 @@ class MyDocumentsFragment : Fragment() {
     override fun onViewCreated(view: View, savedInstanceState: Bundle?) {
         super.onViewCreated(view, savedInstanceState)
         api = MyDocumentsApi(requireContext().applicationContext)
+        docsCache = DocumentsCache(requireContext())
         binding.documentsAppBar.applyStatusBarInset()
         binding.documentsBack.setOnClickListener { goBack() }
         binding.documentsRefresh.setOnClickListener { if (!busy) refresh() }
@@ -164,9 +195,22 @@ class MyDocumentsFragment : Fragment() {
                 ?: documentState.qrCameraUri
             pickingBack = state.getBoolean("picking_back", pickingBack)
         }
-        val cached = documentState.documents
-        if (cached == null) refresh(showInitialOverlay = true)
-        else showCached(cached)
+        val cached = documentState.documents ?: docsCache.load()
+        if (cached == null) {
+            refresh(showInitialOverlay = true)
+        } else {
+            documentState.documents = cached
+            showCached(cached)
+            // Refresh in the background; keep showing the cache if the network fails.
+            refresh()
+        }
+        wasOnline = NetworkMonitor.online.value
+        viewLifecycleOwner.lifecycleScope.launch {
+            NetworkMonitor.online.collect { online ->
+                if (online && !wasOnline && isAdded) refresh()
+                wasOnline = online
+            }
+        }
     }
 
     override fun onSaveInstanceState(outState: Bundle) {
@@ -180,7 +224,9 @@ class MyDocumentsFragment : Fragment() {
     }
 
     private fun goBack() {
-        if (busy) return
+        // Navigation always wins: cancel any in-flight load/upload and close the overlay.
+        viewLifecycleOwner.lifecycleScope.coroutineContext.cancelChildren()
+        setBusy(false)
         if (selectedType != null) {
             selectedType = null; selected = null; front = null; back = null
             aadhaarNumberVisible = false; revealedAadhaarNumber = null
@@ -196,6 +242,8 @@ class MyDocumentsFragment : Fragment() {
         val current = _binding ?: return
         current.documentsLoadingOverlay.isVisible = value
         current.documentsInlineProgress.isVisible = false
+        current.documentsLoadingPercent.isVisible = false
+        current.documentsLoadingPercent.text = "0%"
         if (value) {
             stopSkeletons()
             current.documentsProgress.isIndeterminate = true
@@ -223,6 +271,8 @@ class MyDocumentsFragment : Fragment() {
             loadingAnimator = null
             submitProgressAnimator?.cancel()
             submitProgressAnimator = null
+            submitPercentJob?.cancel()
+            submitPercentJob = null
             current.documentsProgress.isIndeterminate = true
             current.documentsProgress.progress = 0
             current.documentsLoadingIcon.scaleX = 1f
@@ -302,17 +352,45 @@ class MyDocumentsFragment : Fragment() {
         val bar = _binding?.documentsProgress ?: return
         bar.isIndeterminate = false
         bar.progress = 0
+        submitPercentJob?.cancel()
+        _binding?.documentsLoadingPercent?.apply {
+            isVisible = true
+            text = "0%"
+        }
         submitProgressAnimator?.cancel()
         if (!ValueAnimator.areAnimatorsEnabled()) {
             bar.progress = 45
+            _binding?.documentsLoadingPercent?.text = "45%"
             return
         }
         submitProgressAnimator = ValueAnimator.ofInt(0, 90).apply {
             duration = 9000
             interpolator = DecelerateInterpolator()
             addUpdateListener {
-                if (_binding != null) bar.progress = it.animatedValue as Int
+                if (_binding != null) {
+                    val progress = it.animatedValue as Int
+                    bar.progress = progress
+                    _binding?.documentsLoadingPercent?.text = "$progress%"
+                }
             }
+            addListener(object : AnimatorListenerAdapter() {
+                override fun onAnimationEnd(animation: Animator) {
+                    if (_binding == null || !busy) return
+                    // Never freeze at 90%: keep the bar moving while the server finishes.
+                    bar.isIndeterminate = true
+                    _binding?.documentsLoadingPercent?.text = "90%"
+                    submitPercentJob?.cancel()
+                    submitPercentJob = viewLifecycleOwner.lifecycleScope.launch {
+                        var shown = 90
+                        while (busy) {
+                            delay(1200)
+                            if (!busy || _binding == null) break
+                            if (shown < 99) shown++
+                            _binding?.documentsLoadingPercent?.text = "$shown%"
+                        }
+                    }
+                }
+            })
             start()
         }
     }
@@ -349,6 +427,7 @@ class MyDocumentsFragment : Fragment() {
                 if (showInitialOverlay || type == null) {
                     val docs = api.list()
                     documentState.documents = docs
+                    persistDocuments()
                     if (_binding != null) showCached(docs)
                 } else {
                     val doc = api.detail(type)
@@ -356,6 +435,7 @@ class MyDocumentsFragment : Fragment() {
                     documentState.documents = documentState.documents?.map {
                         if (it.type == type) doc else it
                     }
+                    persistDocuments()
                     if (_binding != null && selectedType == type) {
                         renderDetail(doc)
                         if ((doc.status == "FAILED" || doc.status == "REJECTED") &&
@@ -364,10 +444,13 @@ class MyDocumentsFragment : Fragment() {
                         }
                     }
                 }
-            }.onFailure {
+            }.onFailure { error ->
                 if (_binding != null) {
-                    if (showInitialOverlay) binding.documentsContent.removeAllViews()
-                    message(it.message ?: "Could not load documents.")
+                    if (showInitialOverlay && documentState.documents == null) {
+                        renderLoadError()
+                    } else {
+                        message(friendlyError(error))
+                    }
                 }
             }
             if (_binding != null) {
@@ -394,11 +477,13 @@ class MyDocumentsFragment : Fragment() {
         checkStatusButton = null
         binding.documentsTitle.text = "My Documents"
         binding.documentsSubtitle.text = "Your secure document vault"
-        val verified = docs.count { it.status == "VERIFIED" }
+        val requiredDocs = docs.filter { it.required || it.requirementGroup != null }
+            .groupBy { it.requirementGroup ?: it.type }
+        val verified = requiredDocs.count { (_, items) -> items.any { it.status == "VERIFIED" } }
         val hero = card(R.color.navy_primary).apply {
             addView(label("YOUR VAULT", 12f, R.color.amber_light, true))
             addView(label("Documents, all in one place", 21f, R.color.white, true), marginParams(8))
-            addView(label("$verified of ${docs.size} verified  •  Select a document to view its status.",
+            addView(label("$verified of ${requiredDocs.size} required documents verified  •  Select one to view its status.",
                 13f, R.color.white), marginParams(8))
         }
         binding.documentsContent.addView(hero, marginParams(0))
@@ -416,7 +501,11 @@ class MyDocumentsFragment : Fragment() {
             }, LinearLayout.LayoutParams(dp(48), dp(48)))
             val copy = LinearLayout(requireContext()).apply { orientation = LinearLayout.VERTICAL }
             copy.addView(label(doc.title, 16f, R.color.text_primary, true))
-            copy.addView(statusChip(doc.status), marginParams(8, false))
+            copy.addView(statusChip(doc), marginParams(8, false))
+            copy.addView(label(requirementLabel(doc), 11f,
+                if (doc.required || doc.requirementGroup != null) R.color.navy_primary
+                else R.color.text_secondary,
+                doc.required || doc.requirementGroup != null), marginParams(4, false))
             row.addView(copy, LinearLayout.LayoutParams(0, ViewGroup.LayoutParams.WRAP_CONTENT, 1f).apply {
                 marginStart = dp(14)
             })
@@ -453,13 +542,22 @@ class MyDocumentsFragment : Fragment() {
         checkStatusButton = null
         selected = doc
         binding.documentsTitle.text = doc.title
-        binding.documentsSubtitle.text = "Status, images and details"
+        binding.documentsSubtitle.text = when {
+            doc.requirementGroup == "BAR_ENROLLMENT" ->
+                "Bar enrollment proof · upload either this or the Bar Council ID"
+            doc.required -> "Required document · status, images and details"
+            else -> "Optional document · status, images and details"
+        }
         val statusNote = doc.note?.trim()?.takeIf {
             it.isNotEmpty() && !it.equals("null", ignoreCase = true)
-        } ?: when (doc.status) {
-            "VERIFIED" -> "Verification complete."
-            "PENDING" -> "Verification is in progress."
-            "NOT_UPLOADED" -> "Upload a clear image to begin."
+        } ?: when {
+            doc.type == "SELFIE" && doc.status == "PENDING" ->
+                "Complete the live camera check to verify your selfie."
+            doc.type == "SELFIE" && doc.status == "FAILED" ->
+                "Selfie verification failed. Try again from the live selfie screen."
+            doc.status == "VERIFIED" -> "Verification complete."
+            doc.status == "PENDING" -> "Manual review is in progress."
+            doc.status == "NOT_UPLOADED" -> "Upload a clear image to begin."
             else -> "Review the document and try again if needed."
         }
         val statusCard = card(statusBackground(doc.status)).apply {
@@ -473,10 +571,12 @@ class MyDocumentsFragment : Fragment() {
                 setBackgroundResource(R.drawable.bg_document_icon)
                 setPadding(dp(12), dp(12), dp(12), dp(12))
             }, LinearLayout.LayoutParams(dp(48), dp(48)))
-            heading.addView(label(statusText(doc.status), 19f, statusColor(doc.status), true),
+            heading.addView(label(statusLabel(doc), 19f, statusColor(doc.status), true),
                 LinearLayout.LayoutParams(0, ViewGroup.LayoutParams.WRAP_CONTENT, 1f).apply { marginStart = dp(14) })
             addView(heading)
-            addView(label(statusNote, 14f, R.color.text_secondary), marginParams(14, false))
+            addView(label(sentenceLines(statusNote), 14f, R.color.text_secondary).apply {
+                setLineSpacing(dp(4).toFloat(), 1.1f)
+            }, marginParams(14, false))
             if (doc.status == "PENDING") {
                 addView(LinearProgressIndicator(requireContext()).apply {
                     isIndeterminate = true
@@ -491,6 +591,11 @@ class MyDocumentsFragment : Fragment() {
             val check = actionButton("Check verification status", false) { refresh() }
             checkStatusButton = check
             binding.documentsContent.addView(check, marginParams(12))
+            if (doc.type == "PAN" || doc.type == "AADHAAR") {
+                addAction(binding.documentsContent, "Retry QR scan", true) {
+                    launchLiveQrScanner(doc.type)
+                }
+            }
         }
         if (doc.uploadOnly) {
             val note = card(R.color.doc_navy_soft).apply {
@@ -500,7 +605,7 @@ class MyDocumentsFragment : Fragment() {
             }
             binding.documentsContent.addView(note, marginParams(14))
         }
-        if (doc.media.isNotEmpty()) {
+        if (doc.media.isNotEmpty() && doc.type != "AADHAAR" && doc.type != "PAN") {
             sectionTitle("Uploaded images", "Tap an image to view it")
             doc.media.forEach { side ->
                 val sideName = side.replaceFirstChar { it.uppercase() }
@@ -523,8 +628,8 @@ class MyDocumentsFragment : Fragment() {
                 imageCard.addView(previewHolder, LinearLayout.LayoutParams(-1, dp(156)).apply { topMargin = dp(12) })
                 viewLifecycleOwner.lifecycleScope.launch {
                     runCatching {
-                        val bytes = api.media(doc.type, side)
-                        BitmapFactory.decodeByteArray(bytes, 0, bytes.size) ?: error("Cannot read image preview.")
+                        val bytes = loadMedia(doc.type, side)
+                        decodeUpright(bytes) ?: error("Cannot read image preview.")
                     }.onSuccess { bitmap ->
                         if (_binding != null && selectedType == doc.type && preview.parent != null) {
                             preview.setImageBitmap(bitmap)
@@ -556,11 +661,11 @@ class MyDocumentsFragment : Fragment() {
                 val fullNumberAvailable = doc.aadhaarNumber?.let { number ->
                     number.length == 12 && number.all(Char::isDigit)
                 } == true
-                val fullPanAvailable = doc.panNumber?.matches(Regex("[A-Z]{5}[0-9]{4}[A-Z]")) == true
                 when {
                     doc.type == "AADHAAR" && doc.status == "VERIFIED" && fullNumberAvailable ->
                         aadhaarNumberRow(detailCard, it)
-                    doc.type == "PAN" && doc.status == "VERIFIED" && fullPanAvailable ->
+                    // The full PAN is never sent with the document; the eye fetches it on demand.
+                    doc.type == "PAN" && doc.status == "VERIFIED" ->
                         panNumberRow(detailCard, it)
                     else -> detailRow(detailCard, "Number", it)
                 }
@@ -573,33 +678,36 @@ class MyDocumentsFragment : Fragment() {
             doc.verifiedAt?.let { detailRow(detailCard, "Verified", date(it)) }
             binding.documentsContent.addView(detailCard, marginParams(12))
         }
-        val showQrPhoto = !doc.qrPhotoUrl.isNullOrBlank() && when (doc.type) {
-            "AADHAAR" -> useQrDetails
-            // The uploaded card photo takes priority; the QR photo is the fallback
-            // for live scans, where no card image was ever uploaded.
-            "PAN" -> doc.status == "VERIFIED" && doc.media.isEmpty()
-            else -> false
-        }
+        // PAN scans have no card image, so show the photo embedded in the signed QR.
+        // Aadhaar verified details come from the QR text only; its embedded photo is not shown.
+        val showQrPhoto = doc.type == "PAN" && doc.status == "VERIFIED" &&
+            doc.media.isEmpty() && !doc.qrPhotoUrl.isNullOrBlank()
         if (showQrPhoto) {
-            val qrName = if (doc.type == "PAN") "PAN" else "Aadhaar"
-            sectionTitle("$qrName QR photo", "Photo embedded in your signed $qrName QR")
+            sectionTitle("PAN QR photo", "Photo embedded in your signed PAN QR")
             val photoCard = card()
             photoCard.addView(ImageView(requireContext()).apply {
-                contentDescription = "$qrName QR photo"
+                contentDescription = "PAN QR photo"
                 scaleType = ImageView.ScaleType.CENTER_CROP
                 load(doc.qrPhotoUrl) { crossfade(true) }
             }, LinearLayout.LayoutParams(-1, dp(180)))
             binding.documentsContent.addView(photoCard, marginParams(12))
         }
-        if (doc.type == "PAN") {
-            sectionTitle("PAN QR", "Use this if the card text is difficult to read")
-            val qrCard = card()
-            qrCard.addView(label("Scan only the QR code", 16f, R.color.text_primary, true))
-            qrCard.addView(label("Open the live scanner and point the camera at the QR code on the PAN card.",
-                13f, R.color.text_secondary), marginParams(6, false))
-            addAction(qrCard, "Open live QR scanner", true) { launchLiveQrScanner() }
-            addAction(qrCard, "Use a photo of the QR", false) { chooseQrPhotoSource() }
-            binding.documentsContent.addView(qrCard, marginParams(12))
+        if (doc.type == "PAN" || doc.type == "AADHAAR") {
+            if (doc.status != "VERIFIED") {
+                val name = if (doc.type == "AADHAAR") "Aadhaar" else "PAN"
+                sectionTitle("$name QR", "Upload the QR side or scan it live")
+                val qrCard = card()
+                qrCard.addView(label("Use the QR side of your card or e-document", 16f,
+                    R.color.text_primary, true))
+                qrCard.addView(label(
+                    "For a damaged card, download your free e-$name, screenshot its QR, and upload it. " +
+                        "The signed QR is all we need.",
+                    13f, R.color.text_secondary), marginParams(6, false))
+                addAction(qrCard, "Upload QR photo", true) { chooseQrPhotoSource(doc.type) }
+                addAction(qrCard, "Scan QR live", false) { launchLiveQrScanner(doc.type) }
+                addAction(qrCard, "Can't scan? Get e-documents", false) { openDocumentHelp() }
+                binding.documentsContent.addView(qrCard, marginParams(12))
+            }
         }
         if (doc.liveCapture) {
             if (doc.status != "VERIFIED") addAction(binding.documentsContent, "Start live selfie verification", true) {
@@ -609,9 +717,14 @@ class MyDocumentsFragment : Fragment() {
             revealContent()
             return
         }
-        if (doc.status != "VERIFIED" && doc.status != "PENDING") {
-            sectionTitle(if (doc.uploadOnly) "Upload image" else "Upload and verify",
-                "Use a clear, well-lit photo with every corner visible")
+        val canReupload = doc.status != "VERIFIED" && doc.type != "AADHAAR" && doc.type != "PAN"
+        if (canReupload) {
+            val uploadTitle = when {
+                doc.status == "PENDING" -> "Retry upload"
+                doc.uploadOnly -> "Upload image"
+                else -> "Upload and verify"
+            }
+            sectionTitle(uploadTitle, "Use a clear, well-lit photo with every corner visible")
             val uploadCard = card()
             uploadCard.addView(label("Document photos", 16f, R.color.text_primary, true))
             uploadCard.addView(label(getString(R.string.document_upload_limits), 13f,
@@ -656,6 +769,45 @@ class MyDocumentsFragment : Fragment() {
             if (bold) setTypeface(typeface, Typeface.BOLD)
         }
 
+    /** One sentence per line in the status/warning card, with readable spacing. */
+    private fun sentenceLines(value: String): String =
+        value.trim()
+            .split(Regex("(?<=[.!?])\\s+"))
+            .map(String::trim)
+            .filter(String::isNotEmpty)
+            .joinToString("\n")
+
+    /** Camera JPEGs carry EXIF rotation; apply it so previews are upright (portrait selfies). */
+    private fun decodeUpright(bytes: ByteArray): Bitmap? {
+        val bitmap = BitmapFactory.decodeByteArray(bytes, 0, bytes.size) ?: return null
+        val orientation = runCatching {
+            ExifInterface(ByteArrayInputStream(bytes)).getAttributeInt(
+                ExifInterface.TAG_ORIENTATION, ExifInterface.ORIENTATION_NORMAL
+            )
+        }.getOrDefault(ExifInterface.ORIENTATION_NORMAL)
+        val matrix = Matrix()
+        when (orientation) {
+            ExifInterface.ORIENTATION_ROTATE_90 -> matrix.postRotate(90f)
+            ExifInterface.ORIENTATION_ROTATE_180 -> matrix.postRotate(180f)
+            ExifInterface.ORIENTATION_ROTATE_270 -> matrix.postRotate(270f)
+            ExifInterface.ORIENTATION_FLIP_HORIZONTAL -> matrix.postScale(-1f, 1f)
+            ExifInterface.ORIENTATION_FLIP_VERTICAL -> matrix.postScale(1f, -1f)
+            ExifInterface.ORIENTATION_TRANSPOSE -> {
+                matrix.postRotate(90f)
+                matrix.postScale(-1f, 1f)
+            }
+            ExifInterface.ORIENTATION_TRANSVERSE -> {
+                matrix.postRotate(270f)
+                matrix.postScale(-1f, 1f)
+            }
+            else -> return bitmap
+        }
+        return runCatching {
+            Bitmap.createBitmap(bitmap, 0, 0, bitmap.width, bitmap.height, matrix, true)
+                .also { if (it !== bitmap) bitmap.recycle() }
+        }.getOrDefault(bitmap)
+    }
+
     private fun statusColor(status: String) = when (status) {
         "VERIFIED" -> R.color.justitia_teal_success
         "PENDING", "UPLOADED" -> R.color.amber_dark
@@ -676,10 +828,10 @@ class MyDocumentsFragment : Fragment() {
         else -> R.drawable.ic_description
     }
 
-    private fun statusChip(status: String) = label(statusText(status), 12f, statusColor(status), true).apply {
+    private fun statusChip(doc: MyDocument) = label(statusLabel(doc), 12f, statusColor(doc.status), true).apply {
         background = GradientDrawable().apply {
             cornerRadius = dp(100).toFloat()
-            setColor(color(statusBackground(status)))
+            setColor(color(statusBackground(doc.status)))
         }
         setPadding(dp(10), dp(5), dp(10), dp(5))
     }
@@ -853,10 +1005,38 @@ class MyDocumentsFragment : Fragment() {
             .withZone(ZoneId.systemDefault()).format(Instant.parse(raw))
     }.getOrDefault(raw)
 
+    /** Bar enrollment accepts either the certificate (preferred) or the Bar Council ID card. */
+    private fun requirementLabel(doc: MyDocument): String = when {
+        doc.requirementGroup == "BAR_ENROLLMENT" && doc.required -> "Required · or Bar Council ID"
+        doc.requirementGroup == "BAR_ENROLLMENT" -> "Alternative bar proof"
+        doc.required -> "Required"
+        else -> "Optional"
+    }
+
+    /** PENDING is split by reason: re-upload states vs real manual-review conflicts. */
+    private fun statusLabel(doc: MyDocument): String {
+        if (doc.type == "SELFIE") {
+            return when (doc.status) {
+                "VERIFIED" -> "Verified"
+                "FAILED" -> "Selfie not verified"
+                "PENDING" -> "Selfie pending"
+                else -> statusText(doc.status)
+            }
+        }
+        return when {
+            doc.pendingReason == "PAN_WAITING_AADHAAR" -> "Waiting for Aadhaar"
+            doc.pendingReason?.endsWith("_UNREADABLE") == true -> "Re-upload required"
+            doc.pendingReason?.let {
+                it.endsWith("_REVIEW") || it.endsWith("_MISMATCH") || it.endsWith("_DUPLICATE")
+            } == true -> "Manual review"
+            else -> statusText(doc.status)
+        }
+    }
+
     private fun statusText(status: String): String = when (status) {
         "VERIFIED" -> "Verified"
         "UPLOADED" -> "Uploaded · Not verified"
-        "PENDING" -> "Verification pending"
+        "PENDING" -> "Manual review"
         "FAILED" -> "Verification failed"
         "REJECTED" -> "Rejected"
         else -> "Not uploaded"
@@ -880,19 +1060,20 @@ class MyDocumentsFragment : Fragment() {
         takePhoto.launch(cameraUri!!)
     }
 
-    private fun launchLiveQrScanner() {
-        val options = ScanOptions()
-            .setDesiredBarcodeFormats(ScanOptions.QR_CODE)
-            .setPrompt("Align the PAN QR inside the frame")
-            .setBeepEnabled(false)
-            .setOrientationLocked(true)
-            .setBarcodeImageEnabled(false)
-            .setCaptureActivity(PortraitCaptureActivity::class.java)
-        liveQrScanner.launch(options)
+    private fun launchLiveQrScanner(type: String) {
+        qrScanType = type
+        val prompt = getString(if (type == "AADHAAR") R.string.aadhaar_qr_scan_prompt
+        else R.string.pan_qr_scan_prompt)
+        liveQrScanner.launch(
+            Intent(requireContext(), QrScanActivity::class.java)
+                .putExtra(QrScanActivity.EXTRA_PROMPT, prompt)
+        )
     }
 
-    private fun chooseQrPhotoSource() {
-        MaterialAlertDialogBuilder(requireContext()).setTitle("Add a photo of the PAN QR")
+    private fun chooseQrPhotoSource(type: String) {
+        qrPhotoType = type
+        val name = if (type == "AADHAAR") "Aadhaar" else "PAN"
+        MaterialAlertDialogBuilder(requireContext()).setTitle("Add a photo of the $name QR")
             .setItems(arrayOf("Take photo", "Choose from files")) { _, which ->
                 if (which == 0) qrPhotoCameraPermission.launch(android.Manifest.permission.CAMERA)
                 else runCatching { qrPhotoPicker.launch("image/*") }
@@ -902,7 +1083,7 @@ class MyDocumentsFragment : Fragment() {
 
     private fun launchQrCamera() {
         val dir = File(requireContext().cacheDir, "document_captures").apply { mkdirs() }
-        val file = File.createTempFile("pan_qr_", ".jpg", dir)
+        val file = File.createTempFile("qr_", ".jpg", dir)
         val uri = FileProvider.getUriForFile(requireContext(),
             "${requireContext().packageName}.documents", file)
         documentState.qrCameraFile = file
@@ -910,13 +1091,17 @@ class MyDocumentsFragment : Fragment() {
         qrPhotoCamera.launch(uri)
     }
 
-    private fun submitQrPhoto(uri: Uri) {
-        setBusy(true, "Verifying PAN QR", "Reading the QR code from your photo…")
+    private fun submitQrImage(type: String, uri: Uri) {
+        val name = if (type == "AADHAAR") "Aadhaar" else "PAN"
+        setBusy(true, "Verifying $name QR", "Reading the signed QR…")
         viewLifecycleOwner.lifecycleScope.launch {
-            val result = runCatching { api.scanPanQr(uri) }
+            val result = runCatching {
+                if (type == "AADHAAR") api.submitAadhaarImage(uri) else api.submitPanImage(uri)
+            }
             documentState.discardQrCapture()
-            result.onSuccess { doc -> if (_binding != null) applyPanDocument(doc) }
-                .onFailure { if (_binding != null) message(it.message ?: "Could not verify the PAN QR.") }
+            if (uri.scheme == "file") uri.path?.let { File(it).delete() }
+            result.onSuccess { doc -> if (_binding != null) applyDocument(doc) }
+                .onFailure { if (_binding != null) message(it.message ?: "Could not verify the QR.") }
             if (_binding != null) setBusy(false)
         }
     }
@@ -931,10 +1116,10 @@ class MyDocumentsFragment : Fragment() {
             // The backend may already have saved the QR data even if the scan response
             // failed. Re-read the authoritative detail so the UI never stays stale.
             runCatching { api.detail("PAN") }
-                .onSuccess { doc -> applyPanDocument(doc) }
+                .onSuccess { doc -> applyDocument(doc) }
                 .onFailure {
                     val fallback = scannedDoc
-                    if (fallback != null) applyPanDocument(fallback)
+                    if (fallback != null) applyDocument(fallback)
                     else if (_binding != null) {
                         message(scanError ?: it.message ?: "Could not verify the PAN QR.")
                     }
@@ -943,20 +1128,33 @@ class MyDocumentsFragment : Fragment() {
         }
     }
 
-    private fun applyPanDocument(doc: MyDocument) {
+    private fun applyDocument(doc: MyDocument) {
         documentState.documents = documentState.documents?.map {
-            if (it.type == "PAN") doc else it
+            if (it.type == doc.type) doc else it
         }
-        selectedType = "PAN"
+        persistDocuments()
+        selectedType = doc.type
         selected = doc
         front = null
         back = null
         if (_binding == null) return
         renderDetail(doc)
         when (doc.status) {
-            "VERIFIED" -> message("PAN verified successfully.", ToastType.SUCCESS)
+            "VERIFIED" -> message("${doc.title} verified successfully.", ToastType.SUCCESS)
+            "PENDING" -> message(when {
+                doc.pendingReason == "PAN_WAITING_AADHAAR" ->
+                    "PAN QR verified. Verify your Aadhaar to finish."
+                doc.pendingReason?.endsWith("_QR_UNREADABLE") == true ->
+                    "${doc.title} QR could not be read. Upload e-Aadhaar/e-PAN or retry with a clearer photo."
+                else -> "${doc.title} sent for manual review."
+            }, ToastType.INFO)
             "FAILED", "REJECTED" -> scrollToStatusError()
         }
+    }
+
+    private fun openDocumentHelp() {
+        runCatching { startActivity(Intent(requireContext(), DocumentHelpActivity::class.java)) }
+            .onFailure { message(it.message ?: "Could not open the help page.") }
     }
 
     private fun selectedImage(uri: Uri) {
@@ -985,11 +1183,23 @@ class MyDocumentsFragment : Fragment() {
                     documentState.documents = documentState.documents?.map { existing ->
                         if (existing.type == type) it else existing
                     }
+                    persistDocuments()
                     front = null; back = null; documentState.clearCapturedFiles(); renderDetail(it)
                     if (it.status == "FAILED" || it.status == "REJECTED") {
                         scrollToStatusError()
                     } else if (it.status == "VERIFIED") {
                         message("${it.title} verified successfully.", ToastType.SUCCESS)
+                    } else if (it.status == "PENDING") {
+                        message(when (it.pendingReason) {
+                            "AADHAAR_QR_UNREADABLE" ->
+                                "Aadhaar QR could not be read. Upload e-Aadhaar or retry with a clear photo."
+                            "AADHAAR_OCR_UNREADABLE" ->
+                                "Printed Aadhaar details could not be read. Retry with a clearer photo."
+                            "PAN_WAITING_AADHAAR" -> "PAN QR verified. Verify your Aadhaar to finish."
+                            "PAN_QR_UNREADABLE" ->
+                                "PAN QR could not be read. Retry with a clearer photo or e-PAN."
+                            else -> "${it.title} sent for manual review."
+                        }, ToastType.INFO)
                     } else if (it.uploadOnly) {
                         message("${it.title} uploaded. Verification is not available yet.", ToastType.SUCCESS)
                     }
@@ -1005,8 +1215,8 @@ class MyDocumentsFragment : Fragment() {
         setBusy(true, "Opening image", "Loading the saved document photo…")
         viewLifecycleOwner.lifecycleScope.launch {
             runCatching {
-                val bytes = api.media(type, side)
-                BitmapFactory.decodeByteArray(bytes, 0, bytes.size) ?: error("Cannot open image.")
+                val bytes = loadMedia(type, side)
+                decodeUpright(bytes) ?: error("Cannot open image.")
             }.onSuccess { bitmap ->
                 if (isAdded) MaterialAlertDialogBuilder(requireContext())
                     .setTitle("${side.replaceFirstChar { it.uppercase() }} image")
@@ -1021,7 +1231,7 @@ class MyDocumentsFragment : Fragment() {
     private fun startDownload(type: String, side: String) {
         setBusy(true, "Preparing download", "Getting the saved document image…")
         viewLifecycleOwner.lifecycleScope.launch {
-            runCatching { api.media(type, side) }
+            runCatching { loadMedia(type, side) }
                 .onSuccess { bytes ->
                     downloadBytes = bytes
                     val extension = when {
@@ -1054,6 +1264,44 @@ class MyDocumentsFragment : Fragment() {
         ViewGroup.LayoutParams.WRAP_CONTENT
     ).apply { topMargin = (top * resources.displayMetrics.density).toInt() }
 
+    private fun persistDocuments() {
+        val docs = documentState.documents ?: return
+        viewLifecycleOwner.lifecycleScope.launch(Dispatchers.IO) { docsCache.save(docs) }
+    }
+
+    private fun friendlyError(error: Throwable): String {
+        val text = error.message.orEmpty().trim()
+        return if (text.isBlank() || text.contains("Exception") || text.length > 160)
+            "Could not load your documents. Check your connection and try again."
+        else text
+    }
+
+    private fun renderLoadError() {
+        stopSkeletons()
+        binding.documentsContent.removeAllViews()
+        val card = card(R.color.doc_warning_soft).apply {
+            addView(label("Couldn't load documents", 18f, R.color.navy_primary, true))
+            addView(label(
+                "You're offline or the server is unreachable. Reconnect and retry. Saved documents appear once they have been loaded online.",
+                13f, R.color.text_secondary), marginParams(8, false))
+            addAction(this, "Retry", true) { refresh(showInitialOverlay = true) }
+        }
+        binding.documentsContent.addView(card, marginParams(0))
+    }
+
+    private suspend fun loadMedia(type: String, side: String): ByteArray = withContext(Dispatchers.IO) {
+        try {
+            val bytes = api.media(type, side)
+            docsCache.saveImage(type, side, bytes)
+            bytes
+        } catch (error: Exception) {
+            docsCache.image(type, side) ?: throw IllegalStateException(
+                if (NetworkMonitor.online.value) "Could not load this image. Please try again."
+                else "This image isn't available offline."
+            )
+        }
+    }
+
     private fun message(text: String, type: ToastType = ToastType.ERROR) {
         if (isAdded) Toast.makeText(requireContext(), text, Toast.LENGTH_LONG, type).show()
     }
@@ -1083,6 +1331,8 @@ class MyDocumentsFragment : Fragment() {
         loadingAnimator?.cancel()
         skeletonAnimator?.cancel()
         submitProgressAnimator?.cancel()
+        submitPercentJob?.cancel()
+        submitPercentJob = null
         super.onDestroyView()
         _binding = null
         aadhaarValueView = null

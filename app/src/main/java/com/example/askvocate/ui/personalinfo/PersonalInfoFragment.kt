@@ -338,7 +338,10 @@ class PersonalInfoFragment : Fragment() {
                             userId,
                             name,
                             email,
-                            userRole
+                            userRole,
+                            SessionManager.getAuthProvider(requireContext()),
+                            SessionManager.getProfileImageUrl(requireContext()).ifBlank { null },
+                            SessionManager.getAppToken(requireContext()).ifBlank { null }
                         )
                         cacheProfile(name, email, phone, address)
                         // Update View Mode with new data

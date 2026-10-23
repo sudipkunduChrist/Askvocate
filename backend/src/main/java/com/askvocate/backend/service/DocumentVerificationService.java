@@ -154,7 +154,7 @@ public class DocumentVerificationService {
         // the trusted source; OCR alone cannot mark the document VERIFIED.
         AadhaarQrScan qrScan = documentType == DocumentType.AADHAAR
                 ? readAadhaarQr(backImage, frontImage, extractionResult.extractedFields(),
-                        extractionResult.maskedDocumentNumber(), userId)
+                        extractionResult.maskedDocumentNumber())
                 : null;
         QrData qrData = qrScan == null ? null : qrScan.data();
         boolean qrVerified = qrScan != null && qrScan.verified();
@@ -175,57 +175,142 @@ public class DocumentVerificationService {
                         ocrSuccess ? extractionResult.extractedFields() : null,
                         extractionResult.panNumber(), extractionResult.confidence(),
                         panQrScan.data());
+                status = panEvaluation.status();
             } else {
-                panEvaluation = ocrSuccess
-                        ? evaluatePan(userId, extractionResult.extractedFields(),
-                            extractionResult.panNumber(), extractionResult.confidence())
-                        : new PanEvaluation(VerificationStatus.FAILED, List.of(),
-                            extractionResult.error(), false);
+                // No signed QR: never auto-verify PAN from OCR alone. Keep the submitted
+                // image and route the submission to manual review.
+                status = VerificationStatus.PENDING;
             }
-            status = panEvaluation.status();
         } else if (documentType != DocumentType.AADHAAR) {
-            status = ocrSuccess ? VerificationStatus.VERIFIED : VerificationStatus.FAILED;
-        } else if (qrVerified && !qrMismatch && ocrSuccess) {
-            status = VerificationStatus.VERIFIED;
-        } else if (qrVerified) {
+            // Bar Council, COP, Degree and AIBE are evidenced by the uploaded
+            // certificate and reviewed manually; OCR alone never verifies them.
             status = VerificationStatus.PENDING;
+        } else if (qrVerified) {
+            // The signed UIDAI QR is the authority; printed OCR is no longer a gate.
+            status = VerificationStatus.VERIFIED;
         } else {
-            status = VerificationStatus.FAILED;
+            // QR side unreadable: ask for an e-Aadhaar or a clearer QR photo.
+            status = VerificationStatus.PENDING;
         }
 
         String aadhaarFailureReason = null;
         String manualReviewReason = null;
         if (documentType == DocumentType.PAN && status == VerificationStatus.PENDING) {
-            manualReviewReason = panEvaluation.manualReason();
-            if (panQrScan == null && panQrAttempt.failureReason() != null) {
-                manualReviewReason += " PAN QR was not usable: " + panQrAttempt.failureReason();
-            }
-        }
-        if (documentType == DocumentType.AADHAAR) {
-            if (status == VerificationStatus.PENDING) {
-                List<String> mismatchFields = qrScan.mismatchFields();
-                manualReviewReason = qrMismatch
-                        ? "Printed Aadhaar fields do not match the signed QR: "
-                            + String.join(", ", mismatchFields.isEmpty()
-                                ? List.of("printed fields") : mismatchFields) + "."
-                        : "Signed Aadhaar QR verified, but the printed fields could not be read: "
-                            + Objects.toString(extractionResult.error(), "OCR extraction failed.");
-            } else if (status == VerificationStatus.FAILED) {
-                String qrReason = qrScan != null && qrScan.reason() != null && !qrScan.reason().isBlank()
-                        ? qrScan.reason()
-                        : "Aadhaar Secure QR could not be verified; upload a clear photo of the QR side.";
-                aadhaarFailureReason = ocrSuccess || extractionResult.error() == null
-                        ? qrReason : qrReason + " " + extractionResult.error();
-                if (failureFile == null && qrScan != null) {
-                    failureFile = "front".equals(qrScan.side())
-                            ? safeFileName(frontImage) : safeFileName(backImage);
+            if (panEvaluation != null) {
+                manualReviewReason = panEvaluation.manualReason();
+            } else {
+                manualReviewReason = "PAN QR could not be read. Retry the scan or upload a clearer "
+                        + "photo of the QR, or upload your e-PAN.";
+                if (panQrAttempt.failureReason() != null && !panQrAttempt.failureReason().isBlank()) {
+                    manualReviewReason += " " + panQrAttempt.failureReason();
                 }
             }
         }
+        if (documentType == DocumentType.AADHAAR && status == VerificationStatus.PENDING) {
+            String qrReason = qrScan != null && qrScan.reason() != null && !qrScan.reason().isBlank()
+                    ? qrScan.reason()
+                    : "Aadhaar Secure QR could not be verified; upload a clear photo of the QR side.";
+            manualReviewReason = "Aadhaar QR could not be read. Upload a clear photo of the QR side, "
+                    + "or your free e-Aadhaar from uidai.gov.in. " + qrReason;
+            if (!ocrSuccess && extractionResult.error() != null) {
+                manualReviewReason += " " + extractionResult.error();
+            }
+        }
 
-        // Failed verification uploads are discarded; PENDING keeps images for manual review.
-        if (status == VerificationStatus.FAILED) {
-            log.info("Document verification failed; cleaning temporary Cloudinary assets for documentType={}", documentType);
+        // Certificate-backed documents: compare the printed name with the profile and
+        // detect a duplicate Bar Council enrollment number.
+        boolean isBarDocument = documentType == DocumentType.BAR_COUNCIL_ID
+                || documentType == DocumentType.BAR_CERTIFICATE
+                || documentType == DocumentType.CERTIFICATE_OF_PRACTICE;
+        String extractedName = extractionResult.extractedFields().get("name");
+        String profileName = lawyerProfileName(userId);
+        boolean certificateNameMismatch = extractedName != null && profileName != null
+                && !barCouncilValidationService.isNameMatching(extractedName, profileName);
+        String enrollmentNumber = extractionResult.extractedFields().get("enrollmentNumber");
+        String enrollmentHash = null;
+        boolean duplicateEnrollment = false;
+        if (isBarDocument && enrollmentNumber != null && !enrollmentNumber.isBlank()) {
+            enrollmentHash = hashEnrollment(enrollmentNumber);
+            Optional<UserDocument> duplicate = documentRepository.findByEnrollmentNumberHash(enrollmentHash);
+            duplicateEnrollment = duplicate.isPresent()
+                    && !Objects.equals(userId, duplicate.get().getUserId());
+        }
+
+        // Manual review is reserved for data conflicts that a retry cannot fix.
+        // Every other pending outcome is a re-upload state and auto-approves on a correct retry.
+        String pendingReason = null;
+        boolean requiresManualReview = false;
+        if (status == VerificationStatus.PENDING) {
+            if (documentType == DocumentType.AADHAAR) {
+                // QR verified is VERIFIED; only an unreadable QR remains pending.
+                pendingReason = "AADHAAR_QR_UNREADABLE";
+            } else if (documentType == DocumentType.PAN) {
+                if (panQrScan == null) {
+                    pendingReason = "PAN_QR_UNREADABLE";
+                } else if (panEvaluation != null && panEvaluation.duplicate()) {
+                    pendingReason = "PAN_DUPLICATE";
+                    requiresManualReview = true;
+                } else if (panEvaluation != null && !panEvaluation.mismatches().isEmpty()) {
+                    pendingReason = "PAN_MISMATCH";
+                    requiresManualReview = true;
+                } else {
+                    pendingReason = "PAN_WAITING_AADHAAR";
+                }
+            } else {
+                String prefix = switch (documentType) {
+                    case BAR_COUNCIL_ID, BAR_CERTIFICATE, CERTIFICATE_OF_PRACTICE -> "BAR";
+                    case DEGREE_CERTIFICATE -> "DEGREE";
+                    case AIBE_CERTIFICATE -> "AIBE";
+                    default -> "DOC";
+                };
+                if (!ocrSuccess) {
+                    pendingReason = prefix + "_OCR_UNREADABLE";
+                } else if (duplicateEnrollment) {
+                    pendingReason = "BAR_DUPLICATE";
+                    requiresManualReview = true;
+                } else if (certificateNameMismatch) {
+                    pendingReason = prefix + "_MISMATCH";
+                    requiresManualReview = true;
+                } else {
+                    pendingReason = prefix + "_REVIEW";
+                    requiresManualReview = true;
+                }
+            }
+        }
+        if ("PAN_WAITING_AADHAAR".equals(pendingReason)) {
+            manualReviewReason = "PAN QR verified. Verify your Aadhaar to complete PAN verification automatically.";
+        }
+        if (status == VerificationStatus.PENDING && documentType != DocumentType.AADHAAR
+                && documentType != DocumentType.PAN) {
+            manualReviewReason = switch (pendingReason == null ? "" : pendingReason) {
+                case "BAR_OCR_UNREADABLE", "DEGREE_OCR_UNREADABLE", "AIBE_OCR_UNREADABLE" ->
+                        "Could not read this certificate. Re-upload a clearer photo.";
+                case "BAR_DUPLICATE" ->
+                        "This Bar Council enrollment number is already registered to another account. "
+                        + "Manual review is in progress.";
+                case "BAR_MISMATCH", "DEGREE_MISMATCH", "AIBE_MISMATCH" ->
+                        "The name on the certificate does not match your profile. "
+                        + "Manual review is in progress.";
+                default -> "Certificate uploaded. Manual verification is in progress.";
+            };
+        }
+
+        // PAN evidence is kept only when the card is fully auto-verified, the QR was
+        // unreadable (re-upload evidence), or it is only waiting for Aadhaar to verify.
+        // Mismatch, duplicate, organization and invalid outcomes discard the uploads.
+        boolean panWaitingForAadhaar = documentType == DocumentType.PAN
+                && panQrScan != null
+                && panEvaluation != null
+                && panEvaluation.status() == VerificationStatus.PENDING
+                && !panEvaluation.duplicate()
+                && panEvaluation.mismatches().isEmpty();
+        boolean keepPanEvidence = status == VerificationStatus.VERIFIED
+                || panQrScan == null
+                || panWaitingForAadhaar;
+        boolean discardUploads = status == VerificationStatus.FAILED
+                || (documentType == DocumentType.PAN && !keepPanEvidence);
+        if (discardUploads) {
+            log.info("Cleaning temporary Cloudinary assets: type={}, status={}", documentType, status);
             cleanupCloudinaryAssets(cloudinaryRefs);
             cloudinaryRefs = new ArrayList<>();
         }
@@ -236,6 +321,8 @@ public class DocumentVerificationService {
         String previousQrPhoto = userDocument.getQrData() == null
                 ? null : userDocument.getQrData().getPhotoPublicId();
         String previousPanQrPhoto = userDocument.getPanQrPhotoPublicId();
+        List<CloudinaryRef> previousRefs = userDocument.getCloudinaryReferences() == null
+                ? List.of() : new ArrayList<>(userDocument.getCloudinaryReferences());
 
         userDocument.setUserId(userId);
         userDocument.setDocumentType(documentType);
@@ -243,13 +330,29 @@ public class DocumentVerificationService {
         userDocument.setVerificationStatus(status);
         Map<String, String> panQrFields = documentType == DocumentType.PAN && panQrScan != null
                 ? panQrFields(panQrScan.data()) : null;
+        Map<String, String> aadhaarQrFields = null;
+        if (documentType == DocumentType.AADHAAR && qrData != null) {
+            aadhaarQrFields = new LinkedHashMap<>();
+            putIfPresent(aadhaarQrFields, "name", qrData.getName());
+            putIfPresent(aadhaarQrFields, "dob", qrData.getDob());
+            putIfPresent(aadhaarQrFields, "gender", fullGender(qrData.getGender()));
+            putIfPresent(aadhaarQrFields, "address", qrData.getAddress());
+            putIfPresent(aadhaarQrFields, "pincode", qrData.getPincode());
+            putIfPresent(aadhaarQrFields, "aadhaarLast4", qrData.getAadhaarLast4());
+        }
         userDocument.setExtractedData(documentType == DocumentType.PAN && panQrFields != null
                 ? panQrFields
-                : documentType == DocumentType.AADHAAR || documentType == DocumentType.PAN
-                    || extractionResult.success()
-                    ? extractionResult.extractedFields() : Map.of());
-        userDocument.setMaskedDocumentNumber(documentType == DocumentType.AADHAAR || extractionResult.success()
-                ? extractionResult.maskedDocumentNumber() : null);
+                : aadhaarQrFields != null
+                    ? aadhaarQrFields
+                    : documentType == DocumentType.AADHAAR || documentType == DocumentType.PAN
+                        || extractionResult.success()
+                        ? extractionResult.extractedFields() : Map.of());
+        if (documentType == DocumentType.AADHAAR && qrData != null && qrData.getAadhaarLast4() != null) {
+            userDocument.setMaskedDocumentNumber("XXXX-XXXX-" + qrData.getAadhaarLast4());
+        } else {
+            userDocument.setMaskedDocumentNumber(documentType == DocumentType.AADHAAR || extractionResult.success()
+                    ? extractionResult.maskedDocumentNumber() : null);
+        }
         userDocument.setAadhaarNumber(documentType == DocumentType.AADHAAR
                 ? extractionResult.aadhaarNumber() : null);
         userDocument.setAadhaarNumberHash(documentType == DocumentType.AADHAAR
@@ -259,16 +362,27 @@ public class DocumentVerificationService {
                 : null;
         userDocument.setPanNumber(panNumber);
         userDocument.setPanNumberHash(documentType == DocumentType.PAN ? hashPan(panNumber) : null);
+        userDocument.setEnrollmentNumberHash(isBarDocument ? enrollmentHash : null);
         if (documentType == DocumentType.PAN && panNumber != null) {
             userDocument.setMaskedDocumentNumber(ocrExtractionService.maskPan(panNumber));
         }
         if (documentType == DocumentType.PAN) {
+            // The QR-embedded photo is kept for a verified PAN or while waiting for Aadhaar.
+            boolean keepQrPhoto = panQrScan != null
+                    && (status == VerificationStatus.VERIFIED || panWaitingForAadhaar);
             userDocument.setPanQrData(panQrScan == null ? null : panQrScan.data());
             userDocument.setPanQrRawText(panQrScan == null ? null : panQrScan.rawText());
             userDocument.setIsPanQrVerified(panQrScan != null);
             userDocument.setPanQrVersion(panQrScan == null ? null : panQrScan.version());
-            userDocument.setPanQrPhotoUrl(panQrScan == null ? null : panQrScan.photoUrl());
-            userDocument.setPanQrPhotoPublicId(panQrScan == null ? null : panQrScan.photoPublicId());
+            userDocument.setPanQrPhotoUrl(keepQrPhoto ? panQrScan.photoUrl() : null);
+            userDocument.setPanQrPhotoPublicId(keepQrPhoto ? panQrScan.photoPublicId() : null);
+            if (!keepQrPhoto && panQrScan != null && panQrScan.photoPublicId() != null) {
+                try {
+                    cloudinaryService.delete(panQrScan.photoPublicId());
+                } catch (Exception error) {
+                    log.warn("Could not delete unused PAN QR photo: {}", error.getClass().getSimpleName());
+                }
+            }
         }
         userDocument.setCrossDocumentMismatchFields(documentType == DocumentType.PAN
                 && panEvaluation != null && !panEvaluation.mismatches().isEmpty()
@@ -277,25 +391,37 @@ public class DocumentVerificationService {
         userDocument.setReviewedAt(null);
         userDocument.setReviewDecision(null);
         userDocument.setReviewNotes(null);
-        userDocument.setCloudinaryReferences(cloudinaryRefs);
+        boolean discardPanEvidence = documentType == DocumentType.PAN && discardUploads;
+        if (discardPanEvidence) {
+            // PAN images are only kept for auto-verified or QR-unreadable manual review.
+            userDocument.setCloudinaryReferences(new ArrayList<>());
+        } else if (status == VerificationStatus.FAILED && !previousRefs.isEmpty()) {
+            // Non-PAN hard failure: keep the last reviewable evidence.
+            userDocument.setCloudinaryReferences(previousRefs);
+        } else {
+            userDocument.setCloudinaryReferences(cloudinaryRefs);
+        }
         userDocument.setOcrConfidence(extractionResult.confidence());
         userDocument.setQrData(qrData);
         userDocument.setQrRawText(qrData == null ? null : qrData.getRawText());
         userDocument.setQrText(qrText(qrData));
+        userDocument.setRequiresManualReview(requiresManualReview);
+        userDocument.setPendingReason(pendingReason);
+        userDocument.setManualReviewReason(manualReviewReason);
+        userDocument.setAutoApproved(status == VerificationStatus.VERIFIED);
+        userDocument.setConfidenceScore(extractionResult.confidence());
         userDocument.setUpdatedAt(Instant.now());
         if (documentType == DocumentType.AADHAAR) {
             userDocument.setIsQrVerified(qrVerified);
             userDocument.setQrImageSide(qrScan == null ? null : qrScan.side());
             userDocument.setQrDecodedData(qrDecodedData(qrData));
-            userDocument.setQrPrintedMismatch(qrVerified ? qrMismatch : null);
-            userDocument.setQrMismatchFields(qrMismatch ? qrScan.mismatchFields() : null);
-            userDocument.setRequiresManualReview(status == VerificationStatus.PENDING);
+            userDocument.setQrPrintedMismatch(false);
+            userDocument.setQrMismatchFields(null);
             userDocument.setManualReviewReason(manualReviewReason);
             userDocument.setAutoApproved(status == VerificationStatus.VERIFIED);
             userDocument.setConfidenceScore(extractionResult.confidence());
         }
         if (documentType == DocumentType.PAN) {
-            userDocument.setRequiresManualReview(status == VerificationStatus.PENDING);
             userDocument.setManualReviewReason(manualReviewReason);
             userDocument.setAutoApproved(status == VerificationStatus.VERIFIED);
             userDocument.setConfidenceScore(extractionResult.confidence());
@@ -323,6 +449,23 @@ public class DocumentVerificationService {
         }
 
         UserDocument saved = documentRepository.save(userDocument);
+        // Only the latest submission is kept. Replace the previous Cloudinary assets
+        // (including manual-review evidence) instead of orphaning them.
+        if (!cloudinaryRefs.isEmpty() || discardPanEvidence) {
+            Set<String> keptIds = new HashSet<>();
+            for (CloudinaryRef ref : cloudinaryRefs) {
+                if (ref.getPublicId() != null) keptIds.add(ref.getPublicId());
+            }
+            for (CloudinaryRef old : previousRefs) {
+                if (old.getPublicId() != null && !keptIds.contains(old.getPublicId())) {
+                    try {
+                        cloudinaryService.delete(old.getPublicId());
+                    } catch (Exception error) {
+                        log.warn("Could not delete replaced document image: {}", error.getClass().getSimpleName());
+                    }
+                }
+            }
+        }
         if (previousQrPhoto != null && (qrData == null
                 || !previousQrPhoto.equals(qrData.getPhotoPublicId()))) {
             try {
@@ -392,7 +535,7 @@ public class DocumentVerificationService {
         fields.put("stateCouncil", validationResult.stateCouncil());
         fields.put("enrollmentYear", String.valueOf(validationResult.enrollmentYear()));
         fields.put("sequenceNumber", validationResult.sequenceNumber());
-        fields.put("verificationMethod", "DIRECT_BAR_COUNCIL_REGISTRY_VALIDATION");
+        fields.put("verificationMethod", "BAR_COUNCIL_NUMBER_FORMAT_CHECK");
 
         if (request.getAdvocateName() != null && !request.getAdvocateName().isBlank()) {
             fields.put("name", request.getAdvocateName().trim());
@@ -403,11 +546,19 @@ public class DocumentVerificationService {
 
         userDocument.setUserId(userId);
         userDocument.setDocumentType(DocumentType.BAR_COUNCIL_ID);
-        userDocument.setVerificationStatus(VerificationStatus.VERIFIED);
+        // Format validation alone is not proof; a certificate must be reviewed.
+        userDocument.setVerificationStatus(VerificationStatus.PENDING);
+        userDocument.setRequiresManualReview(true);
+        userDocument.setPendingReason("BAR_REVIEW");
+        userDocument.setManualReviewReason(
+                "Bar Council number format validated. Upload the enrollment certificate for manual review.");
+        userDocument.setAutoApproved(false);
+        userDocument.setVerifiedAt(null);
         userDocument.setMaskedDocumentNumber(validationResult.maskedNumber());
         userDocument.setExtractedData(fields);
+        userDocument.setEnrollmentNumberHash(hashEnrollment(validationResult.normalizedNumber()));
         userDocument.setOcrConfidence(1.0);
-        userDocument.setFailureReason(null);
+        userDocument.setFailureReason("Manual verification is required.");
         userDocument.setUpdatedAt(Instant.now());
 
         UserDocument saved = documentRepository.save(userDocument);
@@ -462,44 +613,29 @@ public class DocumentVerificationService {
                 .map(this::toResponse)
                 .toList();
 
-        boolean barCouncilVerified = documents.stream().anyMatch(d ->
-                (d.getDocumentType() == DocumentType.BAR_COUNCIL_ID
-                        || d.getDocumentType() == DocumentType.BAR_CERTIFICATE
-                        || d.getDocumentType() == DocumentType.CERTIFICATE_OF_PRACTICE)
-                        && d.getVerificationStatus() == VerificationStatus.VERIFIED
-        );
+        boolean experienced = expOpt.isPresent();
+        VerificationChecklist checklist = checklist(userId, documents, experienced);
+        boolean identityVerified = checklist.aadhaar() && checklist.pan() && checklist.selfie();
+        int completionPercentage = checklist.requiredCount() == 0 ? 0
+                : checklist.verifiedCount() * 100 / checklist.requiredCount();
+        boolean fullyVerified = checklist.verifiedCount() == checklist.requiredCount();
+        overallStatus = fullyVerified ? Verification_Status.VERIFIED : Verification_Status.PENDING;
 
-        boolean aadhaarVerified = documents.stream().anyMatch(this::isVerifiedAadhaar);
-
-        boolean panVerified = documents.stream().anyMatch(d ->
-                d.getDocumentType() == DocumentType.PAN
-                        && d.getVerificationStatus() == VerificationStatus.VERIFIED
-        );
-
-        boolean selfieVerified = documents.stream().anyMatch(d -> hasVerifiedSelfie(userId, d));
-        boolean identityVerified = aadhaarVerified && panVerified && selfieVerified;
-
-        int verifiedCount = (barCouncilVerified ? 1 : 0) + (aadhaarVerified ? 1 : 0)
-                + (panVerified ? 1 : 0) + (selfieVerified ? 1 : 0);
-        int completionPercentage = verifiedCount * 25;
-        if (verifiedCount < 4) overallStatus = Verification_Status.PENDING;
-
-        List<String> missing = new ArrayList<>();
-        if (!barCouncilVerified) missing.add("Bar Council ID / Certificate");
-        if (!aadhaarVerified) missing.add("Aadhaar Card (front + back)");
-        if (!panVerified) missing.add("PAN Card");
-        if (!selfieVerified) missing.add("Live Selfie");
-
-        String nextStep = missing.isEmpty()
-                ? "Bar Council, Aadhaar, PAN, and live selfie are verified."
-                : "Missing: " + String.join(" and ", missing) + " to achieve 100% document verification process complete (" + completionPercentage + "% completed).";
+        List<String> missing = missingRequired(checklist, experienced);
+        String nextStep = fullyVerified
+                ? "All documents required for this role are verified."
+                : "Missing: " + String.join(", ", missing) + " to complete verification ("
+                    + completionPercentage + "% completed).";
 
         Map<String, Object> summaryDetails = new LinkedHashMap<>();
         summaryDetails.put("totalDocumentsSubmitted", documents.size());
-        summaryDetails.put("isFullyVerified", completionPercentage == 100);
-        summaryDetails.put("mandatoryDocumentsRequired", 4);
-        summaryDetails.put("selfieVerified", selfieVerified);
-        summaryDetails.put("mandatoryDocumentsVerified", verifiedCount);
+        summaryDetails.put("isFullyVerified", fullyVerified);
+        summaryDetails.put("mandatoryDocumentsRequired", checklist.requiredCount());
+        summaryDetails.put("mandatoryDocumentsVerified", checklist.verifiedCount());
+        summaryDetails.put("selfieVerified", checklist.selfie());
+        summaryDetails.put("roleRequirements", experienced
+                ? "Bar enrollment, COP, AIBE, Aadhaar, PAN, live selfie"
+                : "Bar enrollment, LL.B. degree, Aadhaar, PAN, live selfie");
 
         return LawyerVerificationSummaryResponse.builder()
                 .userId(userId)
@@ -509,10 +645,16 @@ public class DocumentVerificationService {
                 .verificationStatus(overallStatus)
                 .barCouncilId(barCouncilId)
                 .completionPercentage(completionPercentage)
-                .barCouncilVerified(barCouncilVerified)
-                .aadhaarVerified(aadhaarVerified)
-                .panVerified(panVerified)
+                .barCouncilVerified(checklist.barEnrollment())
+                .aadhaarVerified(checklist.aadhaar())
+                .panVerified(checklist.pan())
                 .identityVerified(identityVerified)
+                .barEnrollmentVerified(checklist.barEnrollment())
+                .copVerified(checklist.cop())
+                .aibeVerified(checklist.aibe())
+                .degreeVerified(checklist.degree())
+                .requiredDocumentCount(checklist.requiredCount())
+                .verifiedDocumentCount(checklist.verifiedCount())
                 .nextStep(nextStep)
                 .verifiedDocuments(docResponses)
                 .summaryDetails(summaryDetails)
@@ -571,35 +713,18 @@ public class DocumentVerificationService {
             allDocs.add(doc);
         }
 
-        boolean hasBarCouncilVerified = allDocs.stream().anyMatch(d ->
-                (d.getDocumentType() == DocumentType.BAR_COUNCIL_ID
-                        || d.getDocumentType() == DocumentType.BAR_CERTIFICATE
-                        || d.getDocumentType() == DocumentType.CERTIFICATE_OF_PRACTICE)
-                        && d.getVerificationStatus() == VerificationStatus.VERIFIED
-        );
+        boolean experienced = expOpt.isPresent();
+        VerificationChecklist checklist = checklist(userId, allDocs, experienced);
+        boolean isFullyVerified = checklist.verifiedCount() == checklist.requiredCount();
+        int percentage = checklist.requiredCount() == 0 ? 0
+                : checklist.verifiedCount() * 100 / checklist.requiredCount();
 
-        boolean hasAadhaarVerified = allDocs.stream().anyMatch(this::isVerifiedAadhaar);
-
-        boolean hasPanVerified = allDocs.stream().anyMatch(d ->
-                d.getDocumentType() == DocumentType.PAN
-                        && d.getVerificationStatus() == VerificationStatus.VERIFIED
-        );
-
-        boolean hasSelfieVerified = allDocs.stream().anyMatch(d -> hasVerifiedSelfie(userId, d));
-        int verifiedCount = (hasBarCouncilVerified ? 1 : 0) + (hasAadhaarVerified ? 1 : 0)
-                + (hasPanVerified ? 1 : 0) + (hasSelfieVerified ? 1 : 0);
-        int percentage = verifiedCount * 25;
-        boolean isFullyVerified = verifiedCount == 4;
-
-        List<String> remainingDocs = new ArrayList<>();
-        if (!hasBarCouncilVerified) remainingDocs.add("Bar Council ID / Certificate");
-        if (!hasAadhaarVerified) remainingDocs.add("Aadhaar Card");
-        if (!hasPanVerified) remainingDocs.add("PAN Card");
-        if (!hasSelfieVerified) remainingDocs.add("Live Selfie");
+        List<String> remainingDocs = missingRequired(checklist, experienced);
 
         String progressMsg = isFullyVerified
-                ? "Bar Council, Aadhaar, PAN, and live selfie verified."
-                : doc.getDocumentType() + " processed (" + percentage + "% complete). Missing: " + String.join(", ", remainingDocs) + ".";
+                ? "All required documents are verified."
+                : doc.getDocumentType() + " processed (" + percentage + "% complete). Missing: "
+                    + String.join(", ", remainingDocs) + ".";
 
         if (expOpt.isEmpty() && fresherOpt.isEmpty()) {
             throw new DocumentVerificationException("Invalid userID or lawyer role.");
@@ -630,7 +755,7 @@ public class DocumentVerificationService {
                 lawyerExperiencedProfileRepository.save(exp);
                 return new LawyerUpdateResult(true, Verification_Status.PENDING, nameMatch,
                         doc.getVerificationStatus() == VerificationStatus.PENDING
-                                ? "Aadhaar is pending signed QR and printed-field matching: " + doc.getManualReviewReason()
+                                ? doc.getDocumentType() + " is pending review: " + doc.getManualReviewReason()
                                 : "Document verification failed: " + doc.getFailureReason());
             }
         } else {
@@ -658,7 +783,7 @@ public class DocumentVerificationService {
                 lawyerFresherProfileRepository.save(fresher);
                 return new LawyerUpdateResult(true, Verification_Status.PENDING, nameMatch,
                         doc.getVerificationStatus() == VerificationStatus.PENDING
-                                ? "Aadhaar is pending signed QR and printed-field matching: " + doc.getManualReviewReason()
+                                ? doc.getDocumentType() + " is pending review: " + doc.getManualReviewReason()
                                 : "Document verification failed: " + doc.getFailureReason());
             }
         }
@@ -672,6 +797,17 @@ public class DocumentVerificationService {
     private Optional<LawyerFresherProfile> findFresherLawyer(String userId) {
         return lawyerFresherProfileRepository.findById(userId)
                 .filter(profile -> profile.getRole() == Role.LAWYER_FRESHER);
+    }
+
+    private String lawyerProfileName(String userId) {
+        return findExperiencedLawyer(userId).map(LawyerExperiencedProfile::getName)
+                .or(() -> findFresherLawyer(userId).map(LawyerFresherProfile::getName))
+                .orElse(null);
+    }
+
+    private String hashEnrollment(String number) {
+        return number == null || number.isBlank() ? null
+                : hashIdentity(number.replaceAll("[\\s-]", "").toUpperCase());
     }
 
     // OCR is required for verification. A failed upload cannot create local identity data.
@@ -768,17 +904,50 @@ public class DocumentVerificationService {
         });
     }
 
-    private boolean hasAllRequiredDocuments(String userId, List<UserDocument> documents) {
-        boolean bar = documents.stream().anyMatch(d ->
-                (d.getDocumentType() == DocumentType.BAR_COUNCIL_ID
-                        || d.getDocumentType() == DocumentType.BAR_CERTIFICATE
-                        || d.getDocumentType() == DocumentType.CERTIFICATE_OF_PRACTICE)
-                        && d.getVerificationStatus() == VerificationStatus.VERIFIED);
-        boolean aadhaar = documents.stream().anyMatch(this::isVerifiedAadhaar);
-        boolean pan = documents.stream().anyMatch(d -> d.getDocumentType() == DocumentType.PAN
+    private boolean isVerifiedType(List<UserDocument> documents, DocumentType type) {
+        return documents.stream().anyMatch(d -> d.getDocumentType() == type
                 && d.getVerificationStatus() == VerificationStatus.VERIFIED);
+    }
+
+    private boolean isBarEnrollmentVerified(List<UserDocument> documents) {
+        return isVerifiedType(documents, DocumentType.BAR_CERTIFICATE)
+                || isVerifiedType(documents, DocumentType.BAR_COUNCIL_ID);
+    }
+
+    private record VerificationChecklist(boolean barEnrollment, boolean cop, boolean aibe, boolean degree,
+            boolean aadhaar, boolean pan, boolean selfie, int verifiedCount, int requiredCount) {}
+
+    /** Role-based mandatory set: experienced needs COP+AIBE, freshers need an LL.B. degree. */
+    private VerificationChecklist checklist(String userId, List<UserDocument> documents, boolean experienced) {
+        boolean bar = isBarEnrollmentVerified(documents);
+        boolean cop = isVerifiedType(documents, DocumentType.CERTIFICATE_OF_PRACTICE);
+        boolean aibe = isVerifiedType(documents, DocumentType.AIBE_CERTIFICATE);
+        boolean degree = isVerifiedType(documents, DocumentType.DEGREE_CERTIFICATE);
+        boolean aadhaar = documents.stream().anyMatch(this::isVerifiedAadhaar);
+        boolean pan = isVerifiedType(documents, DocumentType.PAN);
         boolean selfie = documents.stream().anyMatch(d -> hasVerifiedSelfie(userId, d));
-        return bar && aadhaar && pan && selfie;
+        int required = experienced ? 6 : 5;
+        int verified = (bar ? 1 : 0) + (aadhaar ? 1 : 0) + (pan ? 1 : 0) + (selfie ? 1 : 0)
+                + (experienced ? (cop ? 1 : 0) + (aibe ? 1 : 0) : (degree ? 1 : 0));
+        return new VerificationChecklist(bar, cop, aibe, degree, aadhaar, pan, selfie, verified, required);
+    }
+
+    private List<String> missingRequired(VerificationChecklist c, boolean experienced) {
+        List<String> missing = new ArrayList<>();
+        if (!c.barEnrollment()) missing.add("Bar Council enrollment certificate");
+        if (experienced && !c.cop()) missing.add("Certificate of Practice");
+        if (experienced && !c.aibe()) missing.add("AIBE certificate");
+        if (!experienced && !c.degree()) missing.add("LL.B. degree certificate");
+        if (!c.aadhaar()) missing.add("Aadhaar Card");
+        if (!c.pan()) missing.add("PAN Card");
+        if (!c.selfie()) missing.add("Live Selfie");
+        return missing;
+    }
+
+    private boolean hasAllRequiredDocuments(String userId, List<UserDocument> documents) {
+        boolean experienced = findExperiencedLawyer(userId).isPresent();
+        VerificationChecklist c = checklist(userId, documents, experienced);
+        return c.verifiedCount() == c.requiredCount();
     }
 
     private boolean isVerifiedAadhaar(UserDocument document) {
@@ -911,48 +1080,23 @@ public class DocumentVerificationService {
         if (value != null && !value.isBlank()) values.put(key, value);
     }
 
+    private String fullGender(String value) {
+        if (value == null) return null;
+        return switch (value.trim().toUpperCase()) {
+            case "M", "MALE" -> "MALE";
+            case "F", "FEMALE" -> "FEMALE";
+            case "T", "TRANSGENDER" -> "TRANSGENDER";
+            default -> value;
+        };
+    }
+
     private String normalizePan(String value) {
         return value == null ? "" : value.replaceAll("[\\s-]", "").toUpperCase();
     }
 
     /**
-     * PAN has no signed QR. It is auto-verified only when OCR succeeds and the name/DOB match
-     * the signed Aadhaar QR. Duplicates, mismatches, and PAN-before-Aadhaar go to admin review.
+     * Resolves the verified Aadhaar signed QR, which is the trust anchor PAN is matched against.
      */
-    private PanEvaluation evaluatePan(String userId, Map<String, String> fields,
-                                      String panNumber, double confidence) {
-        String panHash = hashPan(panNumber);
-        if (panHash != null) {
-            Optional<UserDocument> duplicate = documentRepository.findByPanNumberHash(panHash);
-            if (duplicate.isPresent() && !Objects.equals(userId, duplicate.get().getUserId())) {
-                return new PanEvaluation(VerificationStatus.PENDING, List.of(),
-                        "PAN is already registered to another account.", true);
-            }
-        }
-        if (confidence < 0.5) {
-            return new PanEvaluation(VerificationStatus.PENDING, List.of(),
-                    "PAN OCR confidence is too low for automatic verification; review the image.", false);
-        }
-        QrData qr = verifiedAadhaarQr(userId);
-        if (qr == null) {
-            return new PanEvaluation(VerificationStatus.PENDING, List.of(),
-                    "Verified Aadhaar QR is required before PAN can be auto-verified.", false);
-        }
-        List<String> mismatches = new ArrayList<>();
-        if (!barCouncilValidationService.isNameMatching(fields.get("name"), qr.getName())) {
-            mismatches.add("name");
-        }
-        if (!datesMatch(fields.get("dob"), qr.getDob())) {
-            mismatches.add("dob");
-        }
-        if (mismatches.isEmpty()) {
-            return new PanEvaluation(VerificationStatus.VERIFIED, List.of(), null, false);
-        }
-        return new PanEvaluation(VerificationStatus.PENDING, List.copyOf(mismatches),
-                "PAN fields do not match the signed Aadhaar QR: "
-                        + String.join(", ", mismatches) + ".", false);
-    }
-
     private QrData verifiedAadhaarQr(String userId) {
         return documentRepository.findByUserIdAndDocumentType(userId, DocumentType.AADHAAR)
                 .filter(doc -> doc.getVerificationStatus() == VerificationStatus.VERIFIED)
@@ -980,6 +1124,25 @@ public class DocumentVerificationService {
         return null;
     }
 
+    /** Manual review is only for conflicts a retry cannot fix. */
+    private String panPendingReason(PanEvaluation evaluation) {
+        if (evaluation == null || evaluation.status() != VerificationStatus.PENDING) return null;
+        if (evaluation.duplicate()) return "PAN_DUPLICATE";
+        if (!evaluation.mismatches().isEmpty()) return "PAN_MISMATCH";
+        return "PAN_WAITING_AADHAAR";
+    }
+
+    private boolean panRequiresManualReview(PanEvaluation evaluation) {
+        String reason = panPendingReason(evaluation);
+        return "PAN_DUPLICATE".equals(reason) || "PAN_MISMATCH".equals(reason);
+    }
+
+    private String panReviewReason(PanEvaluation evaluation) {
+        return "PAN_WAITING_AADHAAR".equals(panPendingReason(evaluation))
+                ? "PAN QR verified. Verify your Aadhaar to complete PAN verification automatically."
+                : evaluation.manualReason();
+    }
+
     /** A PAN submitted before Aadhaar becomes eligible once the signed Aadhaar QR is verified. */
     private void reevaluatePendingPan(String userId) {
         Optional<UserDocument> panOpt = documentRepository.findByUserIdAndDocumentType(userId, DocumentType.PAN);
@@ -996,17 +1159,15 @@ public class DocumentVerificationService {
             if (qrPan != null) pan.setMaskedDocumentNumber(ocrExtractionService.maskPan(qrPan));
             pan.setExtractedData(panQrFields(pan.getPanQrData()));
         } else {
-            Map<String, String> fields = pan.getExtractedData();
-            if (fields == null || !fields.containsKey("name") || !fields.containsKey("dob")
-                    || pan.getPanNumber() == null) return;
-            evaluation = evaluatePan(userId, fields, pan.getPanNumber(),
-                    pan.getOcrConfidence() == null ? 0.0 : pan.getOcrConfidence());
+            // Manual submissions (no signed QR) never auto-verify, even after Aadhaar.
+            return;
         }
         pan.setVerificationStatus(evaluation.status());
         pan.setCrossDocumentMismatchFields(evaluation.mismatches().isEmpty()
                 ? null : evaluation.mismatches());
-        pan.setRequiresManualReview(evaluation.status() == VerificationStatus.PENDING);
-        pan.setManualReviewReason(evaluation.manualReason());
+        pan.setRequiresManualReview(panRequiresManualReview(evaluation));
+        pan.setPendingReason(panPendingReason(evaluation));
+        pan.setManualReviewReason(panReviewReason(evaluation));
         pan.setAutoApproved(evaluation.status() == VerificationStatus.VERIFIED);
         pan.setVerifiedAt(evaluation.status() == VerificationStatus.VERIFIED ? Instant.now() : null);
         pan.setFailureReason(evaluation.status() == VerificationStatus.VERIFIED
@@ -1066,12 +1227,19 @@ public class DocumentVerificationService {
         doc.setPanQrRawText(scan.rawText());
         doc.setIsPanQrVerified(true);
         doc.setPanQrVersion(scan.version());
-        doc.setPanQrPhotoUrl(scan.photoUrl());
-        doc.setPanQrPhotoPublicId(scan.photoPublicId());
+        // Keep the QR photo for a verified PAN or while it is waiting for Aadhaar.
+        boolean waitingForAadhaar = evaluation.status() == VerificationStatus.PENDING
+                && !evaluation.duplicate()
+                && evaluation.mismatches().isEmpty();
+        boolean keepQrPhoto = evaluation.status() == VerificationStatus.VERIFIED
+                || waitingForAadhaar;
+        doc.setPanQrPhotoUrl(keepQrPhoto ? scan.photoUrl() : null);
+        doc.setPanQrPhotoPublicId(keepQrPhoto ? scan.photoPublicId() : null);
         doc.setCrossDocumentMismatchFields(evaluation.mismatches().isEmpty()
                 ? null : evaluation.mismatches());
-        doc.setRequiresManualReview(evaluation.status() == VerificationStatus.PENDING);
-        doc.setManualReviewReason(evaluation.manualReason());
+        doc.setRequiresManualReview(panRequiresManualReview(evaluation));
+        doc.setPendingReason(panPendingReason(evaluation));
+        doc.setManualReviewReason(panReviewReason(evaluation));
         doc.setAutoApproved(evaluation.status() == VerificationStatus.VERIFIED);
         doc.setFailureReason(evaluation.status() == VerificationStatus.VERIFIED
                 ? null : evaluation.manualReason());
@@ -1084,6 +1252,13 @@ public class DocumentVerificationService {
         doc.setConfidenceScore(1.0);
         doc.setUpdatedAt(Instant.now());
         UserDocument saved = documentRepository.save(doc);
+        if (!keepQrPhoto && scan.photoPublicId() != null) {
+            try {
+                cloudinaryService.delete(scan.photoPublicId());
+            } catch (Exception error) {
+                log.warn("Could not delete unused PAN QR photo: {}", error.getClass().getSimpleName());
+            }
+        }
         if (previousPhoto != null && (scan.photoPublicId() == null
                 || !previousPhoto.equals(scan.photoPublicId()))) {
             try {
@@ -1104,9 +1279,36 @@ public class DocumentVerificationService {
 
     public UserDocument approveDocument(String documentId, String adminId, String notes) {
         UserDocument doc = requireReviewableDocument(documentId);
+        if (doc.getDocumentType() == DocumentType.AADHAAR
+                && !Boolean.TRUE.equals(doc.getIsQrVerified())) {
+            throw new DocumentVerificationException(
+                    "Aadhaar cannot be approved without a verified Secure QR. "
+                    + "Ask the applicant to upload e-Aadhaar or retry with a clear photo.");
+        }
+        if (doc.getDocumentType() == DocumentType.AADHAAR && doc.getQrData() != null) {
+            // Review resolves the printed-vs-QR mismatch in favour of the signed QR, so
+            // PAN and selfie verification keep working after approval.
+            QrData qr = doc.getQrData();
+            Map<String, String> fields = new LinkedHashMap<>();
+            putIfPresent(fields, "name", qr.getName());
+            putIfPresent(fields, "dob", qr.getDob());
+            String gender = switch (Objects.toString(qr.getGender(), "")) {
+                case "M" -> "MALE";
+                case "F" -> "FEMALE";
+                case "T" -> "TRANSGENDER";
+                default -> qr.getGender();
+            };
+            putIfPresent(fields, "gender", gender);
+            putIfPresent(fields, "address", qr.getAddress());
+            putIfPresent(fields, "pincode", qr.getPincode());
+            doc.setExtractedData(fields);
+            doc.setQrPrintedMismatch(false);
+            doc.setQrMismatchFields(null);
+        }
         doc.setVerificationStatus(VerificationStatus.VERIFIED);
         doc.setVerifiedAt(Instant.now());
         doc.setRequiresManualReview(false);
+        doc.setPendingReason(null);
         doc.setManualReviewReason(null);
         doc.setAutoApproved(false);
         doc.setFailureReason(null);
@@ -1128,6 +1330,7 @@ public class DocumentVerificationService {
         doc.setVerificationStatus(VerificationStatus.REJECTED);
         doc.setVerifiedAt(null);
         doc.setRequiresManualReview(false);
+        doc.setPendingReason(null);
         doc.setAutoApproved(false);
         doc.setFailureReason(rejection);
         doc.setFailureFile(null);
@@ -1144,9 +1347,8 @@ public class DocumentVerificationService {
     private UserDocument requireReviewableDocument(String documentId) {
         UserDocument doc = documentRepository.findById(documentId)
                 .orElseThrow(() -> new DocumentVerificationException("Document not found."));
-        if (doc.getDocumentType() != DocumentType.PAN) {
-            throw new DocumentVerificationException(
-                    "Manual review is currently available for PAN documents only.");
+        if (doc.getDocumentType() == null) {
+            throw new DocumentVerificationException("Document type is missing.");
         }
         if (doc.getRequiresManualReview() == null || !doc.getRequiresManualReview()) {
             throw new DocumentVerificationException("Document is not waiting for manual review.");
@@ -1192,11 +1394,6 @@ public class DocumentVerificationService {
                     null, safeFileName(frontImage));
         }
 
-        if (documentType == DocumentType.AADHAAR && (backImage == null || backImage.isEmpty())) {
-            throw new DocumentVerificationException(
-                    "Both front and back images are required for Aadhaar card verification.",
-                    null, safeFileName(backImage));
-        }
         if (documentType == DocumentType.PAN && backImage != null && !backImage.isEmpty()) {
             throw new DocumentVerificationException("PAN verification requires only the front image.",
                     null, safeFileName(backImage));
@@ -1208,17 +1405,17 @@ public class DocumentVerificationService {
     }
 
     private AadhaarQrScan readAadhaarQr(MultipartFile backImage, MultipartFile frontImage,
-                                        Map<String, String> printed, String maskedNumber, String userId) {
+                                        Map<String, String> printed, String maskedNumber) {
         AadhaarQrScan fromBack = backImage != null && !backImage.isEmpty()
-                ? decodeQr(backImage, "back", printed, maskedNumber, userId) : null;
+                ? decodeQr(backImage, "back", printed, maskedNumber) : null;
         if (fromBack != null && fromBack.verified()) return fromBack;
-        AadhaarQrScan fromFront = decodeQr(frontImage, "front", printed, maskedNumber, userId);
+        AadhaarQrScan fromFront = decodeQr(frontImage, "front", printed, maskedNumber);
         if (fromFront != null && fromFront.verified()) return fromFront;
         return fromBack != null ? fromBack : fromFront;
     }
 
     private AadhaarQrScan decodeQr(MultipartFile image, String side,
-                                   Map<String, String> printed, String maskedNumber, String userId) {
+                                   Map<String, String> printed, String maskedNumber) {
         if (image == null || image.isEmpty()) return null;
         try {
             VisionVerificationClient.QrResult qr = visionVerificationClient.verifyAadhaarQr(
@@ -1243,7 +1440,6 @@ public class DocumentVerificationService {
             data.setVersion(qr.version());
             data.setRawText(qr.rawText());
             data.setScannedAt(Instant.now());
-            storeQrPhoto(data, qr.photoBase64(), userId);
             boolean mismatch = Boolean.TRUE.equals(qr.printedMismatch()) || !mismatches.isEmpty();
             return new AadhaarQrScan(data, true, mismatch, mismatches, side, qr.reason());
         } catch (Exception error) {
@@ -1262,19 +1458,6 @@ public class DocumentVerificationService {
         } catch (Exception error) {
             log.warn("Could not serialize Aadhaar QR data: {}", error.getClass().getSimpleName());
             return values.toString();
-        }
-    }
-
-    private void storeQrPhoto(QrData data, String photoBase64, String userId) {
-        if (photoBase64 == null || photoBase64.isBlank()) return;
-        try {
-            byte[] bytes = Base64.getDecoder().decode(photoBase64);
-            CloudinaryRef ref = cloudinaryService.uploadBytes(bytes,
-                    "askvocate/documents/" + userId + "/AADHAAR/qr", "qr");
-            data.setPhotoUrl(ref.getSecureUrl());
-            data.setPhotoPublicId(ref.getPublicId());
-        } catch (Exception error) {
-            log.warn("Could not store Aadhaar QR photo: {}", error.getClass().getSimpleName());
         }
     }
 
@@ -1330,6 +1513,7 @@ public class DocumentVerificationService {
         response.setAutoApproved(doc.getAutoApproved());
         response.setRequiresManualReview(doc.getRequiresManualReview());
         response.setManualReviewReason(doc.getManualReviewReason());
+        response.setPendingReason(doc.getPendingReason());
         response.setVerifiedAt(doc.getVerifiedAt());
         return response;
     }

@@ -27,6 +27,7 @@ public interface UserDocumentRepository extends MongoRepository<UserDocument, St
 
     /** Find a document by its keyed PAN digest for duplicate detection. */
     Optional<UserDocument> findByPanNumberHash(String panNumberHash);
+    Optional<UserDocument> findByEnrollmentNumberHash(String enrollmentNumberHash);
 
     /** List documents that are waiting for manual review. */
     List<UserDocument> findByRequiresManualReviewTrue();

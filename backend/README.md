@@ -56,47 +56,66 @@ Before production rollout, reconcile that existing full-number/raw-image storage
 [UIDAI's offline-verification guidance](https://uidai.gov.in/images/Dos_and_Don_ts_for_Offline_Verification_Seeking_entities.pdf),
 which calls for retaining only the last four digits and redacting stored card copies.
 
-`POST /api/documents/verify` (lawyer accounts only) accepts Aadhaar `front` and `back`. Local Tesseract OCR
-reads the English name, labeled date of birth, gender, and full printed number from the front;
-it reads only the English `Address` field from the back. Multiple local English-only
-Tesseract reads are compared for Aadhaar images. OCR text is used transiently for
-field extraction and matching, then discarded; raw `ocrText` is not stored in MongoDB.
-The Aadhaar document becomes `VERIFIED` only when a signed UIDAI
-Secure QR is present and verifies, and the printed OCR fields match the QR data. A
-printed-field mismatch is stored as `PENDING` for manual review; a missing or invalid QR
-fails the upload and asks for a re-upload. OCR alone never establishes that a card is
-authentic. Versioned UIDAI Secure QR payloads (V2/V3/V4) and legacy 16-field payloads are
-both decoded. Masked Aadhaar cards/PDFs that show only the last four digits are accepted:
-the last four are matched against the signed QR, while the full 12-digit number stays
-unavailable because the QR does not contain it. When the signed QR verifies, its demographic
-data, version, certificate, raw payload, and embedded photo are stored once on the document
-(`qrData`); the photo is converted to JPEG and its Cloudinary URL is saved as
-`qrData.photoUrl`.
+#### Aadhaar
 
-PAN verification is free and local: OCR + format/type checks are compared with the signed
-Aadhaar QR name and date of birth. A match auto-verifies PAN; a mismatch, a duplicate PAN,
-or a PAN submitted before Aadhaar is verified becomes `PENDING` for admin review. Manual
-review uses a password login (`POST /api/admin/login`), then
-`GET /api/admin/verification/documents/pending?type=PAN`,
-`POST /api/admin/verification/documents/{id}/approve`, and
-`POST /api/admin/verification/documents/{id}/reject`. Set `ADMIN_PASSWORD` in production;
-the default is `askvocate-admin`. Set `AADHAAR_HASH_KEY` to enable keyed Aadhaar/PAN
-duplicate detection. PAN uses multiple English-only OCR reads too, and stores
-the selected raw text in `ocrText.front`; a missing card heading alone does not reject
-a PAN if its number and required labeled fields are readable. Bar Council verification
-retains its existing parsing and status rules.
+- Upload a single **QR-side image** to `POST /api/my-documents/AADHAAR` (multipart `front`): a photo of the card's QR side or a free **e-Aadhaar** screenshot.
+- The **signed UIDAI Secure QR** is the sole authority (signature + embedded photo). OCR is no longer required and printed fields are not compared. Versioned V2/V3/V4 and legacy 16-field payloads are decoded.
+- Outcomes:
+  - `VERIFIED` — QR verifies. Demographics (name, DOB, gender, address, pincode) and the last 4 digits come from the QR and are stored in `qrData`/`extractedData`; the image is stored for selfie matching.
+  - `PENDING` + `AADHAAR_QR_UNREADABLE` — QR unreadable. Re-upload a clearer QR photo or e-Aadhaar; no manual review.
+- The full 12-digit Aadhaar number is not present in the QR; only the last 4 are available/displayed.
+- The app offers **Upload QR photo** and **Scan QR live**, plus a “Can’t scan? Get e-documents” help screen with e-Aadhaar/e-PAN links.
 
-After Aadhaar is verified, call `POST /api/documents/selfie/challenge?userId=...` to
+#### PAN
+
+- Upload a single QR-side image to `POST /api/my-documents/PAN`, or use the app's live scanner (ML Kit captures a still and submits it). `/api/my-documents/PAN/qr-text` remains for text-only clients. The signed PAN QR (ECDSA P-384/SHA-384) is unpacked into PII + photo and verified against the issuer key. **OCR alone never auto-verifies PAN.**
+- A verified PAN must be an **Individual** PAN, structurally valid, not a duplicate of another account, and must match the verified Aadhaar QR (name, DOB).
+- Outcomes:
+  - `VERIFIED` — all checks pass; the submitted image is stored.
+  - `PENDING` + `PAN_MISMATCH` / `PAN_DUPLICATE` — data conflict that a retry cannot fix. **Manual review.**
+  - `PENDING` + `PAN_QR_UNREADABLE` — quality failure. **No manual review**: retry the scan/photo or upload e-PAN. The latest image is kept as evidence.
+  - `PENDING` + `PAN_WAITING_AADHAAR` — PAN verified, waiting for Aadhaar. Auto-completes when Aadhaar verifies.
+  - `FAILED` — organization/non-individual or structurally invalid PAN.
+- Image retention: only `VERIFIED`, `PAN_QR_UNREADABLE`, and `PAN_WAITING_AADHAAR` keep the latest image. Mismatch/duplicate/org/invalid discard it. A new submission replaces (and deletes) the previous Cloudinary asset.
+
+#### Role-based document sets
+
+| Role | Required | Optional |
+|---|---|---|
+| `LAWYER_EXPERIENCED` | Bar enrollment **proof** (certificate preferred, or Bar Council ID), Certificate of Practice, AIBE certificate, Aadhaar, PAN, live selfie | — |
+| `LAWYER_FRESHER` | Bar enrollment **proof** (certificate preferred, or Bar Council ID), LL.B. degree certificate, Aadhaar, PAN, live selfie | AIBE certificate |
+
+"Bar enrollment proof" is one requirement satisfied by **either** the enrollment certificate **or** the Bar Council ID card; the certificate is preferred.
+
+Bar Council, COP, Degree and AIBE uploads are OCR-extracted and **always go to manual review**
+(`BAR_REVIEW`, `BAR_MISMATCH`, `BAR_DUPLICATE`, `DEGREE_REVIEW`, `AIBE_REVIEW`). Unreadable
+uploads are `*_OCR_UNREADABLE` re-upload states. OCR never auto-verifies these certificates.
+Completion percentage and "fully verified" are computed from the role's required set.
+
+#### Manual review (admin)
+
+- `POST /api/admin/login`, then `GET /api/admin/verification/documents/pending?type=PAN` or `?type=AADHAAR`.
+- Only documents with `requiresManualReview=true` are queued: Aadhaar/PAN OCR↔QR mismatches, duplicate PAN, and Bar/COP/Degree/AIBE certificate reviews. QR/OCR-unreadable cases are re-upload states and are **not** queued.
+- `POST /api/admin/verification/documents/{id}/approve|reject`.
+- An Aadhaar without a verified Secure QR **cannot be approved**.
+- Set `ADMIN_PASSWORD` in production; the default is `askvocate-admin`. Set `AADHAAR_HASH_KEY` to enable keyed duplicate detection. Bar Council verification retains its existing parsing and status rules.
+
+#### Live selfie (after Aadhaar is verified)
+
+Call `POST /api/documents/selfie/challenge?userId=...` to
 obtain a single-use three-minute `challengeId` and random `expectedTurn`. The Android
 lawyer profile has a **Verify live selfie** button that captures center, turned, and
 returned frames directly from its front camera. For API testing, submit those frames
 as multipart fields to `POST /api/documents/selfie/verify?userId=...` with `challengeId`.
 The attempt is stored in `selfie_verifications` using the existing `DocType.SELFIE`.
-The selfie step checks the signed Aadhaar QR and compares its embedded photo to the
-live capture; an Aadhaar upload without a readable signed QR cannot pass selfie matching.
-The overall lawyer profile becomes `VERIFIED` only after Bar Council, Aadhaar, PAN,
-and a selfie tied to that verified Aadhaar are all verified. A new Aadhaar submission
-requires a new selfie match.
+The selfie step re-reads the signed Aadhaar QR from the stored Aadhaar images and compares
+its embedded photo to the live capture; an Aadhaar without a readable signed QR cannot pass
+selfie matching. Live capture is hardened with local quality gates (brightness, blur, face
+size), a three-frame head-turn challenge, a local MiniFASNetV2 anti-spoof score, and a limit
+of 5 selfie challenges per lawyer per hour. The QR photo and PAD thresholds are starting
+points and must be calibrated on representative live/spoof samples. The overall lawyer
+profile becomes `VERIFIED` only after Bar Council, Aadhaar, PAN, and a selfie tied to that
+verified Aadhaar are all verified. A new Aadhaar submission requires a new selfie match.
 
 All OCR, QR, signature, and face checks run locally without a paid per-verification API.
 Cloudinary image storage remains subject to its account quota and pricing.
@@ -164,9 +183,14 @@ accounts are rejected. `GET /api/my-documents` returns the lawyer verification c
 `GET /api/my-documents/{type}` returns one document's status and details;
 `POST /api/my-documents/{type}` accepts multipart `front` and optional `back` images;
 `GET /api/my-documents/{type}/media/{side}` serves account-scoped images for
-preview and download. Aadhaar needs both images. Live selfie uses the existing
-challenge and verify endpoints. Degree and AIBE certificates support upload and
-view only; they are labeled unverified until a verification backend is added.
+preview and download. Aadhaar and PAN accept a single QR-side image (upload or live scan).
+Live selfie uses the existing challenge and verify endpoints. The app also links to a
+“Get e-documents” help screen with official e-Aadhaar/e-PAN and DigiLocker links.
+Bar/COP/Degree/AIBE uploads are OCR-extracted and queued for manual review.
+`PENDING` items expose `requiresManualReview`, `pendingReason` and `required`
+(`AADHAAR_QR_UNREADABLE`, `AADHAAR_OCR_UNREADABLE`, `AADHAAR_OCR_MISMATCH`,
+`PAN_QR_UNREADABLE`, `PAN_MISMATCH`, `PAN_DUPLICATE`, `PAN_WAITING_AADHAAR`,
+`BAR_*`, `DEGREE_*`, `AIBE_*`) so the app can show the right label and retry actions.
 
 The older `/api/documents` upload, verification, listing, download URL, and deletion
 routes also require an app token belonging to the requested user. Selfie challenge
