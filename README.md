@@ -1,12 +1,13 @@
 # Askvocate
 
-Askvocate is a legal-tech platform with three runnable parts:
+Askvocate is a legal-tech platform with four runnable parts:
 
 | Part | Tech | Default port | Purpose |
 | --- | --- | --- | --- |
 | `app/` | Android (Kotlin, Jetpack) | — | Client & lawyer mobile app |
 | `backend/` | Spring Boot (Java 21) + local Python worker | `8080` | Auth, documents, verification, sessions |
 | `ai-service/` | FastAPI (Python) | `8000` | Lawyer recommendation & legal-assistant chat |
+| `admin-frontend/` | React (Vite, TypeScript, Tailwind) | `5173` | Admin document & lawyer verification review portal |
 
 Document verification (Aadhaar, PAN, Bar/COP/Degree/AIBE, selfie) runs **inside `backend/`** using the local Python worker in `backend/verification/`. The `ai-service` is **not** required to test documents; it is only for lawyer matching and the legal assistant.
 
@@ -17,9 +18,10 @@ Document verification (Aadhaar, PAN, Bar/COP/Degree/AIBE, selfie) runs **inside 
 - **JDK 21** (backend and Android builds)
 - **Android Studio** (latest stable; project uses AGP `9.3.1`, `compileSdk 36`, `minSdk 28`)
 - **Python 3.10+** (both `backend/verification` and `ai-service`)
+- **Node.js 18+** (for `admin-frontend`)
 - **Git**
 - **Tesseract OCR** (English) for document verification
-- A **MongoDB** database (Atlas or local) and a **Cloudinary** account
+- A **MongoDB** database (Atlas or local) and an **AWS S3 bucket** (for document & selfie storage)
 - Android device/emulator running **API 28+**
 
 ---
@@ -32,6 +34,7 @@ Askvocate/
 ├── backend/                 # Spring Boot API
 │   └── verification/        # Local Python OCR/QR/face worker + models
 ├── ai-service/              # FastAPI matching/legal-assistant service
+├── admin-frontend/          # React + Vite admin verification dashboard
 └── README.md
 ```
 
@@ -54,7 +57,8 @@ Windows (PowerShell):
 ```powershell
 Copy-Item backend\.env.example backend\.env
 Copy-Item app\.env.example app\.env
-Copy-Item ai-service\.env.example ai-service\.env  # optional
+Copy-Item ai-service\.env.example ai-service\.env        # optional
+Copy-Item admin-frontend\.env.example admin-frontend\.env  # optional
 ```
 
 macOS / Linux:
@@ -62,61 +66,86 @@ macOS / Linux:
 ```bash
 cp backend/.env.example backend/.env
 cp app/.env.example app/.env
-cp ai-service/.env.example ai-service/.env  # optional
+cp ai-service/.env.example ai-service/.env              # optional
+cp admin-frontend/.env.example admin-frontend/.env      # optional
 ```
 
-### `backend/.env` (auto-loaded by the backend)
+---
+
+### Environment Files Breakdown
+
+#### 1. `backend/.env` (Auto-loaded by the backend — **Required**)
 
 Copy `backend/.env.example` → `backend/.env` and fill in:
 
 ```env
-# MongoDB
-MONGO_URL=mongodb+srv://<user>:<password>@cluster.mongodb.net/askvocate
+# MongoDB connection
+MONGO_URL=mongodb+srv://<username>:<password>@cluster.mongodb.net/askvocate
+
+# AWS S3 (file storage — replaces Cloudinary)
+# Create an IAM user with AmazonS3FullAccess (or scoped S3 permissions)
+AWS_ACCESS_KEY_ID=<your-aws-access-key-id>
+AWS_SECRET_ACCESS_KEY=<your-aws-secret-access-key>
+AWS_S3_REGION=ap-south-1
+AWS_S3_BUCKET_NAME=<your-s3-bucket-name>
+# Optional: duration in days (1 to 7) for pre-signed URLs stored in MongoDB (default: 7)
+AWS_S3_PRESIGN_DURATION_DAYS=7
+
+# Google Sign-In (must match the client ID in app/.env)
+GOOGLE_WEB_CLIENT_ID=<web-client-id>.apps.googleusercontent.com
 
 # JWT / sessions
 JWT_SECRET=<a-long-random-secret>
 
-# Cloudinary
-CLOUDINARY_CLOUD_NAME=<cloud-name>
-CLOUDINARY_API_KEY=<api-key>
-CLOUDINARY_API_SECRET=<api-secret>
-
-# Google Sign-In (must match app/.env)
-GOOGLE_WEB_CLIENT_ID=<web-client-id>.apps.googleusercontent.com
-
-# Optional integrations
-BIGDATACLOUD_DEVELOPMENT_ENABLED=true
-BIGDATACLOUD_API_KEY=<key>
-
-# Admin API password (default: askvocate-admin)
+# Admin review portal password (default: askvocate-admin)
 ADMIN_PASSWORD=<strong-password>
 
 # Enables keyed duplicate hashes for Aadhaar/PAN/enrollment numbers
 AADHAAR_HASH_KEY=<random-secret>
 
-# Optional: force a specific Python for the verification worker
+# Optional integrations
+BIGDATACLOUD_DEVELOPMENT_ENABLED=true
+BIGDATACLOUD_API_KEY=<key>
+
+# Optional: force a specific Python executable for the verification worker
 # VERIFICATION_PYTHON=C:\Path\To\python.exe
 # VERIFICATION_WORKER_PATH=D:\Askvocate\backend\verification\worker.py
 ```
 
-### `app/.env`
+#### 2. `app/.env` (Android App — **Required**)
 
 Copy `app/.env.example` → `app/.env`:
 
 ```env
-GOOGLE_CLIENT_ID=<same-web-client-id>.apps.googleusercontent.com
+# Must match the GOOGLE_WEB_CLIENT_ID in backend/.env
+GOOGLE_CLIENT_ID=<web-client-id>.apps.googleusercontent.com
 ```
 
-### `ai-service/.env` (only for matching/legal-assistant features)
+#### 3. `ai-service/.env` (AI Matching & Assistant — **Optional**)
 
 Copy `ai-service/.env.example` → `ai-service/.env`:
 
 ```env
-NVIDIA_API_KEY=<key>
+NVIDIA_API_KEY=<your-nvidia-api-key>
 NVIDIA_MODEL=nvidia/nemotron-3-super-120b-a12b
+
 # Optional fallbacks
-GEMINI_API_KEY=<key>
-GROQ_API_KEY=<key>
+GEMINI_API_KEY=<your-gemini-api-key>
+GROQ_API_KEY=<your-groq-api-key>
+GEMINI_MODEL=gemini-3.8-flash
+GROQ_MODEL=openai/gpt-oss-20b
+```
+
+#### 4. `admin-frontend/.env` (Admin Review Portal — **Optional**)
+
+Copy `admin-frontend/.env.example` → `admin-frontend/.env`:
+
+```env
+# Leave empty to use same-origin /api requests (Vite dev server proxies to backend at :8080)
+VITE_API_BASE_URL=
+
+# Set to true to use bundled mock data instead of connecting to a live backend
+VITE_DEMO_MODE=false
 ```
 
 ---

@@ -1,156 +1,79 @@
 package com.askvocate.backend.service;
 
 import com.askvocate.backend.model.CloudinaryRef;
-import com.cloudinary.Cloudinary;
-import com.cloudinary.utils.ObjectUtils;
-import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 import org.springframework.web.multipart.MultipartFile;
 
 import java.io.IOException;
-import java.net.URI;
-import java.net.http.HttpClient;
-import java.net.http.HttpRequest;
-import java.net.http.HttpResponse;
-import java.time.Duration;
 import java.util.Map;
 
+/**
+ * Legacy compatibility facade.
+ *
+ * <p>All file storage is now backed by AWS S3 via {@link S3StorageService}.
+ * This class keeps the original {@code CloudinaryService} name so that
+ * every existing caller ({@link DocumentService}, {@link DocumentVerificationService},
+ * {@link SelfieVerificationService}, {@link MyDocumentsController}, and all tests)
+ * can continue to compile without renaming injection points.
+ *
+ * <p>Every method delegates directly to {@link S3StorageService}.
+ * The {@code UploadResult} record is re-exported for binary compatibility.
+ */
 @Service
 public class CloudinaryService {
 
-    @Autowired
-    private Cloudinary cloudinary;
+    private final S3StorageService s3;
 
-    @Autowired
-    private VisionVerificationClient visionVerificationClient;
+    public CloudinaryService(S3StorageService s3) {
+        this.s3 = s3;
+    }
 
     public String uploadFile(MultipartFile file, String folder) throws IOException {
-        Map<String, Object> options = ObjectUtils.asMap("folder", folder);
-        Map<?, ?> uploadResult = cloudinary.uploader().upload(file.getBytes(), options);
-        return (String) uploadResult.get("secure_url");
+        return s3.uploadFile(file, folder);
     }
 
     public CloudinaryRef uploadSelfie(MultipartFile file, String folder) throws IOException {
-        Map<?, ?> result = cloudinary.uploader().upload(file.getBytes(), ObjectUtils.asMap("folder", folder));
-        return new CloudinaryRef((String) result.get("public_id"), (String) result.get("secure_url"), "selfie");
+        return s3.uploadSelfie(file, folder);
     }
 
     public CloudinaryRef uploadBytes(byte[] bytes, String folder, String tag) throws IOException {
-        Map<?, ?> result = cloudinary.uploader().upload(bytes, ObjectUtils.asMap("folder", folder, "tags", tag));
-        return new CloudinaryRef((String) result.get("public_id"), (String) result.get("secure_url"), tag);
+        return s3.uploadBytes(bytes, folder, tag);
     }
 
     public byte[] downloadReference(CloudinaryRef ref) throws IOException {
-        try {
-            URI uri = URI.create(ref.getSecureUrl());
-            if (!"https".equals(uri.getScheme()) || !"res.cloudinary.com".equals(uri.getHost())) {
-                throw new IOException("Invalid Cloudinary image URL.");
-            }
-            HttpClient client = HttpClient.newBuilder().followRedirects(HttpClient.Redirect.NEVER)
-                    .connectTimeout(Duration.ofSeconds(5)).build();
-            HttpResponse<byte[]> response = client.send(HttpRequest.newBuilder(uri).timeout(Duration.ofSeconds(10))
-                    .GET().build(), HttpResponse.BodyHandlers.ofByteArray());
-            if (response.statusCode() != 200 || response.body().length > 30 * 1024 * 1024) {
-                throw new IOException("Saved document image is unavailable or exceeds the 30 MB delivery limit.");
-            }
-            return response.body();
-        } catch (InterruptedException e) {
-            Thread.currentThread().interrupt();
-            throw new IOException("Aadhaar image download interrupted.", e);
-        } catch (IllegalArgumentException e) {
-            throw new IOException("Invalid Cloudinary image URL.", e);
-        }
+        return s3.downloadReference(ref);
     }
 
-    /**
-     * Runs free local OCR before uploading the file to Cloudinary storage.
-     */
     public UploadResult uploadWithOcr(MultipartFile file, String folder, String tag) throws IOException {
-        byte[] image = file.getBytes();
-        // Aadhaar and PAN are QR-only now: the signed QR carries the data, so the
-        // Tesseract pass (and its extra Python worker startup) is skipped.
-        boolean qrOnly = folder.endsWith("/AADHAAR") || folder.endsWith("/PAN");
-        Map<String, Object> ocrData = qrOnly ? Map.of() : visionVerificationClient.localOcr(
-                image, folder.endsWith("/AADHAAR") ? tag : folder.endsWith("/PAN") ? "pan" : "");
-        Map<String, Object> options = ObjectUtils.asMap(
-                "folder", folder,
-                "tags", tag
-        );
-        
-        @SuppressWarnings("unchecked")
-        Map<String, Object> uploadResult = (Map<String, Object>) cloudinary.uploader().upload(image, options);
-        
-        String publicId = (String) uploadResult.get("public_id");
-        String secureUrl = (String) uploadResult.get("secure_url");
-        
-        CloudinaryRef ref = new CloudinaryRef();
-        ref.setPublicId(publicId);
-        ref.setSecureUrl(secureUrl);
-        ref.setLabel(tag);
-        
-        return new UploadResult(ref, ocrData);
+        S3StorageService.UploadResult result = s3.uploadWithOcr(file, folder, tag);
+        return new UploadResult(result.cloudinaryRef(), result.rawOcrData());
     }
 
-    // ✅ Signed URL - 1 hour (FIXED)
     public String getSignedUrl(String publicId) {
-        return cloudinary.url()
-                .secure(true)
-                .signed(true)
-                .generate(publicId);
+        return s3.getSignedUrl(publicId);
     }
 
-    // ✅ Extract public ID from URL
     public String extractPublicId(String fileUrl) {
-        try {
-            String[] parts = fileUrl.split("/");
-            int uploadIndex = -1;
-
-            for (int i = 0; i < parts.length; i++) {
-                if (parts[i].equals("upload")) {
-                    uploadIndex = i;
-                    break;
-                }
-            }
-
-            if (uploadIndex == -1) {
-                String fileName = fileUrl.substring(fileUrl.lastIndexOf("/") + 1);
-                int lastDot = fileName.lastIndexOf(".");
-                return lastDot != -1 ? fileName.substring(0, lastDot) : fileName;
-            }
-
-            StringBuilder publicId = new StringBuilder();
-            for (int i = uploadIndex + 2; i < parts.length; i++) {
-                if (i > uploadIndex + 2) publicId.append("/");
-                publicId.append(parts[i]);
-            }
-
-            String result = publicId.toString();
-            int lastDot = result.lastIndexOf(".");
-            return lastDot != -1 ? result.substring(0, lastDot) : result;
-        } catch (Exception e) {
-            String fileName = fileUrl.substring(fileUrl.lastIndexOf("/") + 1);
-            int lastDot = fileName.lastIndexOf(".");
-            return lastDot != -1 ? fileName.substring(0, lastDot) : fileName;
-        }
+        return s3.extractPublicId(fileUrl);
     }
 
     public void deleteFile(String publicId) throws IOException {
-        cloudinary.uploader().destroy(publicId, ObjectUtils.emptyMap());
+        s3.deleteFile(publicId);
     }
 
     public void delete(String publicId) throws IOException {
-        deleteFile(publicId);
+        s3.delete(publicId);
     }
 
     /**
-     * Result of uploading a file with OCR to Cloudinary.
+     * Re-exported result record — callers that reference
+     * {@code CloudinaryService.UploadResult} continue to compile.
      *
-     * @param cloudinaryRef reference to the uploaded asset (public ID, URL, etc.)
-     * @param rawOcrData    the raw OCR extraction data from Cloudinary (if available)
+     * @param cloudinaryRef reference to the uploaded asset (S3 key / public URL)
+     * @param rawOcrData    raw OCR extraction data from the local Python worker
      */
     public record UploadResult(
             CloudinaryRef cloudinaryRef,
             Object rawOcrData
-    ) {
-    }
+    ) {}
 }

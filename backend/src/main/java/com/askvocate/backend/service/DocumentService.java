@@ -20,11 +20,11 @@ public class DocumentService {
     @Autowired
     private CloudinaryService cloudinaryService;
 
-    // ✅ Upload document - Saves to Cloudinary AND MongoDB
+    // ✅ Upload document - Saves to S3 AND MongoDB
     public UserDoc uploadDocument(String userId, DocType docType, MultipartFile file) throws Exception {
         file = DocumentImageCompressor.compressIfNeeded(file);
-        // 1. Upload to Cloudinary
-        String folder = "documents/" + userId + "/" + docType.name().toLowerCase();
+        // 1. Upload to S3
+        String folder = "documents/" + docType.name();
         String fileUrl = cloudinaryService.uploadFile(file, folder);
 
         // 2. Save metadata to MongoDB
@@ -40,7 +40,7 @@ public class DocumentService {
         return userDocRepository.save(userDoc);  // ✅ Saves to MongoDB
     }
 
-    // ✅ Get signed URL - Retrieves from MongoDB, generates signed URL from Cloudinary
+    // ✅ Get signed URL - Retrieves from MongoDB, generates pre-signed URL from S3
     public String getDocumentSignedUrl(String userId, DocType docType) throws Exception {
         // 1. Get document metadata from MongoDB
         Optional<UserDoc> docOptional = userDocRepository.findByUserIdAndDocType(userId, docType);
@@ -50,25 +50,45 @@ public class DocumentService {
         }
 
         UserDoc doc = docOptional.get();
-        String fileUrl = doc.getFileUrl();  // Get Cloudinary URL from MongoDB
+        String fileUrl = doc.getFileUrl();  // Get S3 URL from MongoDB
 
         if (fileUrl == null || fileUrl.isEmpty()) {
             throw new IllegalStateException("Document URL is empty");
         }
 
-        // 2. Generate signed URL from Cloudinary
+        // 2. Generate pre-signed URL from S3
         String publicId = cloudinaryService.extractPublicId(fileUrl);
-        return cloudinaryService.getSignedUrl(publicId);
+        String signedUrl = cloudinaryService.getSignedUrl(publicId);
+
+        // Update MongoDB so the stored URL stays fresh and viewable
+        doc.setFileUrl(signedUrl);
+        userDocRepository.save(doc);
+
+        return signedUrl;
     }
 
-    // ✅ Get all documents for a user - From MongoDB
+    // ✅ Get all documents for a user - From MongoDB with fresh pre-signed URLs
     public List<UserDoc> getUserDocuments(String userId) {
-        return userDocRepository.findByUserId(userId);  // ✅ Queries MongoDB
+        List<UserDoc> docs = userDocRepository.findByUserId(userId);
+        for (UserDoc doc : docs) {
+            if (doc.getFileUrl() != null && !doc.getFileUrl().isEmpty()) {
+                String publicId = cloudinaryService.extractPublicId(doc.getFileUrl());
+                doc.setFileUrl(cloudinaryService.getSignedUrl(publicId));
+            }
+        }
+        return docs;
     }
 
-    // ✅ Get specific document - From MongoDB
+    // ✅ Get specific document - From MongoDB with fresh pre-signed URL
     public Optional<UserDoc> getDocument(String userId, DocType docType) {
-        return userDocRepository.findByUserIdAndDocType(userId, docType);  // ✅ Queries MongoDB
+        return userDocRepository.findByUserIdAndDocType(userId, docType)
+                .map(doc -> {
+                    if (doc.getFileUrl() != null && !doc.getFileUrl().isEmpty()) {
+                        String publicId = cloudinaryService.extractPublicId(doc.getFileUrl());
+                        doc.setFileUrl(cloudinaryService.getSignedUrl(publicId));
+                    }
+                    return doc;
+                });
     }
 
     // ✅ Delete document - From Cloudinary AND MongoDB
@@ -82,13 +102,13 @@ public class DocumentService {
 
         UserDoc doc = docOptional.get();
 
-        // 2. Delete from Cloudinary
-        if (doc.getFileUrl() != null && doc.getFileUrl().contains("cloudinary")) {
+        // 2. Delete from S3
+        if (doc.getFileUrl() != null && !doc.getFileUrl().isEmpty()) {
             try {
                 String publicId = cloudinaryService.extractPublicId(doc.getFileUrl());
                 cloudinaryService.deleteFile(publicId);
             } catch (Exception e) {
-                System.err.println("Failed to delete from Cloudinary: " + e.getMessage());
+                System.err.println("Failed to delete from S3: " + e.getMessage());
             }
         }
 
