@@ -1025,8 +1025,9 @@ class MyDocumentsFragment : Fragment() {
         }
         return when {
             doc.pendingReason == "PAN_WAITING_AADHAAR" -> "Waiting for Aadhaar"
-            doc.pendingReason?.endsWith("_UNREADABLE") == true -> "Re-upload required"
-            doc.pendingReason?.let {
+            doc.pendingReason == "AWAITING_IDENTITY" -> "Waiting for Identity"
+            doc.pendingReason?.endsWith("_UNREADABLE") == true -> "Invalid document"
+            doc.requiresManualReview || doc.pendingReason?.let {
                 it.endsWith("_REVIEW") || it.endsWith("_MISMATCH") || it.endsWith("_DUPLICATE")
             } == true -> "Manual review"
             else -> statusText(doc.status)
@@ -1141,13 +1142,20 @@ class MyDocumentsFragment : Fragment() {
         renderDetail(doc)
         when (doc.status) {
             "VERIFIED" -> message("${doc.title} verified successfully.", ToastType.SUCCESS)
-            "PENDING" -> message(when {
-                doc.pendingReason == "PAN_WAITING_AADHAAR" ->
-                    "PAN QR verified. Verify your Aadhaar to finish."
-                doc.pendingReason?.endsWith("_QR_UNREADABLE") == true ->
-                    "${doc.title} QR could not be read. Upload e-Aadhaar/e-PAN or retry with a clearer photo."
-                else -> "${doc.title} sent for manual review."
-            }, ToastType.INFO)
+            "PENDING" -> {
+                val isUnreadable = doc.pendingReason?.endsWith("_UNREADABLE") == true
+                message(when {
+                    isUnreadable ->
+                        "Invalid '${doc.title}'. Please upload again for verification."
+                    doc.pendingReason == "PAN_WAITING_AADHAAR" ->
+                        "PAN QR verified. Verify your Aadhaar to finish."
+                    doc.pendingReason == "AWAITING_IDENTITY" ->
+                        "${doc.title} verified. Verify your Aadhaar or PAN to auto-approve."
+                    doc.requiresManualReview ->
+                        "${doc.title} is blurry or unclear. Sent for manual review."
+                    else -> "${doc.title} verification is pending."
+                }, if (isUnreadable) ToastType.ERROR else ToastType.INFO)
+            }
             "FAILED", "REJECTED" -> scrollToStatusError()
         }
     }
@@ -1190,16 +1198,18 @@ class MyDocumentsFragment : Fragment() {
                     } else if (it.status == "VERIFIED") {
                         message("${it.title} verified successfully.", ToastType.SUCCESS)
                     } else if (it.status == "PENDING") {
-                        message(when (it.pendingReason) {
-                            "AADHAAR_QR_UNREADABLE" ->
-                                "Aadhaar QR could not be read. Upload e-Aadhaar or retry with a clear photo."
-                            "AADHAAR_OCR_UNREADABLE" ->
-                                "Printed Aadhaar details could not be read. Retry with a clearer photo."
-                            "PAN_WAITING_AADHAAR" -> "PAN QR verified. Verify your Aadhaar to finish."
-                            "PAN_QR_UNREADABLE" ->
-                                "PAN QR could not be read. Retry with a clearer photo or e-PAN."
-                            else -> "${it.title} sent for manual review."
-                        }, ToastType.INFO)
+                        val isUnreadable = it.pendingReason?.endsWith("_UNREADABLE") == true
+                        message(when {
+                            isUnreadable ->
+                                "Invalid '${it.title}'. Please upload again for verification."
+                            it.pendingReason == "PAN_WAITING_AADHAAR" ->
+                                "PAN QR verified. Verify your Aadhaar to finish."
+                            it.pendingReason == "AWAITING_IDENTITY" ->
+                                "${it.title} verified. Verify your Aadhaar or PAN to auto-approve."
+                            it.requiresManualReview ->
+                                "${it.title} is blurry or unclear. Sent for manual review."
+                            else -> "${it.title} verification is pending."
+                        }, if (isUnreadable) ToastType.ERROR else ToastType.INFO)
                     } else if (it.uploadOnly) {
                         message("${it.title} uploaded. Verification is not available yet.", ToastType.SUCCESS)
                     }

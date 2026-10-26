@@ -1,54 +1,54 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
-    <!-- Primary Colors -->
-    <color name="navy_primary">#FF1F3A5F</color>
-    <color name="navy_dark">#FF152A45</color>
-    <color name="navy_light">#FF2D5080</color>
+    <!-- Primary Colors (Updated with #03289F and #6B9BE6) -->
+    <color name="navy_primary">#FF03289F</color>
+    <color name="navy_dark">#FF021D73</color>
+    <color name="navy_light">#FF6B9BE6</color>
 
-    <!-- Accent Colors -->
-    <color name="amber_accent">#FFEB940E</color>
-    <color name="amber_light">#FFFDB94D</color>
-    <color name="amber_dark">#FFC57A0B</color>
+    <!-- Accent Colors (Updated with #EDA312) -->
+    <color name="amber_accent">#FFEDA312</color>
+    <color name="amber_light">#FFF6C566</color>
+    <color name="amber_dark">#FFC98409</color>
 
-    <!-- Background Colors -->
+    <!-- Background Colors (Clean White) -->
     <color name="background_cream">#FFFFFFFF</color>
     <color name="surface_white">#FFFFFFFF</color>
-    <color name="border_light">#FFE7E2D6</color>
-    <color name="divider">#FFEDE9E0</color>
+    <color name="border_light">#FFE2EBF8</color>
+    <color name="divider">#FFF0F4FA</color>
 
     <!-- Text Colors -->
-    <color name="text_primary">#FF2B2B2B</color>
-    <color name="text_secondary">#FF6B7280</color>
-    <color name="text_tertiary">#FF9CA3AF</color>
+    <color name="text_primary">#FF1B1F2A</color>
+    <color name="text_secondary">#FF5E6C84</color>
+    <color name="text_tertiary">#FF8C9BAB</color>
     <color name="text_on_primary">#FFFFFFFF</color>
     <color name="text_on_accent">#FFFFFFFF</color>
-    <color name="text_link">#FF1F3A5F</color>
+    <color name="text_link">#FF03289F</color>
 
     <!-- Status Colors -->
     <color name="success_green">#FF22C55E</color>
     <color name="error_red">#FFEF4444</color>
-    <color name="warning_orange">#FFF59E0B</color>
-    <color name="info_blue">#FF3B82F6</color>
+    <color name="warning_orange">#FFEDA312</color>
+    <color name="info_blue">#FF03289F</color>
 
     <!-- Chat Colors -->
-    <color name="chat_sent_bg">#FFEB940E</color>
-    <color name="chat_received_bg">#FFFFFFFF</color>
+    <color name="chat_sent_bg">#FF03289F</color>
+    <color name="chat_received_bg">#FFF4F7FD</color>
     <color name="chat_sent_text">#FFFFFFFF</color>
-    <color name="chat_received_text">#FF2B2B2B</color>
+    <color name="chat_received_text">#FF1B1F2A</color>
 
     <!-- Rating Star -->
-    <color name="star_filled">#FFFBBF24</color>
-    <color name="star_empty">#FFD1D5DB</color>
+    <color name="star_filled">#FFEDA312</color>
+    <color name="star_empty">#FFD8E2F0</color>
 
     <!-- Chip Colors -->
-    <color name="chip_selected_bg">#FF1F3A5F</color>
+    <color name="chip_selected_bg">#FF03289F</color>
     <color name="chip_selected_text">#FFFFFFFF</color>
-    <color name="chip_unselected_bg">#FFFFFFFF</color>
-    <color name="chip_unselected_text">#FF1F3A5F</color>
+    <color name="chip_unselected_bg">#FFF0F5FD</color>
+    <color name="chip_unselected_text">#FF03289F</color>
 
     <!-- Scrim / Overlay -->
     <color name="scrim">#66000000</color>
-    <color name="ripple_light">#1F1F3A5F</color>
+    <color name="ripple_light">#1F03289F</color>
     <color name="ripple_dark">#33FFFFFF</color>
 
     <!-- Standard -->
@@ -56,9 +56,9 @@
     <color name="white">#FFFFFFFF</color>
     <color name="transparent">#00000000</color>
 
-    <!-- Gradient -->
-    <color name="gradient_start">#FF1F3A5F</color>
-    <color name="gradient_end">#FF2D5080</color>
+    <!-- Gradient (Smooth blend between #03289F and #6B9BE6) -->
+    <color name="gradient_start">#FF03289F</color>
+    <color name="gradient_end">#FF6B9BE6</color>
 
     <!-- Online status -->
     <color name="online_green">#FF22C55E</color>
@@ -67,25 +67,27 @@
     <!-- Unread badge -->
     <color name="badge_red">#FFEF4444</color>
     <color name="badge_text">#FFFFFFFF</color>
-    <!-- Splash Screen (Sovereign Legal) -->
+
+    <!-- Splash Screen -->
     <color name="splash_background">#FFFFFFFF</color>
-    <color name="splash_primary">#FFF2CA50</color>
-    <color name="splash_text">#FF1D2021</color>
-    <color name="splash_text_variant">#661D2021</color>
-    <!-- Justitia Premium Design System (from code.html) -->
+    <color name="splash_primary">#FF03289F</color>
+    <color name="splash_text">#FF1B1F2A</color>
+    <color name="splash_text_variant">#661B1F2A</color>
+
+    <!-- Justitia Premium Design System -->
     <color name="justitia_bg">#FFFFFFFF</color>
-    <color name="justitia_on_background">#171c20</color>
-    <color name="justitia_primary">#002961</color>
-    <color name="justitia_primary_container">#063e8a</color>
-    <color name="justitia_secondary_container">#fca223</color>
-    <color name="justitia_on_secondary">#ffffff</color>
-    <color name="justitia_on_surface_variant">#434751</color>
-    <color name="justitia_slate_text">#0F172A</color>
-    <color name="justitia_teal_success">#0D9488</color>
+    <color name="justitia_on_background">#FF1B1F2A</color>
+    <color name="justitia_primary">#FF03289F</color>
+    <color name="justitia_primary_container">#FF6B9BE6</color>
+    <color name="justitia_secondary_container">#FFEDA312</color>
+    <color name="justitia_on_secondary">#FFFFFFFF</color>
+    <color name="justitia_on_surface_variant">#FF5E6C84</color>
+    <color name="justitia_slate_text">#FF1B1F2A</color>
+    <color name="justitia_teal_success">#FF0D9488</color>
     <color name="justitia_surface_elevated">#FFFFFFFF</color>
-    <color name="justitia_border">#E2E8F0</color>
-    <color name="justitia_shadow_glow">#26063E8A</color>
-    <color name="justitia_secondary_shadow">#875200</color>
+    <color name="justitia_border">#FFE2EBF8</color>
+    <color name="justitia_shadow_glow">#2603289F</color>
+    <color name="justitia_secondary_shadow">#FFC98409</color>
 
     <!-- Mappings -->
     <color name="journey_background">@color/white</color>
@@ -94,16 +96,16 @@
     <color name="journey_card_bg">@color/white</color>
     <color name="journey_timeline_line">@color/justitia_secondary_container</color>
 
-    <!-- Home screen redesign (matched to product mockups) -->
-    <color name="home_blue">#FF063E8A</color>
-    <color name="home_section_header">#FF2B2B2B</color>
-    <color name="home_outline">#FFE3E3E3</color>
+    <!-- Home screen & cards -->
+    <color name="home_blue">#FF03289F</color>
+    <color name="home_section_header">#FF1B1F2A</color>
+    <color name="home_outline">#FFE2EBF8</color>
     <color name="home_input_bg">#FFFFFFFF</color>
-    <color name="pill_selected_bg">#FFF8EEDC</color>
-    <color name="pill_selected_text">#FFA7834D</color>
+    <color name="pill_selected_bg">#FFFDF4E3</color>
+    <color name="pill_selected_text">#FFC98409</color>
     <color name="pill_unselected_text">#FF454545</color>
-    <color name="status_warm_bg">#FFF8EEDC</color>
-    <color name="status_warm_text">#FFA7834D</color>
+    <color name="status_warm_bg">#FFFDF4E3</color>
+    <color name="status_warm_text">#FFC98409</color>
     <color name="home_map_water">#FFBCD8EE</color>
     <color name="home_map_park">#FFD3E6C9</color>
     <color name="home_map_land">#FFE9EDF1</color>
@@ -113,10 +115,10 @@
     <color name="avatar_pastel_peach">#FFF3E3D9</color>
     <color name="avatar_pastel_mint">#FFDCEFDF</color>
     <color name="avatar_pastel_lilac">#FFE9E0F2</color>
-    <color name="doc_surface">#FFF7F9FC</color>
-    <color name="doc_navy_soft">#FFE8EFF8</color>
+    <color name="doc_surface">#FFF8FAFD</color>
+    <color name="doc_navy_soft">#FFE9F0FC</color>
     <color name="doc_success_soft">#FFE8F7EF</color>
-    <color name="doc_warning_soft">#FFFFF3DF</color>
+    <color name="doc_warning_soft">#FFFDF4E3</color>
     <color name="doc_error_soft">#FFFFEBEB</color>
-    <color name="doc_loading_scrim">#DDF7F9FC</color>
+    <color name="doc_loading_scrim">#DDF8FAFD</color>
 </resources>

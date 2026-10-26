@@ -74,9 +74,9 @@ class DocumentVerificationServiceTest {
     }
 
     @Test
-    @DisplayName("Bar Council number format alone is sent to manual review")
+    @DisplayName("Bar Council direct check without verified identity enters AWAITING_IDENTITY status")
     void testVerifyBarCouncilDirectSuccess() {
-        when(documentRepository.findByUserIdAndDocumentType("lawyer-123", DocumentType.BAR_COUNCIL_ID))
+        when(documentRepository.findByUserIdAndDocumentType(eq("lawyer-123"), any(DocumentType.class)))
                 .thenReturn(Optional.empty());
         when(documentRepository.save(any(UserDocument.class)))
                 .thenAnswer(invocation -> {
@@ -101,8 +101,8 @@ class DocumentVerificationServiceTest {
         assertEquals(DocumentType.BAR_COUNCIL_ID, response.getDocumentType());
         assertEquals("PENDING", response.getLawyerVerificationStatus());
         assertEquals(Boolean.TRUE, response.getNameMatched());
-        assertTrue(response.getRequiresManualReview());
-        assertEquals("BAR_REVIEW", response.getPendingReason());
+        assertFalse(response.getRequiresManualReview());
+        assertEquals("AWAITING_IDENTITY", response.getPendingReason());
         verify(lawyerExperiencedProfileRepository).save(mockExperiencedLawyer);
         assertEquals(Verification_Status.PENDING, mockExperiencedLawyer.getVerificationStatus());
     }
@@ -223,8 +223,8 @@ class DocumentVerificationServiceTest {
 
         assertEquals(Verification_Status.PENDING, mockExperiencedLawyer.getVerificationStatus());
         assertEquals("PENDING", response.getLawyerVerificationStatus());
-        assertTrue(response.getRequiresManualReview());
-        assertEquals("BAR_REVIEW", response.getPendingReason());
+        assertFalse(response.getRequiresManualReview());
+        assertEquals("AWAITING_IDENTITY", response.getPendingReason());
         assertNull(mockExperiencedLawyer.getVerifiedAt());
     }
 }

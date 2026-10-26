@@ -20,9 +20,15 @@ class VisionVerificationClientIntegrationTest {
     @Test
     void backendInvokesLocalOcrWithoutAiService() throws Exception {
         assumeTrue(Files.isRegularFile(Path.of("verification", "worker.py")));
-        Process check = new ProcessBuilder("python", "-c", "import cv2, PIL, cryptography, pytesseract")
-                .redirectError(ProcessBuilder.Redirect.DISCARD).start();
-        assumeTrue(check.waitFor() == 0, "Local Python verification dependencies are not installed");
+        boolean pythonAvailable = false;
+        try {
+            Process check = new ProcessBuilder("python", "-c", "import cv2, PIL, cryptography, pytesseract")
+                    .redirectError(ProcessBuilder.Redirect.DISCARD).start();
+            pythonAvailable = check.waitFor() == 0;
+        } catch (Exception e) {
+            pythonAvailable = false;
+        }
+        assumeTrue(pythonAvailable, "Local Python verification dependencies are not installed");
 
         BufferedImage image = new BufferedImage(900, 140, BufferedImage.TYPE_INT_RGB);
         Graphics2D graphics = image.createGraphics();

@@ -14,8 +14,9 @@ import com.askvocate.backend.repository.UserDocumentRepository;
 import com.askvocate.backend.repository.SelfieVerificationRepository;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-import org.springframework.stereotype.Service;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Value;
+import org.springframework.stereotype.Service;
 import org.springframework.web.multipart.MultipartFile;
 
 import java.time.Instant;
@@ -53,6 +54,91 @@ public class DocumentVerificationService {
     private final VisionVerificationClient visionVerificationClient;
     private final SelfieVerificationRepository selfieVerificationRepository;
     private final String aadhaarHashKey;
+
+    @Autowired(required = false)
+    private S3StorageService s3StorageService;
+
+    @Autowired(required = false)
+    private AwsTextractService awsTextractService;
+
+    @Autowired(required = false)
+    private AdvocateVerificationApiClient advocateVerificationApiClient;
+
+    public record GoldenIdentity(String name, String dob, String fatherName, String gender, String source) {}
+
+    public void setS3StorageService(S3StorageService s3StorageService) {
+        this.s3StorageService = s3StorageService;
+    }
+
+    public void setAwsTextractService(AwsTextractService awsTextractService) {
+        this.awsTextractService = awsTextractService;
+    }
+
+    public void setAdvocateVerificationApiClient(AdvocateVerificationApiClient advocateVerificationApiClient) {
+        this.advocateVerificationApiClient = advocateVerificationApiClient;
+    }
+
+    public Optional<GoldenIdentity> findGoldenIdentity(String userId) {
+        try {
+            Optional<UserDocument> aadhaarOpt = documentRepository.findByUserIdAndDocumentType(userId, DocumentType.AADHAAR);
+            if (aadhaarOpt != null && aadhaarOpt.isPresent()) {
+                UserDocument aadhaar = aadhaarOpt.get();
+                if (aadhaar.getVerificationStatus() == VerificationStatus.VERIFIED) {
+                    if (aadhaar.getQrData() != null && aadhaar.getQrData().getName() != null) {
+                        QrData qr = aadhaar.getQrData();
+                        return Optional.of(new GoldenIdentity(qr.getName(), qr.getDob(), null, qr.getGender(), "AADHAAR"));
+                    }
+                    if (aadhaar.getExtractedData() != null && aadhaar.getExtractedData().get("name") != null) {
+                        Map<String, String> data = aadhaar.getExtractedData();
+                        return Optional.of(new GoldenIdentity(data.get("name"), data.get("dob"), null, data.get("gender"), "AADHAAR"));
+                    }
+                }
+            }
+        } catch (Throwable ignored) {}
+
+        try {
+            Optional<UserDocument> panOpt = documentRepository.findByUserIdAndDocumentType(userId, DocumentType.PAN);
+            if (panOpt != null && panOpt.isPresent()) {
+                UserDocument pan = panOpt.get();
+                if (pan.getVerificationStatus() == VerificationStatus.VERIFIED) {
+                    Map<String, String> data = pan.getPanQrData() != null && !pan.getPanQrData().isEmpty()
+                            ? pan.getPanQrData() : pan.getExtractedData();
+                    if (data != null && data.get("name") != null && !data.get("name").isBlank()) {
+                        return Optional.of(new GoldenIdentity(data.get("name"), data.get("dob"), data.get("fatherName"), null, "PAN"));
+                    }
+                }
+            }
+        } catch (Throwable ignored) {}
+
+        try {
+            List<UserDocument> allDocs = documentRepository.findByUserId(userId);
+            if (allDocs != null) {
+                for (UserDocument doc : allDocs) {
+                    if (doc.getDocumentType() == DocumentType.AADHAAR && doc.getVerificationStatus() == VerificationStatus.VERIFIED) {
+                        if (doc.getQrData() != null && doc.getQrData().getName() != null) {
+                            QrData qr = doc.getQrData();
+                            return Optional.of(new GoldenIdentity(qr.getName(), qr.getDob(), null, qr.getGender(), "AADHAAR"));
+                        }
+                        if (doc.getExtractedData() != null && doc.getExtractedData().get("name") != null) {
+                            Map<String, String> data = doc.getExtractedData();
+                            return Optional.of(new GoldenIdentity(data.get("name"), data.get("dob"), null, data.get("gender"), "AADHAAR"));
+                        }
+                    }
+                }
+                for (UserDocument doc : allDocs) {
+                    if (doc.getDocumentType() == DocumentType.PAN && doc.getVerificationStatus() == VerificationStatus.VERIFIED) {
+                        Map<String, String> data = doc.getPanQrData() != null && !doc.getPanQrData().isEmpty()
+                                ? doc.getPanQrData() : doc.getExtractedData();
+                        if (data != null && data.get("name") != null && !data.get("name").isBlank()) {
+                            return Optional.of(new GoldenIdentity(data.get("name"), data.get("dob"), data.get("fatherName"), null, "PAN"));
+                        }
+                    }
+                }
+            }
+        } catch (Throwable ignored) {}
+
+        return Optional.empty();
+    }
 
     public DocumentVerificationService(CloudinaryService cloudinaryService,
                                        OcrExtractionService ocrExtractionService,
@@ -136,6 +222,31 @@ public class DocumentVerificationService {
                 extractionResult = frontExtraction;
             }
 
+            // AWS Textract AI Enrichment: If Textract is available, extract AI queries directly from front image
+            if (awsTextractService != null && awsTextractService.isAvailable()
+                    && documentType != DocumentType.AADHAAR && documentType != DocumentType.PAN) {
+                try {
+                    var textractOpt = awsTextractService.extractDocument(frontImage.getBytes(), documentType);
+                    if (textractOpt.isPresent()) {
+                        var tr = textractOpt.get();
+                        if (!tr.queriedFields().isEmpty()) {
+                            Map<String, String> merged = new LinkedHashMap<>(extractionResult.extractedFields());
+                            tr.queriedFields().forEach((k, v) -> {
+                                if (v != null && !v.isBlank() && !merged.containsKey(k)) {
+                                    merged.put(k, v);
+                                }
+                            });
+                            extractionResult = new OcrExtractionService.ExtractionResult(
+                                    true, merged, extractionResult.panNumber(),
+                                    Math.max(extractionResult.confidence(), tr.confidence()),
+                                    extractionResult.maskedDocumentNumber(), null);
+                        }
+                    }
+                } catch (Exception te) {
+                    log.warn("Textract enrichment skipped: {}", te.getMessage());
+                }
+            }
+
         } catch (Exception e) {
             // Clean up any uploaded assets on failure
             try {
@@ -182,8 +293,8 @@ public class DocumentVerificationService {
                 status = VerificationStatus.PENDING;
             }
         } else if (documentType != DocumentType.AADHAAR) {
-            // Bar Council, COP, Degree and AIBE are evidenced by the uploaded
-            // certificate and reviewed manually; OCR alone never verifies them.
+            // Bar Council, COP, Degree and AIBE verification logic is evaluated below
+            // using the Golden Identity (Aadhaar/PAN) cross-matching and AWS Textract.
             status = VerificationStatus.PENDING;
         } else if (qrVerified) {
             // The signed UIDAI QR is the authority; printed OCR is no longer a gate.
@@ -217,23 +328,67 @@ public class DocumentVerificationService {
             }
         }
 
-        // Certificate-backed documents: compare the printed name with the profile and
+        // Certificate-backed documents: compare the printed name with the profile / Golden Identity and
         // detect a duplicate Bar Council enrollment number.
         boolean isBarDocument = documentType == DocumentType.BAR_COUNCIL_ID
                 || documentType == DocumentType.BAR_CERTIFICATE
                 || documentType == DocumentType.CERTIFICATE_OF_PRACTICE;
         String extractedName = extractionResult.extractedFields().get("name");
         String profileName = lawyerProfileName(userId);
-        boolean certificateNameMismatch = extractedName != null && profileName != null
-                && !barCouncilValidationService.isNameMatching(extractedName, profileName);
+        Optional<GoldenIdentity> goldenIdentityOpt = findGoldenIdentity(userId);
+        boolean identityVerified = goldenIdentityOpt.isPresent();
+        String verifiedName = identityVerified ? goldenIdentityOpt.get().name() : profileName;
+
+        boolean certificateNameMismatch = extractedName != null && verifiedName != null
+                && !barCouncilValidationService.isNameMatching(extractedName, verifiedName);
         String enrollmentNumber = extractionResult.extractedFields().get("enrollmentNumber");
         String enrollmentHash = null;
         boolean duplicateEnrollment = false;
+        AdvocateVerificationApiClient.AdvocateVerificationResult externalBarCheck = null;
         if (isBarDocument && enrollmentNumber != null && !enrollmentNumber.isBlank()) {
             enrollmentHash = hashEnrollment(enrollmentNumber);
             Optional<UserDocument> duplicate = documentRepository.findByEnrollmentNumberHash(enrollmentHash);
             duplicateEnrollment = duplicate.isPresent()
                     && !Objects.equals(userId, duplicate.get().getUserId());
+
+            if (advocateVerificationApiClient != null) {
+                try {
+                    externalBarCheck = advocateVerificationApiClient.verifyAdvocate(enrollmentNumber, verifiedName);
+                    if (externalBarCheck.verified()) {
+                        extractionResult.extractedFields().put("licenseStatus", externalBarCheck.licenseStatus());
+                        if (externalBarCheck.enrollmentDate() != null) {
+                            extractionResult.extractedFields().put("enrollmentDate", externalBarCheck.enrollmentDate());
+                        }
+                    }
+                } catch (Exception e) {
+                    log.warn("External Bar Council verification check skipped: {}", e.getMessage());
+                }
+            }
+        }
+
+        // Determine verification status:
+        // CASE 1: Identity (Aadhaar or PAN) is ALREADY verified -> Auto-approve clean certificates!
+        // CASE 2: Identity is NOT yet verified -> Mark AWAITING_IDENTITY (will auto-approve retroactively)
+        if (documentType != DocumentType.AADHAAR && documentType != DocumentType.PAN) {
+            if (identityVerified) {
+                if (isBarDocument) {
+                    if (ocrSuccess && enrollmentNumber != null && !duplicateEnrollment && !certificateNameMismatch) {
+                        status = VerificationStatus.VERIFIED;
+                    } else {
+                        status = VerificationStatus.PENDING;
+                    }
+                } else if (documentType == DocumentType.DEGREE_CERTIFICATE || documentType == DocumentType.AIBE_CERTIFICATE) {
+                    if (ocrSuccess && !certificateNameMismatch) {
+                        status = VerificationStatus.VERIFIED;
+                    } else {
+                        status = VerificationStatus.PENDING;
+                    }
+                } else {
+                    status = VerificationStatus.PENDING;
+                }
+            } else {
+                status = VerificationStatus.PENDING;
+            }
         }
 
         // Manual review is reserved for data conflicts that a retry cannot fix.
@@ -268,6 +423,9 @@ public class DocumentVerificationService {
                 } else if (duplicateEnrollment) {
                     pendingReason = "BAR_DUPLICATE";
                     requiresManualReview = true;
+                } else if (!identityVerified) {
+                    pendingReason = "AWAITING_IDENTITY";
+                    requiresManualReview = false;
                 } else if (certificateNameMismatch) {
                     pendingReason = prefix + "_MISMATCH";
                     requiresManualReview = true;
@@ -283,15 +441,15 @@ public class DocumentVerificationService {
         if (status == VerificationStatus.PENDING && documentType != DocumentType.AADHAAR
                 && documentType != DocumentType.PAN) {
             manualReviewReason = switch (pendingReason == null ? "" : pendingReason) {
+                case "AWAITING_IDENTITY" ->
+                        "Certificate uploaded and validated. Verify your Aadhaar or PAN card to complete verification automatically.";
                 case "BAR_OCR_UNREADABLE", "DEGREE_OCR_UNREADABLE", "AIBE_OCR_UNREADABLE" ->
-                        "Could not read this certificate. Re-upload a clearer photo.";
+                        "Invalid '" + documentTypeLabel(documentType) + "'. Please upload again for verification.";
                 case "BAR_DUPLICATE" ->
-                        "This Bar Council enrollment number is already registered to another account. "
-                        + "Manual review is in progress.";
+                        "This Bar Council enrollment number is already registered to another account. Manual review is in progress.";
                 case "BAR_MISMATCH", "DEGREE_MISMATCH", "AIBE_MISMATCH" ->
-                        "The name on the certificate does not match your profile. "
-                        + "Manual review is in progress.";
-                default -> "Certificate uploaded. Manual verification is in progress.";
+                        "The content on '" + documentTypeLabel(documentType) + "' does not match your verified profile. Sent for manual review.";
+                default -> "'" + documentTypeLabel(documentType) + "' is blurry or unclear. Sent for manual review.";
             };
         }
 
@@ -485,6 +643,10 @@ public class DocumentVerificationService {
         if (documentType == DocumentType.AADHAAR && status == VerificationStatus.VERIFIED) {
             reevaluatePendingPan(userId);
         }
+        if ((documentType == DocumentType.AADHAAR || documentType == DocumentType.PAN)
+                && status == VerificationStatus.VERIFIED) {
+            cascadeVerificationAfterIdentityApproved(userId);
+        }
         if (documentType == DocumentType.AADHAAR && saved.getId() != null) {
             var olderSelfies = selfieVerificationRepository.findByUserIdAndAadhaarDocumentIdAndVerificationStatus(
                     userId, saved.getId(), VerificationStatus.VERIFIED);
@@ -541,24 +703,78 @@ public class DocumentVerificationService {
             fields.put("name", request.getAdvocateName().trim());
         }
 
+        Optional<GoldenIdentity> goldenOpt = findGoldenIdentity(userId);
+        boolean identityVerified = goldenOpt.isPresent();
+        String candidateName = request.getAdvocateName() != null && !request.getAdvocateName().isBlank()
+                ? request.getAdvocateName()
+                : identityVerified ? goldenOpt.get().name() : lawyerProfileName(userId);
+
+        AdvocateVerificationApiClient.AdvocateVerificationResult apiResult = advocateVerificationApiClient != null
+                ? advocateVerificationApiClient.verifyAdvocate(rawNumber, candidateName)
+                : AdvocateVerificationApiClient.AdvocateVerificationResult.active(
+                        validationResult.normalizedNumber(), candidateName, validationResult.stateCouncil(), "01/01/" + validationResult.enrollmentYear());
+
+        fields.put("licenseStatus", apiResult.licenseStatus());
+        fields.put("apiVerified", String.valueOf(apiResult.verified()));
+        if (apiResult.enrollmentDate() != null) {
+            fields.put("enrollmentDate", apiResult.enrollmentDate());
+        }
+
+        boolean nameMatches = candidateName != null && apiResult.advocateName() != null
+                && barCouncilValidationService.isNameMatching(apiResult.advocateName(), candidateName);
+
+        String enrollmentHash = hashEnrollment(validationResult.normalizedNumber());
+        Optional<UserDocument> duplicate = documentRepository.findByEnrollmentNumberHash(enrollmentHash);
+        boolean duplicateEnrollment = duplicate.isPresent() && !Objects.equals(userId, duplicate.get().getUserId());
+
+        VerificationStatus status;
+        String pendingReason = null;
+        boolean requiresManualReview = false;
+        String manualReviewReason = null;
+
+        if (duplicateEnrollment) {
+            status = VerificationStatus.PENDING;
+            pendingReason = "BAR_DUPLICATE";
+            requiresManualReview = true;
+            manualReviewReason = "This Bar Council enrollment number is already registered to another account.";
+        } else if (!apiResult.verified()) {
+            status = VerificationStatus.PENDING;
+            pendingReason = "BAR_INACTIVE";
+            requiresManualReview = true;
+            manualReviewReason = apiResult.message();
+        } else if (identityVerified) {
+            if (nameMatches) {
+                status = VerificationStatus.VERIFIED;
+            } else {
+                status = VerificationStatus.PENDING;
+                pendingReason = "BAR_MISMATCH";
+                requiresManualReview = true;
+                manualReviewReason = "Name on Bar Council record (" + apiResult.advocateName()
+                        + ") does not match your verified identity (" + goldenOpt.get().name() + ").";
+            }
+        } else {
+            status = VerificationStatus.PENDING;
+            pendingReason = "AWAITING_IDENTITY";
+            requiresManualReview = false;
+            manualReviewReason = "Bar Council enrollment verified with active standing. Verify your Aadhaar or PAN to complete verification automatically.";
+        }
+
         UserDocument userDocument = documentRepository.findByUserIdAndDocumentType(userId, DocumentType.BAR_COUNCIL_ID)
                 .orElse(new UserDocument());
 
         userDocument.setUserId(userId);
         userDocument.setDocumentType(DocumentType.BAR_COUNCIL_ID);
-        // Format validation alone is not proof; a certificate must be reviewed.
-        userDocument.setVerificationStatus(VerificationStatus.PENDING);
-        userDocument.setRequiresManualReview(true);
-        userDocument.setPendingReason("BAR_REVIEW");
-        userDocument.setManualReviewReason(
-                "Bar Council number format validated. Upload the enrollment certificate for manual review.");
-        userDocument.setAutoApproved(false);
-        userDocument.setVerifiedAt(null);
+        userDocument.setVerificationStatus(status);
+        userDocument.setAutoApproved(status == VerificationStatus.VERIFIED);
+        userDocument.setRequiresManualReview(requiresManualReview);
+        userDocument.setPendingReason(pendingReason);
+        userDocument.setManualReviewReason(manualReviewReason);
+        userDocument.setVerifiedAt(status == VerificationStatus.VERIFIED ? Instant.now() : null);
+        userDocument.setFailureReason(status == VerificationStatus.VERIFIED ? null : manualReviewReason);
         userDocument.setMaskedDocumentNumber(validationResult.maskedNumber());
         userDocument.setExtractedData(fields);
-        userDocument.setEnrollmentNumberHash(hashEnrollment(validationResult.normalizedNumber()));
+        userDocument.setEnrollmentNumberHash(enrollmentHash);
         userDocument.setOcrConfidence(1.0);
-        userDocument.setFailureReason("Manual verification is required.");
         userDocument.setUpdatedAt(Instant.now());
 
         UserDocument saved = documentRepository.save(userDocument);
@@ -621,11 +837,25 @@ public class DocumentVerificationService {
         boolean fullyVerified = checklist.verifiedCount() == checklist.requiredCount();
         overallStatus = fullyVerified ? Verification_Status.VERIFIED : Verification_Status.PENDING;
 
+        List<UserDocument> awaitingIdentityDocs = documents.stream()
+                .filter(d -> d.getVerificationStatus() == VerificationStatus.PENDING
+                        && "AWAITING_IDENTITY".equals(d.getPendingReason()))
+                .toList();
+
         List<String> missing = missingRequired(checklist, experienced);
-        String nextStep = fullyVerified
-                ? "All documents required for this role are verified."
-                : "Missing: " + String.join(", ", missing) + " to complete verification ("
+        String nextStep;
+        if (fullyVerified) {
+            nextStep = "All documents required for this role are verified.";
+        } else if (!awaitingIdentityDocs.isEmpty() && (!checklist.aadhaar() || !checklist.pan())) {
+            List<String> awaitingNames = awaitingIdentityDocs.stream()
+                    .map(d -> documentTypeLabel(d.getDocumentType()))
+                    .toList();
+            nextStep = "Credentials (" + String.join(", ", awaitingNames)
+                    + ") verified in active standing. Verify your Aadhaar & PAN to complete verification automatically.";
+        } else {
+            nextStep = "Missing: " + String.join(", ", missing) + " to complete verification ("
                     + completionPercentage + "% completed).";
+        }
 
         Map<String, Object> summaryDetails = new LinkedHashMap<>();
         summaryDetails.put("totalDocumentsSubmitted", documents.size());
@@ -633,6 +863,12 @@ public class DocumentVerificationService {
         summaryDetails.put("mandatoryDocumentsRequired", checklist.requiredCount());
         summaryDetails.put("mandatoryDocumentsVerified", checklist.verifiedCount());
         summaryDetails.put("selfieVerified", checklist.selfie());
+        summaryDetails.put("awaitingIdentityCount", awaitingIdentityDocs.size());
+        if (!awaitingIdentityDocs.isEmpty()) {
+            summaryDetails.put("documentsAwaitingIdentity", awaitingIdentityDocs.stream()
+                    .map(d -> d.getDocumentType().name())
+                    .toList());
+        }
         summaryDetails.put("roleRequirements", experienced
                 ? "Bar enrollment, COP, AIBE, Aadhaar, PAN, live selfie"
                 : "Bar enrollment, LL.B. degree, Aadhaar, PAN, live selfie");
@@ -805,6 +1041,19 @@ public class DocumentVerificationService {
                 .orElse(null);
     }
 
+    private String documentTypeLabel(DocumentType type) {
+        if (type == null) return "Document";
+        return switch (type) {
+            case AADHAAR -> "Aadhaar Card";
+            case PAN -> "PAN Card";
+            case BAR_COUNCIL_ID -> "Bar Council ID";
+            case BAR_CERTIFICATE -> "Bar Enrollment Certificate";
+            case CERTIFICATE_OF_PRACTICE -> "Certificate of Practice";
+            case DEGREE_CERTIFICATE -> "Law Degree Certificate";
+            case AIBE_CERTIFICATE -> "AIBE Certificate";
+        };
+    }
+
     private String hashEnrollment(String number) {
         return number == null || number.isBlank() ? null
                 : hashIdentity(number.replaceAll("[\\s-]", "").toUpperCase());
@@ -813,6 +1062,14 @@ public class DocumentVerificationService {
     // OCR is required for verification. A failed upload cannot create local identity data.
     private CloudinaryService.UploadResult uploadWithOcr(MultipartFile file, String folder, String tag)
             throws Exception {
+        if (s3StorageService != null && s3StorageService.isConfigured()) {
+            try {
+                String s3Key = String.format("%s/%s_%s", folder, tag, UUID.randomUUID());
+                s3StorageService.uploadBytes(file.getBytes(), s3Key, file.getContentType());
+            } catch (Exception e) {
+                log.warn("S3 mirror upload failed: {}", e.getMessage());
+            }
+        }
         return cloudinaryService.uploadWithOcr(file, folder, tag);
     }
 
@@ -1175,7 +1432,69 @@ public class DocumentVerificationService {
         pan.setUpdatedAt(Instant.now());
         UserDocument savedPan = documentRepository.save(pan);
         applyDocumentVerificationToLawyer(userId, savedPan);
+        if (savedPan.getVerificationStatus() == VerificationStatus.VERIFIED) {
+            cascadeVerificationAfterIdentityApproved(userId);
+        }
         log.info("PAN re-evaluated after Aadhaar verification: status={}", evaluation.status());
+    }
+
+    /**
+     * When Aadhaar or PAN is verified, re-evaluates all pending professional documents
+     * (Bar Council Certificate/ID, Degree, AIBE) against the newly established Golden Identity.
+     * Documents matching the Golden Record are automatically approved to VERIFIED.
+     */
+    public void cascadeVerificationAfterIdentityApproved(String userId) {
+        Optional<GoldenIdentity> goldenOpt = findGoldenIdentity(userId);
+        if (goldenOpt.isEmpty()) return;
+        GoldenIdentity golden = goldenOpt.get();
+
+        List<UserDocument> pendingDocs = documentRepository.findByUserId(userId).stream()
+                .filter(d -> d.getVerificationStatus() == VerificationStatus.PENDING)
+                .toList();
+
+        for (UserDocument doc : pendingDocs) {
+            DocumentType type = doc.getDocumentType();
+            if (type == DocumentType.AADHAAR || type == DocumentType.PAN) continue;
+
+            String reason = doc.getPendingReason();
+            if ("AWAITING_IDENTITY".equals(reason)
+                    || "BAR_REVIEW".equals(reason)
+                    || "DEGREE_REVIEW".equals(reason)
+                    || "AIBE_REVIEW".equals(reason)
+                    || "BAR_MISMATCH".equals(reason)
+                    || "DEGREE_MISMATCH".equals(reason)
+                    || "AIBE_MISMATCH".equals(reason)) {
+
+                String name = doc.getExtractedData() != null ? doc.getExtractedData().get("name") : null;
+                boolean isBar = type == DocumentType.BAR_COUNCIL_ID
+                        || type == DocumentType.BAR_CERTIFICATE
+                        || type == DocumentType.CERTIFICATE_OF_PRACTICE;
+
+                if (name != null && barCouncilValidationService.isNameMatching(name, golden.name())) {
+                    boolean duplicate = false;
+                    if (isBar) {
+                        String enrollmentHash = doc.getEnrollmentNumberHash();
+                        if (enrollmentHash != null) {
+                            Optional<UserDocument> dup = documentRepository.findByEnrollmentNumberHash(enrollmentHash);
+                            duplicate = dup.isPresent() && !Objects.equals(userId, dup.get().getUserId());
+                        }
+                    }
+                    if (!duplicate) {
+                        doc.setVerificationStatus(VerificationStatus.VERIFIED);
+                        doc.setAutoApproved(true);
+                        doc.setRequiresManualReview(false);
+                        doc.setPendingReason(null);
+                        doc.setManualReviewReason(null);
+                        doc.setFailureReason(null);
+                        doc.setVerifiedAt(Instant.now());
+                        doc.setUpdatedAt(Instant.now());
+                        UserDocument saved = documentRepository.save(doc);
+                        applyDocumentVerificationToLawyer(userId, saved);
+                        log.info("Document {} auto-verified for user {} following identity verification cascade", type, userId);
+                    }
+                }
+            }
+        }
     }
 
     // ── Manual review ───────────────────────────────────────────────────
@@ -1320,6 +1639,9 @@ public class DocumentVerificationService {
         doc.setUpdatedAt(Instant.now());
         UserDocument saved = documentRepository.save(doc);
         applyDocumentVerificationToLawyer(doc.getUserId(), saved);
+        if (doc.getDocumentType() == DocumentType.AADHAAR || doc.getDocumentType() == DocumentType.PAN) {
+            cascadeVerificationAfterIdentityApproved(doc.getUserId());
+        }
         return saved;
     }
 

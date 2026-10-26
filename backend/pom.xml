@@ -88,6 +88,18 @@
 			<version>5.1.0</version>
 		</dependency>
 
+		<!-- ✅ AWS SDK v2: S3 & Textract -->
+		<dependency>
+			<groupId>software.amazon.awssdk</groupId>
+			<artifactId>s3</artifactId>
+			<version>2.25.16</version>
+		</dependency>
+		<dependency>
+			<groupId>software.amazon.awssdk</groupId>
+			<artifactId>textract</artifactId>
+			<version>2.25.16</version>
+		</dependency>
+
 		<!-- ✅ Test -->
 		<dependency>
 			<groupId>org.springframework.boot</groupId>
