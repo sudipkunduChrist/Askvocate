@@ -3,6 +3,7 @@ package com.askvocate.backend.controller;
 import com.askvocate.backend.model.*;
 import com.askvocate.backend.repository.UserDocumentRepository;
 import com.askvocate.backend.service.AppSessionService;
+import com.askvocate.backend.service.CloudinaryService;
 import com.askvocate.backend.service.DocumentVerificationService;
 import org.springframework.http.HttpStatus;
 import org.springframework.web.bind.annotation.*;
@@ -19,12 +20,15 @@ public class AdminDocumentReviewController {
     private final DocumentVerificationService verification;
     private final UserDocumentRepository documents;
     private final AppSessionService sessions;
+    private final CloudinaryService cloudinaryService;
 
     public AdminDocumentReviewController(DocumentVerificationService verification,
-            UserDocumentRepository documents, AppSessionService sessions) {
+            UserDocumentRepository documents, AppSessionService sessions,
+            CloudinaryService cloudinaryService) {
         this.verification = verification;
         this.documents = documents;
         this.sessions = sessions;
+        this.cloudinaryService = cloudinaryService;
     }
 
     public record AdminDocumentResponse(
@@ -89,6 +93,20 @@ public class AdminDocumentReviewController {
                     putIfPresent(qr, "pincode", data.getPincode());
                     putIfPresent(qr, "aadhaarLast4", data.getAadhaarLast4());
                 });
+        List<CloudinaryRef> images = doc.getCloudinaryReferences() == null ? List.of()
+                : doc.getCloudinaryReferences().stream().map(ref -> {
+                    String publicId = ref.getPublicId();
+                    if (publicId != null && !publicId.isBlank()) {
+                        return new CloudinaryRef(publicId, cloudinaryService.getSignedUrl(publicId), ref.getLabel());
+                    }
+                    return ref;
+                }).toList();
+
+        String panPhotoUrl = doc.getPanQrPhotoUrl();
+        if (doc.getPanQrPhotoPublicId() != null && !doc.getPanQrPhotoPublicId().isBlank()) {
+            panPhotoUrl = cloudinaryService.getSignedUrl(doc.getPanQrPhotoPublicId());
+        }
+
         return new AdminDocumentResponse(
                 doc.getId(), doc.getUserId(), doc.getDocumentType(), doc.getVerificationStatus(),
                 doc.getMaskedDocumentNumber(), doc.getPanNumber(),
@@ -97,9 +115,9 @@ public class AdminDocumentReviewController {
                 Boolean.TRUE.equals(doc.getRequiresManualReview()),
                 doc.getManualReviewReason(), doc.getFailureReason(),
                 doc.getReviewedBy(), doc.getReviewedAt(), doc.getReviewDecision(), doc.getReviewNotes(),
-                doc.getCloudinaryReferences() == null ? List.of() : doc.getCloudinaryReferences(),
+                images,
                 qr, doc.getPanQrData(), Boolean.TRUE.equals(doc.getIsPanQrVerified()),
-                doc.getPanQrPhotoUrl(), doc.getCreatedAt(), doc.getVerifiedAt());
+                panPhotoUrl, doc.getCreatedAt(), doc.getVerifiedAt());
     }
 
     private void putIfPresent(Map<String, String> values, String key, String value) {

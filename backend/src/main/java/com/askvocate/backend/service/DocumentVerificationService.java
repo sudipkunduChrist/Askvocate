@@ -186,7 +186,7 @@ public class DocumentVerificationService {
         }
         rejectCompletedLawyerVerification(userId);
 
-        String folder = "askvocate/documents/" + userId + "/" + documentType.name();
+        String folder = "documents/" + documentType.name();
         List<CloudinaryRef> cloudinaryRefs = new ArrayList<>();
         OcrExtractionService.ExtractionResult extractionResult;
         String failureFile = null;
@@ -252,7 +252,7 @@ public class DocumentVerificationService {
             try {
                 cleanupCloudinaryAssets(cloudinaryRefs);
             } catch (Exception cleanupException) {
-                log.warn("Failed to clean up Cloudinary assets after verification failure", cleanupException);
+                log.warn("Failed to clean up S3 assets after verification failure", cleanupException);
             }
             if (e instanceof DocumentVerificationException verificationError) {
                 throw new DocumentVerificationException(verificationError.getMessage(), verificationError, currentFile);
@@ -468,7 +468,7 @@ public class DocumentVerificationService {
         boolean discardUploads = status == VerificationStatus.FAILED
                 || (documentType == DocumentType.PAN && !keepPanEvidence);
         if (discardUploads) {
-            log.info("Cleaning temporary Cloudinary assets: type={}, status={}", documentType, status);
+            log.info("Cleaning temporary S3 assets: type={}, status={}", documentType, status);
             cleanupCloudinaryAssets(cloudinaryRefs);
             cloudinaryRefs = new ArrayList<>();
         }
@@ -619,7 +619,7 @@ public class DocumentVerificationService {
                     try {
                         cloudinaryService.delete(old.getPublicId());
                     } catch (Exception error) {
-                        log.warn("Could not delete replaced document image: {}", error.getClass().getSimpleName());
+                        log.warn("Could not delete replaced document image from S3: {}", error.getClass().getSimpleName());
                     }
                 }
             }
@@ -1087,7 +1087,7 @@ public class DocumentVerificationService {
                     cloudinaryService.delete(ref.getPublicId());
                 }
             } catch (Exception e) {
-                log.error("Failed to cleanup Cloudinary asset: {}", ref.getPublicId(), e);
+                log.error("Failed to cleanup S3 asset: {}", ref.getPublicId(), e);
             }
         }
     }
@@ -1255,7 +1255,7 @@ public class DocumentVerificationService {
             try {
                 byte[] bytes = Base64.getDecoder().decode(qr.photoBase64());
                 CloudinaryRef ref = cloudinaryService.uploadBytes(bytes,
-                        "askvocate/documents/" + userId + "/PAN/qr", "qr");
+                        "documents/PAN", "qr");
                 photoUrl = ref.getSecureUrl();
                 photoPublicId = ref.getPublicId();
             } catch (Exception error) {

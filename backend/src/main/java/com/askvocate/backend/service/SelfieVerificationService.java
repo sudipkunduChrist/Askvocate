@@ -114,7 +114,7 @@ public class SelfieVerificationService {
             attempt.setFailureReason(result.reason());
             if (Boolean.TRUE.equals(result.matched())) {
                 CloudinaryRef uploaded = cloudinary.uploadSelfie(center,
-                        "askvocate/documents/" + userId + "/SELFIE");
+                        "documents/SELFIE");
                 attempt.setSelfieImageUrl(uploaded.getSecureUrl());
                 attempt.setSelfiePublicId(uploaded.getPublicId());
                 attempt.setVerificationStatus(VerificationStatus.VERIFIED);
