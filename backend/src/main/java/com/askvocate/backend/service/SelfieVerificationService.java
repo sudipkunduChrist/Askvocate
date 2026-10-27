@@ -27,17 +27,17 @@ public class SelfieVerificationService {
     private final UserDocumentRepository documentRepository;
     private final SelfieVerificationRepository selfies;
     private final MongoTemplate mongo;
-    private final CloudinaryService cloudinary;
+    private final S3StorageService storageService;
     private final VisionVerificationClient vision;
 
     public SelfieVerificationService(DocumentVerificationService documents, UserDocumentRepository documentRepository,
-            SelfieVerificationRepository selfies, MongoTemplate mongo, CloudinaryService cloudinary,
+            SelfieVerificationRepository selfies, MongoTemplate mongo, S3StorageService storageService,
             VisionVerificationClient vision) {
         this.documents = documents;
         this.documentRepository = documentRepository;
         this.selfies = selfies;
         this.mongo = mongo;
-        this.cloudinary = cloudinary;
+        this.storageService = storageService;
         this.vision = vision;
     }
 
@@ -85,13 +85,13 @@ public class SelfieVerificationService {
         if (attempt == null) throw new DocumentVerificationException("Selfie challenge is invalid, expired, or already used.");
         attempt.setChallengeConsumedAt(now);
         try {
-            List<CloudinaryRef> references = new ArrayList<>(aadhaar.getCloudinaryReferences());
+            List<StorageRef> references = new ArrayList<>(aadhaar.getStorageReferences());
             references.sort(Comparator.comparing(ref -> "back".equals(ref.getLabel()) ? 0 : 1));
             byte[] qrImage = null;
             String qrFailure = "No signed Aadhaar QR matching the printed details was found.";
-            for (CloudinaryRef reference : references) {
+            for (StorageRef reference : references) {
                 try {
-                    byte[] candidate = cloudinary.downloadReference(reference);
+                    byte[] candidate = storageService.downloadReference(reference);
                     VisionVerificationClient.QrResult qr = vision.verifyAadhaarQr(candidate,
                             aadhaar.getExtractedData(), aadhaar.getMaskedDocumentNumber());
                     if (qr.matched()) {
@@ -113,7 +113,7 @@ public class SelfieVerificationService {
             attempt.setPadScore(result.padScore());
             attempt.setFailureReason(result.reason());
             if (Boolean.TRUE.equals(result.matched())) {
-                CloudinaryRef uploaded = cloudinary.uploadSelfie(center,
+                StorageRef uploaded = storageService.uploadSelfie(center,
                         "documents/SELFIE");
                 attempt.setSelfieImageUrl(uploaded.getSecureUrl());
                 attempt.setSelfiePublicId(uploaded.getPublicId());
@@ -140,7 +140,7 @@ public class SelfieVerificationService {
                         && !Boolean.TRUE.equals(doc.getQrPrintedMismatch())
                         && doc.getId() != null
                         && doc.getSubmissionToken() != null
-                        && doc.getCloudinaryReferences() != null && !doc.getCloudinaryReferences().isEmpty())
+                        && doc.getStorageReferences() != null && !doc.getStorageReferences().isEmpty())
                 .orElseThrow(() -> new DocumentVerificationException(
                         "Aadhaar front and back OCR and signed QR must be complete before selfie verification."));
     }

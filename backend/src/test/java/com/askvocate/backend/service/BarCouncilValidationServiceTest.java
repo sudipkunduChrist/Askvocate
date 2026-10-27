@@ -64,6 +64,8 @@ class BarCouncilValidationServiceTest {
         assertTrue(validationService.isNameMatching("Advocate Priya Mehta", "Priya Mehta"));
         assertTrue(validationService.isNameMatching("Mr. Amit Kumar Singh", "Amit Kumar Singh"));
         assertTrue(validationService.isNameMatching("Nidhi Bose", "Adv. Nidhi Bose"));
+        assertTrue(validationService.isNameMatching("Ayushi S", "Ayushi Sharma"));
+        assertTrue(validationService.isNameMatching("Ayushi Sharma", "Ayushi S"));
         assertFalse(validationService.isNameMatching("Suresh Verma", "Ramesh Gupta"));
     }
 }

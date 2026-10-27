@@ -26,18 +26,18 @@ public class MyDocumentsController {
     private final SelfieVerificationRepository selfies;
     private final DocumentVerificationService verifier;
     private final DocumentService uploads;
-    private final CloudinaryService cloudinary;
+    private final S3StorageService storageService;
 
     public MyDocumentsController(AppSessionService sessions, UserDocumentRepository verifiedDocs,
             UserDocRepository uploadedDocs, SelfieVerificationRepository selfies,
-            DocumentVerificationService verifier, DocumentService uploads, CloudinaryService cloudinary) {
+            DocumentVerificationService verifier, DocumentService uploads, S3StorageService storageService) {
         this.sessions = sessions;
         this.verifiedDocs = verifiedDocs;
         this.uploadedDocs = uploadedDocs;
         this.selfies = selfies;
         this.verifier = verifier;
         this.uploads = uploads;
-        this.cloudinary = cloudinary;
+        this.storageService = storageService;
     }
 
     public record Item(String type, String title, String status, String note, String maskedNumber,
@@ -45,8 +45,8 @@ public class MyDocumentsController {
             List<String> media, boolean requiresBack, boolean uploadOnly, boolean liveCapture,
             String aadhaarNumber, String panNumber,
             Map<String, String> qrDetails, String qrPhotoUrl,
-            boolean requiresManualReview, String pendingReason, boolean required,
-            String requirementGroup) {}
+            boolean requiresManualReview, String pendingReason, List<String> mismatchFields,
+            boolean required, String requirementGroup) {}
 
     private List<String> types(String role) {
         if ("CLIENT".equals(role)) return List.of();
@@ -80,7 +80,7 @@ public class MyDocumentsController {
         return switch (type) {
             case "AADHAAR" -> "Aadhaar Card";
             case "PAN" -> "PAN Card";
-            case "BAR_COUNCIL_ID" -> "Bar Council ID";
+            case "BAR_COUNCIL_ID" -> "Bar Council ID Card";
             case "BAR_CERTIFICATE" -> "Bar Enrollment Certificate";
             case "CERTIFICATE_OF_PRACTICE" -> "Certificate of Practice";
             case "DEGREE_CERTIFICATE" -> "Law Degree Certificate";
@@ -146,8 +146,20 @@ public class MyDocumentsController {
             return ResponseEntity.ok().cacheControl(CacheControl.noStore())
                     .body(Map.of("panNumber", number));
         }
+        if ("BAR_COUNCIL_ID".equals(type)) {
+            var document = verifiedDocs.findByUserIdAndDocumentType(
+                            account.userId(), DocumentType.BAR_COUNCIL_ID)
+                    .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND,
+                            "Bar Council ID Card not found"));
+            String number = document.getExtractedData() == null
+                    ? null : document.getExtractedData().get("enrollmentNumber");
+            if (number == null || number.isBlank())
+                throw new ResponseStatusException(HttpStatus.NOT_FOUND, "Enrollment number is unavailable");
+            return ResponseEntity.ok().cacheControl(CacheControl.noStore())
+                    .body(Map.of("enrollmentNumber", number));
+        }
         throw new ResponseStatusException(HttpStatus.BAD_REQUEST,
-                "Number reveal is only available for Aadhaar and PAN");
+                "Number reveal is only available for Aadhaar, PAN and Bar Council ID Card");
     }
 
     @PostMapping(value = "/PAN/qr", consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
@@ -161,6 +173,20 @@ public class MyDocumentsController {
     }
 
     public record PanQrTextRequest(String qrText) {}
+
+    public record BarIdCodeRequest(String codeText, String format) {}
+
+    @PostMapping(value = "/BAR_COUNCIL_ID/code", consumes = MediaType.APPLICATION_JSON_VALUE)
+    public Item scanBarIdCode(@RequestHeader("Authorization") String authorization,
+            @RequestBody BarIdCodeRequest request) {
+        var account = sessions.requireAccount(authorization);
+        allow(account, "BAR_COUNCIL_ID");
+        if (request == null || request.codeText() == null || request.codeText().isBlank()) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "The scanned card code is empty.");
+        }
+        verifier.applyBarIdCode(account.userId(), request.codeText().trim(), request.format());
+        return item(account.userId(), account.role(), "BAR_COUNCIL_ID", false);
+    }
 
     @PostMapping(value = "/PAN/qr-text", consumes = MediaType.APPLICATION_JSON_VALUE)
     public Item scanPanQrText(@RequestHeader("Authorization") String authorization,
@@ -179,7 +205,7 @@ public class MyDocumentsController {
             var latest = selfies.findByUserIdOrderByCreatedAtDesc(userId).stream().findFirst();
             if (latest.isEmpty()) return new Item(type, title(type), "NOT_UPLOADED", "Complete the live camera check.",
                     null, Map.of(), null, null, List.of(), false, false, true, null, null, Map.of(), null,
-                    false, null, required(role, type), requirementGroup(type));
+                    false, null, List.of(), required(role, type), requirementGroup(type));
             var selfie = latest.get();
             String status = selfie.getVerificationStatus() == null ? "PENDING" : selfie.getVerificationStatus().name();
             List<String> media = selfie.getSelfieImageUrl() == null ? List.of() : List.of("selfie");
@@ -192,15 +218,15 @@ public class MyDocumentsController {
             return new Item(type, title(type), status,
                     note, null, Map.of(),
                     selfie.getCreatedAt(), selfie.getVerifiedAt(), media, false, false, true, null, null,
-                    Map.of(), null, false, null, required(role, type), requirementGroup(type));
+                    Map.of(), null, false, null, List.of(), required(role, type), requirementGroup(type));
         }
         var found = verifiedDocs.findByUserIdAndDocumentType(userId, DocumentType.valueOf(type));
         if (found.isEmpty()) return new Item(type, title(type), "NOT_UPLOADED", null, null,
                 Map.of(), null, null, List.of(), false, false, false, null, null,
-                Map.of(), null, false, null, required(role, type), requirementGroup(type));
+                Map.of(), null, false, null, List.of(), required(role, type), requirementGroup(type));
         var doc = found.get();
-        List<String> media = doc.getCloudinaryReferences() == null ? List.of() : doc.getCloudinaryReferences()
-                .stream().map(CloudinaryRef::getLabel).filter(Objects::nonNull).distinct().toList();
+        List<String> media = doc.getStorageReferences() == null ? List.of() : doc.getStorageReferences()
+                .stream().map(StorageRef::getLabel).filter(Objects::nonNull).distinct().toList();
         String note = doc.getVerificationStatus() == VerificationStatus.VERIFIED
                 ? null : cleanNote(doc.getFailureReason());
         return new Item(type, title(type), doc.getVerificationStatus().name(), note,
@@ -212,9 +238,18 @@ public class MyDocumentsController {
                 includeSensitiveNumbers && "PAN".equals(type)
                         && doc.getVerificationStatus() == VerificationStatus.VERIFIED
                         ? doc.getPanNumber() : null,
-                qrDetails(doc), qrPhotoUrl(doc),
+                "BAR_COUNCIL_ID".equals(type) ? barIdQrDetails(doc) : qrDetails(doc), qrPhotoUrl(doc),
                 Boolean.TRUE.equals(doc.getRequiresManualReview()), doc.getPendingReason(),
-                required(role, type), requirementGroup(type));
+                mismatchFields(doc), required(role, type), requirementGroup(type));
+    }
+
+    /** Field-level mismatches surfaced to the client (cross-document or QR-vs-printed). */
+    private List<String> mismatchFields(UserDocument doc) {
+        Set<String> fields = new LinkedHashSet<>();
+        if (doc.getCrossDocumentMismatchFields() != null) fields.addAll(doc.getCrossDocumentMismatchFields());
+        if (doc.getQrMismatchFields() != null) fields.addAll(doc.getQrMismatchFields());
+        fields.removeIf(field -> field == null || field.isBlank());
+        return List.copyOf(fields);
     }
 
     private String qrPhotoUrl(UserDocument doc) {
@@ -223,6 +258,21 @@ public class MyDocumentsController {
     }
 
     /** Verified Aadhaar details are displayed from the signed QR, not noisy OCR text. */
+    private Map<String, String> barIdQrDetails(UserDocument doc) {
+        Map<String, String> fields = doc.getExtractedData();
+        Map<String, String> values = new LinkedHashMap<>();
+        String name = fields == null ? null : fields.get("name");
+        values.put("Name", name == null || name.isBlank() ? "Not available" : name);
+        if (fields == null) return values;
+        putIfPresent(values, "State Bar Council", fields.get("stateCouncil"));
+        putIfPresent(values, "Enrollment Year", fields.get("enrollmentYear"));
+        String matched = fields.get("barcodeMatchesOcr");
+        if ("true".equals(matched)) values.put("Card code", "Matched printed card");
+        else if ("not_applicable".equals(matched)) values.put("Card code", "Scanned from card");
+        putIfPresent(values, "Code format", fields.get("barcodeFormat"));
+        return values;
+    }
+
     private Map<String, String> qrDetails(UserDocument doc) {
         QrData qr = doc.getQrData();
         if (qr == null || doc.getVerificationStatus() != VerificationStatus.VERIFIED) return Map.of();
@@ -285,19 +335,19 @@ public class MyDocumentsController {
             @PathVariable String type, @PathVariable String side) throws IOException {
         var account = sessions.requireAccount(authorization);
         allow(account, type);
-        CloudinaryRef ref;
+        StorageRef ref;
         if ("SELFIE".equals(type)) {
             if (!"selfie".equals(side)) throw new ResponseStatusException(HttpStatus.NOT_FOUND);
             var doc = selfies.findByUserIdOrderByCreatedAtDesc(account.userId()).stream().findFirst()
                     .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND));
-            ref = new CloudinaryRef(doc.getSelfiePublicId(), doc.getSelfieImageUrl(), side);
+            ref = new StorageRef(doc.getSelfiePublicId(), doc.getSelfieImageUrl(), side);
         } else {
             var doc = verifiedDocs.findByUserIdAndDocumentType(account.userId(), DocumentType.valueOf(type))
                     .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND));
-            ref = doc.getCloudinaryReferences().stream().filter(r -> side.equals(r.getLabel())).findFirst()
+            ref = doc.getStorageReferences().stream().filter(r -> side.equals(r.getLabel())).findFirst()
                     .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND));
         }
-        byte[] bytes = cloudinary.downloadReference(ref);
+        byte[] bytes = storageService.downloadReference(ref);
         MediaType contentType = imageMediaType(bytes);
         log.info("Document media delivered: type={}, side={}, bytes={}", type, side, bytes.length);
         return ResponseEntity.ok().contentType(contentType).cacheControl(CacheControl.noStore()).body(bytes);

@@ -18,14 +18,14 @@ public class DocumentService {
     private UserDocRepository userDocRepository;
 
     @Autowired
-    private CloudinaryService cloudinaryService;
+    private S3StorageService storageService;
 
     // ✅ Upload document - Saves to S3 AND MongoDB
     public UserDoc uploadDocument(String userId, DocType docType, MultipartFile file) throws Exception {
         file = DocumentImageCompressor.compressIfNeeded(file);
         // 1. Upload to S3
         String folder = "documents/" + docType.name();
-        String fileUrl = cloudinaryService.uploadFile(file, folder);
+        String fileUrl = storageService.uploadFile(file, folder);
 
         // 2. Save metadata to MongoDB
         UserDoc userDoc = userDocRepository.findByUserIdAndDocType(userId, docType)
@@ -57,8 +57,8 @@ public class DocumentService {
         }
 
         // 2. Generate pre-signed URL from S3
-        String publicId = cloudinaryService.extractPublicId(fileUrl);
-        String signedUrl = cloudinaryService.getSignedUrl(publicId);
+        String publicId = storageService.extractPublicId(fileUrl);
+        String signedUrl = storageService.getSignedUrl(publicId);
 
         // Update MongoDB so the stored URL stays fresh and viewable
         doc.setFileUrl(signedUrl);
@@ -72,8 +72,8 @@ public class DocumentService {
         List<UserDoc> docs = userDocRepository.findByUserId(userId);
         for (UserDoc doc : docs) {
             if (doc.getFileUrl() != null && !doc.getFileUrl().isEmpty()) {
-                String publicId = cloudinaryService.extractPublicId(doc.getFileUrl());
-                doc.setFileUrl(cloudinaryService.getSignedUrl(publicId));
+                String publicId = storageService.extractPublicId(doc.getFileUrl());
+                doc.setFileUrl(storageService.getSignedUrl(publicId));
             }
         }
         return docs;
@@ -84,14 +84,14 @@ public class DocumentService {
         return userDocRepository.findByUserIdAndDocType(userId, docType)
                 .map(doc -> {
                     if (doc.getFileUrl() != null && !doc.getFileUrl().isEmpty()) {
-                        String publicId = cloudinaryService.extractPublicId(doc.getFileUrl());
-                        doc.setFileUrl(cloudinaryService.getSignedUrl(publicId));
+                        String publicId = storageService.extractPublicId(doc.getFileUrl());
+                        doc.setFileUrl(storageService.getSignedUrl(publicId));
                     }
                     return doc;
                 });
     }
 
-    // ✅ Delete document - From Cloudinary AND MongoDB
+    // ✅ Delete document - From S3 AND MongoDB
     public void deleteDocument(String userId, DocType docType) throws Exception {
         // 1. Get document metadata from MongoDB
         Optional<UserDoc> docOptional = userDocRepository.findByUserIdAndDocType(userId, docType);
@@ -105,8 +105,8 @@ public class DocumentService {
         // 2. Delete from S3
         if (doc.getFileUrl() != null && !doc.getFileUrl().isEmpty()) {
             try {
-                String publicId = cloudinaryService.extractPublicId(doc.getFileUrl());
-                cloudinaryService.deleteFile(publicId);
+                String publicId = storageService.extractPublicId(doc.getFileUrl());
+                storageService.deleteFile(publicId);
             } catch (Exception e) {
                 System.err.println("Failed to delete from S3: " + e.getMessage());
             }

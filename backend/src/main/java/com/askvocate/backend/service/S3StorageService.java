@@ -1,6 +1,6 @@
 package com.askvocate.backend.service;
 
-import com.askvocate.backend.model.CloudinaryRef;
+import com.askvocate.backend.model.StorageRef;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Value;
@@ -21,13 +21,10 @@ import java.util.UUID;
 /**
  * AWS S3-backed file storage service.
  *
- * <p>Drop-in replacement for the previous Cloudinary-based service.
- * All methods keep identical signatures so callers require no changes.
- *
- * <p>S3 key layout mirrors the old Cloudinary folder/public-id convention:
- * {@code <folder>/<uuid>.<ext>}.  The "publicId" stored in {@link CloudinaryRef}
- * is therefore the full S3 object key and the "secureUrl" is the pre-signed URL
- * (regenerated on demand) or the public HTTPS URL when the bucket is public.
+ * <p>All document, selfie and QR images are written here. Keys follow
+ * {@code <folder>/<tag>-<uuid>.<ext>}, so the "publicId" held in a
+ * {@link StorageRef} is the full S3 object key and its "secureUrl" is a
+ * pre-signed URL, regenerated on demand. The bucket itself is private.
  */
 @Service
 public class S3StorageService {
@@ -113,7 +110,7 @@ public class S3StorageService {
         return "https://" + bucketName + ".s3." + region + ".amazonaws.com/" + key;
     }
 
-    // ── Public API (mirrors old CloudinaryService) ────────────────────
+    // ── Public API ──────────────────────────────────────────────────
 
     /**
      * Uploads a document image to S3 and returns a pre-signed URL (up to 7 days).
@@ -126,36 +123,36 @@ public class S3StorageService {
     }
 
     /**
-     * Uploads a selfie image and returns a {@link CloudinaryRef} carrying the
+     * Uploads a selfie image and returns a {@link StorageRef} carrying the
      * S3 key as {@code publicId} and the pre-signed URL as {@code secureUrl}.
      */
-    public CloudinaryRef uploadSelfie(MultipartFile file, String folder) throws IOException {
+    public StorageRef uploadSelfie(MultipartFile file, String folder) throws IOException {
         String key = buildKey(folder, "selfie", extension(file));
         putObject(file.getBytes(), key, contentType(file));
-        return new CloudinaryRef(key, getSignedUrl(key), "selfie");
+        return new StorageRef(key, getSignedUrl(key), "selfie");
     }
 
     /**
      * Uploads arbitrary bytes (e.g. a QR photo extracted from a PAN card)
-     * and returns a {@link CloudinaryRef} with the pre-signed URL.
+     * and returns a {@link StorageRef} with the pre-signed URL.
      *
      * @param bytes   raw image bytes
      * @param folder  S3 folder prefix
-     * @param tag     label stored in {@link CloudinaryRef#getLabel()}
+     * @param tag     label stored in {@link StorageRef#getLabel()}
      */
-    public CloudinaryRef uploadBytes(byte[] bytes, String folder, String tag) throws IOException {
+    public StorageRef uploadBytes(byte[] bytes, String folder, String tag) throws IOException {
         String key = buildKey(folder, tag, ".jpg");
         putObject(bytes, key, "image/jpeg");
-        return new CloudinaryRef(key, getSignedUrl(key), tag);
+        return new StorageRef(key, getSignedUrl(key), tag);
     }
 
     /**
      * Downloads an image from S3 using the object key stored in the
-     * {@link CloudinaryRef#getPublicId()} field.
+     * {@link StorageRef#getPublicId()} field.
      *
-     * <p>Enforces a 30 MB safety cap identical to the previous Cloudinary implementation.
+     * <p>Enforces a 30 MB safety cap on the delivered image.
      */
-    public byte[] downloadReference(CloudinaryRef ref) throws IOException {
+    public byte[] downloadReference(StorageRef ref) throws IOException {
         String key = ref.getPublicId();
         if (key == null || key.isBlank()) {
             throw new IOException("Invalid S3 object key in storage reference.");
@@ -179,20 +176,21 @@ public class S3StorageService {
     }
 
     /**
-     * Runs free local OCR before uploading the file to S3.
-     * Return type mirrors the previous {@code CloudinaryService.UploadResult} record.
+     * Runs free local OCR before uploading the file to S3, returning the OCR data
+     * alongside the stored object's key and pre-signed URL.
      */
     public UploadResult uploadWithOcr(MultipartFile file, String folder, String tag) throws IOException {
         byte[] image = file.getBytes();
         boolean qrOnly = folder.endsWith("/AADHAAR") || folder.endsWith("/PAN");
-        Map<String, Object> ocrData = qrOnly ? Map.of() : visionVerificationClient.localOcr(
-                image, folder.endsWith("/AADHAAR") ? tag : folder.endsWith("/PAN") ? "pan" : "");
+        // Certificate documents get the dedicated multi-pass Tesseract path.
+        Map<String, Object> ocrData = qrOnly ? Map.of()
+                : visionVerificationClient.localOcr(image, "certificate");
 
         String ext = extension(file);
         String key = buildKey(folder, tag, ext);
         putObject(image, key, contentType(file));
 
-        CloudinaryRef ref = new CloudinaryRef();
+        StorageRef ref = new StorageRef();
         ref.setPublicId(key);
         ref.setSecureUrl(getSignedUrl(key));
         ref.setLabel(tag);
@@ -272,11 +270,11 @@ public class S3StorageService {
     /**
      * Result of uploading a file with OCR to S3.
      *
-     * @param cloudinaryRef reference to the uploaded asset (S3 key as publicId, public URL as secureUrl)
+     * @param storageRef reference to the uploaded asset (S3 key as publicId, public URL as secureUrl)
      * @param rawOcrData    the raw OCR extraction data (if available)
      */
     public record UploadResult(
-            CloudinaryRef cloudinaryRef,
+            StorageRef storageRef,
             Object rawOcrData
     ) {}
 }

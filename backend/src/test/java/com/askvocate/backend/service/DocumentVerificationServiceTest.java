@@ -33,7 +33,7 @@ import static org.mockito.Mockito.*;
 class DocumentVerificationServiceTest {
 
     @Mock
-    private CloudinaryService cloudinaryService;
+    private S3StorageService storageService;
 
     @Mock
     private OcrExtractionService ocrExtractionService;

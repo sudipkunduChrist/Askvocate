@@ -109,6 +109,28 @@ public class UserDocument {
     @Setter
     private List<String> crossDocumentMismatchFields;
 
+    /** Machine-generated risk flags for admin review (e.g. {@code FOREIGN_UNIVERSITY}). */
+    @Setter
+    private List<String> verificationFlags;
+
+    /** Reviewer-completed checklist for manual review (checklist key -> checked). */
+    @Setter
+    private Map<String, Boolean> reviewChecklist;
+
+    /** Canonical BCI institution matched from OCR. */
+    @Setter
+    private String institutionCanonicalName;
+    @Setter
+    private String institutionMatchType;
+    @Setter
+    private Double institutionMatchScore;
+    @Setter
+    private Boolean courseApproved;
+    @Setter
+    private Boolean approvalValid;
+    @Setter
+    private String bciRegistryVersion;
+
     /** Admin account that reviewed this document. */
     @Setter
     private String reviewedBy;
@@ -120,9 +142,9 @@ public class UserDocument {
     @Setter
     private String reviewNotes;
 
-    /** References to the uploaded images on Cloudinary. */
+    /** References to the uploaded images in S3. */
     @Setter
-    private List<CloudinaryRef> cloudinaryReferences = new ArrayList<>();
+    private List<StorageRef> storageReferences = new ArrayList<>();
 
     /** OCR confidence score (0.0–1.0). */
     @Setter

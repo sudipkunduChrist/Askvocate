@@ -12,13 +12,6 @@ class AadhaarOcrExtractionTest {
     private final OcrExtractionService ocr = new OcrExtractionService();
 
     @Test
-    void readsCloudinaryFullTextAnnotationDescription() {
-        Map<String, Object> response = Map.of("ocr", Map.of("adv_ocr", Map.of("data", List.of(
-                Map.of("textAnnotations", List.of(Map.of("description", "Aadhaar\nTest Lawyer")))))));
-        assertEquals("Aadhaar\nTest Lawyer", ocr.extractTextFromOcrResponse(response));
-    }
-
-    @Test
     void extractsDistinctFrontAndBackFieldsWithoutUsingIssueDateAsDob() {
         String number = validAadhaarNumber();
         var front = ocr.extract("Government of India\nTest Lawyer\nDOB: 01/02/1990\nFemale\n"

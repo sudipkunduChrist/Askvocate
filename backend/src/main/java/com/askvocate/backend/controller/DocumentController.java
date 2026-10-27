@@ -50,7 +50,7 @@ public class DocumentController {
             return ResponseEntity.ok(Map.of(
                     "success", true,
                     "message", "Document uploaded successfully",
-                    "document", doc  // Returns MongoDB document with Cloudinary URL
+                    "document", doc  // Returns the MongoDB document with a pre-signed S3 URL
             ));
         } catch (Exception e) {
             return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)

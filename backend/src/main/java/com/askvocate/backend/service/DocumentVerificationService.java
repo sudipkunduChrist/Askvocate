@@ -27,6 +27,7 @@ import java.nio.charset.StandardCharsets;
 import javax.crypto.Mac;
 import javax.crypto.spec.SecretKeySpec;
 import java.util.*;
+import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 import tools.jackson.databind.ObjectMapper;
 
@@ -44,9 +45,10 @@ public class DocumentVerificationService {
     private static final Pattern PAN_STRUCTURE =
             Pattern.compile("[A-Z]{3}[PCHFATBLJG][A-Z][0-9]{4}[A-Z]");
 
-    private final CloudinaryService cloudinaryService;
+    private final S3StorageService storageService;
     private final OcrExtractionService ocrExtractionService;
     private final BarCouncilValidationService barCouncilValidationService;
+    private final DegreeCertificatePolicy degreeCertificatePolicy;
     private final UserDocumentRepository documentRepository;
     private final LawyerExperiencedProfileRepository lawyerExperiencedProfileRepository;
     private final LawyerFresherProfileRepository lawyerFresherProfileRepository;
@@ -56,23 +58,9 @@ public class DocumentVerificationService {
     private final String aadhaarHashKey;
 
     @Autowired(required = false)
-    private S3StorageService s3StorageService;
-
-    @Autowired(required = false)
-    private AwsTextractService awsTextractService;
-
-    @Autowired(required = false)
     private AdvocateVerificationApiClient advocateVerificationApiClient;
 
     public record GoldenIdentity(String name, String dob, String fatherName, String gender, String source) {}
-
-    public void setS3StorageService(S3StorageService s3StorageService) {
-        this.s3StorageService = s3StorageService;
-    }
-
-    public void setAwsTextractService(AwsTextractService awsTextractService) {
-        this.awsTextractService = awsTextractService;
-    }
 
     public void setAdvocateVerificationApiClient(AdvocateVerificationApiClient advocateVerificationApiClient) {
         this.advocateVerificationApiClient = advocateVerificationApiClient;
@@ -140,9 +128,10 @@ public class DocumentVerificationService {
         return Optional.empty();
     }
 
-    public DocumentVerificationService(CloudinaryService cloudinaryService,
+    public DocumentVerificationService(S3StorageService storageService,
                                        OcrExtractionService ocrExtractionService,
                                        BarCouncilValidationService barCouncilValidationService,
+                                       DegreeCertificatePolicy degreeCertificatePolicy,
                                        UserDocumentRepository documentRepository,
                                        LawyerExperiencedProfileRepository lawyerExperiencedProfileRepository,
                                        LawyerFresherProfileRepository lawyerFresherProfileRepository,
@@ -150,9 +139,10 @@ public class DocumentVerificationService {
                                        VisionVerificationClient visionVerificationClient,
                                        SelfieVerificationRepository selfieVerificationRepository,
                                        @Value("${verification.aadhaar-hash-key:}") String aadhaarHashKey) {
-        this.cloudinaryService = cloudinaryService;
+        this.storageService = storageService;
         this.ocrExtractionService = ocrExtractionService;
         this.barCouncilValidationService = barCouncilValidationService;
+        this.degreeCertificatePolicy = degreeCertificatePolicy;
         this.documentRepository = documentRepository;
         this.lawyerExperiencedProfileRepository = lawyerExperiencedProfileRepository;
         this.lawyerFresherProfileRepository = lawyerFresherProfileRepository;
@@ -160,6 +150,9 @@ public class DocumentVerificationService {
         this.visionVerificationClient = visionVerificationClient;
         this.selfieVerificationRepository = selfieVerificationRepository;
         this.aadhaarHashKey = aadhaarHashKey;
+        if (aadhaarHashKey == null || aadhaarHashKey.isBlank()) {
+            log.warn("AADHAAR_HASH_KEY is not set: duplicate identity/enrollment detection is disabled.");
+        }
     }
 
     /**
@@ -187,16 +180,24 @@ public class DocumentVerificationService {
         rejectCompletedLawyerVerification(userId);
 
         String folder = "documents/" + documentType.name();
-        List<CloudinaryRef> cloudinaryRefs = new ArrayList<>();
+        List<StorageRef> storageRefs = new ArrayList<>();
         OcrExtractionService.ExtractionResult extractionResult;
+        StringBuilder degreeOcrText = new StringBuilder();
+        Object degreeRawOcrData = null;
         String failureFile = null;
         String currentFile = safeFileName(frontImage);
 
         try {
             // 2. Upload front image with OCR
             log.info("Uploading front image for documentType={}, bytes={}", documentType, frontImage.getSize());
-            CloudinaryService.UploadResult frontResult = uploadWithOcr(frontImage, folder, "front");
-            cloudinaryRefs.add(frontResult.cloudinaryRef());
+            S3StorageService.UploadResult frontResult = uploadWithOcr(frontImage, folder, "front");
+            storageRefs.add(frontResult.storageRef());
+            if (documentType == DocumentType.DEGREE_CERTIFICATE) {
+                degreeOcrText.append(ocrText(frontResult.rawOcrData())).append('\n');
+            }
+            if (documentType != DocumentType.AADHAAR && documentType != DocumentType.PAN) {
+                degreeRawOcrData = frontResult.rawOcrData();
+            }
 
             // 3. Extract OCR from front
             OcrExtractionService.ExtractionResult frontExtraction =
@@ -207,8 +208,11 @@ public class DocumentVerificationService {
             if (backImage != null && !backImage.isEmpty()) {
                 currentFile = safeFileName(backImage);
                 log.info("Uploading back image for documentType={}, bytes={}", documentType, backImage.getSize());
-                CloudinaryService.UploadResult backResult = uploadWithOcr(backImage, folder, "back");
-                cloudinaryRefs.add(backResult.cloudinaryRef());
+                S3StorageService.UploadResult backResult = uploadWithOcr(backImage, folder, "back");
+                storageRefs.add(backResult.storageRef());
+                if (documentType == DocumentType.DEGREE_CERTIFICATE) {
+                    degreeOcrText.append(ocrText(backResult.rawOcrData())).append('\n');
+                }
 
                 OcrExtractionService.ExtractionResult backExtraction =
                         ocrExtractionService.extract(backResult.rawOcrData(), documentType, "back");
@@ -222,35 +226,10 @@ public class DocumentVerificationService {
                 extractionResult = frontExtraction;
             }
 
-            // AWS Textract AI Enrichment: If Textract is available, extract AI queries directly from front image
-            if (awsTextractService != null && awsTextractService.isAvailable()
-                    && documentType != DocumentType.AADHAAR && documentType != DocumentType.PAN) {
-                try {
-                    var textractOpt = awsTextractService.extractDocument(frontImage.getBytes(), documentType);
-                    if (textractOpt.isPresent()) {
-                        var tr = textractOpt.get();
-                        if (!tr.queriedFields().isEmpty()) {
-                            Map<String, String> merged = new LinkedHashMap<>(extractionResult.extractedFields());
-                            tr.queriedFields().forEach((k, v) -> {
-                                if (v != null && !v.isBlank() && !merged.containsKey(k)) {
-                                    merged.put(k, v);
-                                }
-                            });
-                            extractionResult = new OcrExtractionService.ExtractionResult(
-                                    true, merged, extractionResult.panNumber(),
-                                    Math.max(extractionResult.confidence(), tr.confidence()),
-                                    extractionResult.maskedDocumentNumber(), null);
-                        }
-                    }
-                } catch (Exception te) {
-                    log.warn("Textract enrichment skipped: {}", te.getMessage());
-                }
-            }
-
         } catch (Exception e) {
             // Clean up any uploaded assets on failure
             try {
-                cleanupCloudinaryAssets(cloudinaryRefs);
+                cleanupStorageAssets(storageRefs);
             } catch (Exception cleanupException) {
                 log.warn("Failed to clean up S3 assets after verification failure", cleanupException);
             }
@@ -269,7 +248,6 @@ public class DocumentVerificationService {
                 : null;
         QrData qrData = qrScan == null ? null : qrScan.data();
         boolean qrVerified = qrScan != null && qrScan.verified();
-        boolean qrMismatch = qrVerified && qrScan.printedMismatch();
         boolean ocrSuccess = extractionResult.success();
         PanQrAttempt panQrAttempt = documentType == DocumentType.PAN
                 ? readPanQr(frontImage, userId) : new PanQrAttempt(null, null);
@@ -294,7 +272,7 @@ public class DocumentVerificationService {
             }
         } else if (documentType != DocumentType.AADHAAR) {
             // Bar Council, COP, Degree and AIBE verification logic is evaluated below
-            // using the Golden Identity (Aadhaar/PAN) cross-matching and AWS Textract.
+            // using the Golden Identity (Aadhaar/PAN) cross-matching and local OCR.
             status = VerificationStatus.PENDING;
         } else if (qrVerified) {
             // The signed UIDAI QR is the authority; printed OCR is no longer a gate.
@@ -333,21 +311,51 @@ public class DocumentVerificationService {
         boolean isBarDocument = documentType == DocumentType.BAR_COUNCIL_ID
                 || documentType == DocumentType.BAR_CERTIFICATE
                 || documentType == DocumentType.CERTIFICATE_OF_PRACTICE;
-        String extractedName = extractionResult.extractedFields().get("name");
-        String profileName = lawyerProfileName(userId);
         Optional<GoldenIdentity> goldenIdentityOpt = findGoldenIdentity(userId);
         boolean identityVerified = goldenIdentityOpt.isPresent();
+        boolean certificateDocument = documentType == DocumentType.DEGREE_CERTIFICATE
+                || documentType == DocumentType.BAR_CERTIFICATE
+                || documentType == DocumentType.BAR_COUNCIL_ID
+                || documentType == DocumentType.CERTIFICATE_OF_PRACTICE
+                || documentType == DocumentType.AIBE_CERTIFICATE;
+        if (certificateDocument && identityVerified && degreeRawOcrData != null) {
+            String matchedName = ocrExtractionService.bestNameFor(
+                    degreeRawOcrData, goldenIdentityOpt.get().name());
+            if (matchedName != null) {
+                Map<String, String> fields = new LinkedHashMap<>(extractionResult.extractedFields());
+                fields.put("name", matchedName);
+                extractionResult = new OcrExtractionService.ExtractionResult(
+                        true, fields, extractionResult.maskedDocumentNumber(),
+                        extractionResult.confidence(), null,
+                        extractionResult.aadhaarNumber(), extractionResult.panNumber());
+            }
+        }
+        String extractedName = extractionResult.extractedFields().get("name");
+        String profileName = lawyerProfileName(userId);
         String verifiedName = identityVerified ? goldenIdentityOpt.get().name() : profileName;
 
         boolean certificateNameMismatch = extractedName != null && verifiedName != null
                 && !barCouncilValidationService.isNameMatching(extractedName, verifiedName);
+        DegreeCertificatePolicy.Decision degreeDecision = null;
+        DegreeCertificatePolicy.DegreeEvidence degreeEvidence = null;
+        if (documentType == DocumentType.DEGREE_CERTIFICATE) {
+            var fields = extractionResult.extractedFields();
+            degreeEvidence = new DegreeCertificatePolicy.DegreeEvidence(
+                    fields.get("institution"), fields.get("college"), fields.get("degreeType"),
+                    fields.get("courseDuration"), fields.get("year"), fields.get("passingYear"),
+                    fields.get("issueDate"));
+            degreeDecision = degreeCertificatePolicy.evaluate(degreeOcrText.toString(), extractedName,
+                    identityVerified ? goldenIdentityOpt.get().name() : null,
+                    extractionResult.confidence(), degreeEvidence);
+        }
         String enrollmentNumber = extractionResult.extractedFields().get("enrollmentNumber");
         String enrollmentHash = null;
         boolean duplicateEnrollment = false;
         AdvocateVerificationApiClient.AdvocateVerificationResult externalBarCheck = null;
         if (isBarDocument && enrollmentNumber != null && !enrollmentNumber.isBlank()) {
             enrollmentHash = hashEnrollment(enrollmentNumber);
-            Optional<UserDocument> duplicate = documentRepository.findByEnrollmentNumberHash(enrollmentHash);
+            Optional<UserDocument> duplicate = enrollmentHash == null ? Optional.empty()
+                    : documentRepository.findByEnrollmentNumberHash(enrollmentHash);
             duplicateEnrollment = duplicate.isPresent()
                     && !Objects.equals(userId, duplicate.get().getUserId());
 
@@ -367,10 +375,13 @@ public class DocumentVerificationService {
         }
 
         // Determine verification status:
+        // CASE 0: Degree policy rejected the certificate outright.
         // CASE 1: Identity (Aadhaar or PAN) is ALREADY verified -> Auto-approve clean certificates!
         // CASE 2: Identity is NOT yet verified -> Mark AWAITING_IDENTITY (will auto-approve retroactively)
         if (documentType != DocumentType.AADHAAR && documentType != DocumentType.PAN) {
-            if (identityVerified) {
+            if (degreeDecision != null && degreeDecision.rejected()) {
+                status = VerificationStatus.REJECTED;
+            } else if (identityVerified) {
                 if (isBarDocument) {
                     if (ocrSuccess && enrollmentNumber != null && !duplicateEnrollment && !certificateNameMismatch) {
                         status = VerificationStatus.VERIFIED;
@@ -378,7 +389,9 @@ public class DocumentVerificationService {
                         status = VerificationStatus.PENDING;
                     }
                 } else if (documentType == DocumentType.DEGREE_CERTIFICATE || documentType == DocumentType.AIBE_CERTIFICATE) {
-                    if (ocrSuccess && !certificateNameMismatch) {
+                    if (degreeDecision != null && degreeDecision.manualReview()) {
+                        status = VerificationStatus.PENDING;
+                    } else if (ocrSuccess && !certificateNameMismatch) {
                         status = VerificationStatus.VERIFIED;
                     } else {
                         status = VerificationStatus.PENDING;
@@ -418,8 +431,16 @@ public class DocumentVerificationService {
                     case AIBE_CERTIFICATE -> "AIBE";
                     default -> "DOC";
                 };
-                if (!ocrSuccess) {
-                    pendingReason = prefix + "_OCR_UNREADABLE";
+                if (degreeDecision != null && degreeDecision.manualReview()) {
+                    pendingReason = degreeDecision.reasonCode();
+                    requiresManualReview = true;
+                } else if (!ocrSuccess) {
+                    if (documentType == DocumentType.DEGREE_CERTIFICATE) {
+                        pendingReason = "DEGREE_OCR_INCOMPLETE";
+                        requiresManualReview = true;
+                    } else {
+                        pendingReason = prefix + "_OCR_UNREADABLE";
+                    }
                 } else if (duplicateEnrollment) {
                     pendingReason = "BAR_DUPLICATE";
                     requiresManualReview = true;
@@ -435,22 +456,32 @@ public class DocumentVerificationService {
                 }
             }
         }
+        if (degreeDecision != null && degreeDecision.rejected()) {
+            pendingReason = degreeDecision.reasonCode();
+            manualReviewReason = degreeDecision.userMessage();
+        }
         if ("PAN_WAITING_AADHAAR".equals(pendingReason)) {
             manualReviewReason = "PAN QR verified. Verify your Aadhaar to complete PAN verification automatically.";
         }
         if (status == VerificationStatus.PENDING && documentType != DocumentType.AADHAAR
                 && documentType != DocumentType.PAN) {
-            manualReviewReason = switch (pendingReason == null ? "" : pendingReason) {
-                case "AWAITING_IDENTITY" ->
-                        "Certificate uploaded and validated. Verify your Aadhaar or PAN card to complete verification automatically.";
-                case "BAR_OCR_UNREADABLE", "DEGREE_OCR_UNREADABLE", "AIBE_OCR_UNREADABLE" ->
-                        "Invalid '" + documentTypeLabel(documentType) + "'. Please upload again for verification.";
-                case "BAR_DUPLICATE" ->
-                        "This Bar Council enrollment number is already registered to another account. Manual review is in progress.";
-                case "BAR_MISMATCH", "DEGREE_MISMATCH", "AIBE_MISMATCH" ->
-                        "The content on '" + documentTypeLabel(documentType) + "' does not match your verified profile. Sent for manual review.";
-                default -> "'" + documentTypeLabel(documentType) + "' is blurry or unclear. Sent for manual review.";
-            };
+            if (degreeDecision != null && degreeDecision.manualReview()) {
+                manualReviewReason = degreeDecision.userMessage();
+            } else {
+                manualReviewReason = switch (pendingReason == null ? "" : pendingReason) {
+                    case "AWAITING_IDENTITY" ->
+                            "Certificate uploaded and validated. Verify your Aadhaar or PAN card to complete verification automatically.";
+                    case "BAR_OCR_UNREADABLE", "DEGREE_OCR_UNREADABLE", "AIBE_OCR_UNREADABLE" ->
+                            "Invalid '" + documentTypeLabel(documentType) + "'. Please upload again for verification.";
+                    case "DEGREE_OCR_INCOMPLETE" ->
+                            "We could read this certificate but not the holder's name. Sent for manual review.";
+                    case "BAR_DUPLICATE" ->
+                            "This Bar Council enrollment number is already registered to another account. Manual review is in progress.";
+                    case "BAR_MISMATCH", "DEGREE_MISMATCH", "AIBE_MISMATCH" ->
+                            "The content on '" + documentTypeLabel(documentType) + "' does not match your verified profile. Sent for manual review.";
+                    default -> "'" + documentTypeLabel(documentType) + "' is blurry or unclear. Sent for manual review.";
+                };
+            }
         }
 
         // PAN evidence is kept only when the card is fully auto-verified, the QR was
@@ -469,8 +500,8 @@ public class DocumentVerificationService {
                 || (documentType == DocumentType.PAN && !keepPanEvidence);
         if (discardUploads) {
             log.info("Cleaning temporary S3 assets: type={}, status={}", documentType, status);
-            cleanupCloudinaryAssets(cloudinaryRefs);
-            cloudinaryRefs = new ArrayList<>();
+            cleanupStorageAssets(storageRefs);
+            storageRefs = new ArrayList<>();
         }
 
         // 6. Look up existing document record or create a new one (supports re-verification)
@@ -479,8 +510,8 @@ public class DocumentVerificationService {
         String previousQrPhoto = userDocument.getQrData() == null
                 ? null : userDocument.getQrData().getPhotoPublicId();
         String previousPanQrPhoto = userDocument.getPanQrPhotoPublicId();
-        List<CloudinaryRef> previousRefs = userDocument.getCloudinaryReferences() == null
-                ? List.of() : new ArrayList<>(userDocument.getCloudinaryReferences());
+        List<StorageRef> previousRefs = userDocument.getStorageReferences() == null
+                ? List.of() : new ArrayList<>(userDocument.getStorageReferences());
 
         userDocument.setUserId(userId);
         userDocument.setDocumentType(documentType);
@@ -536,15 +567,41 @@ public class DocumentVerificationService {
             userDocument.setPanQrPhotoPublicId(keepQrPhoto ? panQrScan.photoPublicId() : null);
             if (!keepQrPhoto && panQrScan != null && panQrScan.photoPublicId() != null) {
                 try {
-                    cloudinaryService.delete(panQrScan.photoPublicId());
+                    storageService.delete(panQrScan.photoPublicId());
                 } catch (Exception error) {
                     log.warn("Could not delete unused PAN QR photo: {}", error.getClass().getSimpleName());
                 }
             }
         }
-        userDocument.setCrossDocumentMismatchFields(documentType == DocumentType.PAN
-                && panEvaluation != null && !panEvaluation.mismatches().isEmpty()
-                ? panEvaluation.mismatches() : null);
+        List<String> mismatchFields = null;
+        if (documentType == DocumentType.PAN && panEvaluation != null && !panEvaluation.mismatches().isEmpty()) {
+            mismatchFields = panEvaluation.mismatches();
+        } else if (certificateNameMismatch) {
+            mismatchFields = List.of("name");
+        }
+        userDocument.setCrossDocumentMismatchFields(mismatchFields);
+        userDocument.setVerificationFlags(degreeDecision != null && !degreeDecision.flags().isEmpty()
+                ? degreeDecision.flags() : null);
+        if (documentType == DocumentType.DEGREE_CERTIFICATE && degreeEvidence != null) {
+            String institutionText = String.join("\n",
+                    degreeEvidence.institution() == null ? "" : degreeEvidence.institution(),
+                    degreeEvidence.college() == null ? "" : degreeEvidence.college());
+            DegreeInstitutionAllowlist.Match institutionMatch = degreeCertificatePolicy.matchInstitution(
+                    institutionText + "\n" + degreeOcrText);
+            userDocument.setInstitutionCanonicalName(institutionMatch == null ? null : institutionMatch.name());
+            userDocument.setInstitutionMatchType(institutionMatch == null ? null : institutionMatch.matchType());
+            userDocument.setInstitutionMatchScore(institutionMatch == null ? null : institutionMatch.score());
+            userDocument.setCourseApproved(degreeCertificatePolicy.courseApproved(institutionMatch, degreeEvidence));
+            userDocument.setApprovalValid(degreeCertificatePolicy.approvalValid(institutionMatch, degreeEvidence));
+            userDocument.setBciRegistryVersion(degreeCertificatePolicy.registryVersion());
+        } else {
+            userDocument.setInstitutionCanonicalName(null);
+            userDocument.setInstitutionMatchType(null);
+            userDocument.setInstitutionMatchScore(null);
+            userDocument.setCourseApproved(null);
+            userDocument.setApprovalValid(null);
+            userDocument.setBciRegistryVersion(null);
+        }
         userDocument.setReviewedBy(null);
         userDocument.setReviewedAt(null);
         userDocument.setReviewDecision(null);
@@ -552,12 +609,12 @@ public class DocumentVerificationService {
         boolean discardPanEvidence = documentType == DocumentType.PAN && discardUploads;
         if (discardPanEvidence) {
             // PAN images are only kept for auto-verified or QR-unreadable manual review.
-            userDocument.setCloudinaryReferences(new ArrayList<>());
+            userDocument.setStorageReferences(new ArrayList<>());
         } else if (status == VerificationStatus.FAILED && !previousRefs.isEmpty()) {
             // Non-PAN hard failure: keep the last reviewable evidence.
-            userDocument.setCloudinaryReferences(previousRefs);
+            userDocument.setStorageReferences(previousRefs);
         } else {
-            userDocument.setCloudinaryReferences(cloudinaryRefs);
+            userDocument.setStorageReferences(storageRefs);
         }
         userDocument.setOcrConfidence(extractionResult.confidence());
         userDocument.setQrData(qrData);
@@ -573,8 +630,11 @@ public class DocumentVerificationService {
             userDocument.setIsQrVerified(qrVerified);
             userDocument.setQrImageSide(qrScan == null ? null : qrScan.side());
             userDocument.setQrDecodedData(qrDecodedData(qrData));
+            // The signed QR remains the authority; keep the verification flag false but
+            // retain the field list so the app can explain what differed on the card.
             userDocument.setQrPrintedMismatch(false);
-            userDocument.setQrMismatchFields(null);
+            userDocument.setQrMismatchFields(qrScan != null && !qrScan.mismatchFields().isEmpty()
+                    ? qrScan.mismatchFields() : null);
             userDocument.setManualReviewReason(manualReviewReason);
             userDocument.setAutoApproved(status == VerificationStatus.VERIFIED);
             userDocument.setConfidenceScore(extractionResult.confidence());
@@ -601,23 +661,27 @@ public class DocumentVerificationService {
         } else if (status == VerificationStatus.PENDING) {
             userDocument.setFailureReason(manualReviewReason);
             userDocument.setFailureFile(null);
+        } else if (status == VerificationStatus.REJECTED) {
+            userDocument.setFailureReason(degreeDecision != null && degreeDecision.userMessage() != null
+                    ? degreeDecision.userMessage() : documentTypeLabel(documentType) + " could not be accepted.");
+            userDocument.setFailureFile(failureFile);
         } else {
             userDocument.setFailureReason(null);
             userDocument.setFailureFile(null);
         }
 
         UserDocument saved = documentRepository.save(userDocument);
-        // Only the latest submission is kept. Replace the previous Cloudinary assets
+        // Only the latest submission is kept. Replace the previously stored assets
         // (including manual-review evidence) instead of orphaning them.
-        if (!cloudinaryRefs.isEmpty() || discardPanEvidence) {
+        if (!storageRefs.isEmpty() || discardPanEvidence) {
             Set<String> keptIds = new HashSet<>();
-            for (CloudinaryRef ref : cloudinaryRefs) {
+            for (StorageRef ref : storageRefs) {
                 if (ref.getPublicId() != null) keptIds.add(ref.getPublicId());
             }
-            for (CloudinaryRef old : previousRefs) {
+            for (StorageRef old : previousRefs) {
                 if (old.getPublicId() != null && !keptIds.contains(old.getPublicId())) {
                     try {
-                        cloudinaryService.delete(old.getPublicId());
+                        storageService.delete(old.getPublicId());
                     } catch (Exception error) {
                         log.warn("Could not delete replaced document image from S3: {}", error.getClass().getSimpleName());
                     }
@@ -627,7 +691,7 @@ public class DocumentVerificationService {
         if (previousQrPhoto != null && (qrData == null
                 || !previousQrPhoto.equals(qrData.getPhotoPublicId()))) {
             try {
-                cloudinaryService.delete(previousQrPhoto);
+                storageService.delete(previousQrPhoto);
             } catch (Exception error) {
                 log.warn("Could not delete replaced Aadhaar QR photo: {}", error.getClass().getSimpleName());
             }
@@ -635,7 +699,7 @@ public class DocumentVerificationService {
         if (previousPanQrPhoto != null && (panQrScan == null
                 || !previousPanQrPhoto.equals(panQrScan.photoPublicId()))) {
             try {
-                cloudinaryService.delete(previousPanQrPhoto);
+                storageService.delete(previousPanQrPhoto);
             } catch (Exception error) {
                 log.warn("Could not delete replaced PAN QR photo: {}", error.getClass().getSimpleName());
             }
@@ -724,7 +788,8 @@ public class DocumentVerificationService {
                 && barCouncilValidationService.isNameMatching(apiResult.advocateName(), candidateName);
 
         String enrollmentHash = hashEnrollment(validationResult.normalizedNumber());
-        Optional<UserDocument> duplicate = documentRepository.findByEnrollmentNumberHash(enrollmentHash);
+        Optional<UserDocument> duplicate = enrollmentHash == null ? Optional.empty()
+                : documentRepository.findByEnrollmentNumberHash(enrollmentHash);
         boolean duplicateEnrollment = duplicate.isPresent() && !Objects.equals(userId, duplicate.get().getUserId());
 
         VerificationStatus status;
@@ -774,6 +839,7 @@ public class DocumentVerificationService {
         userDocument.setMaskedDocumentNumber(validationResult.maskedNumber());
         userDocument.setExtractedData(fields);
         userDocument.setEnrollmentNumberHash(enrollmentHash);
+        userDocument.setCrossDocumentMismatchFields("BAR_MISMATCH".equals(pendingReason) ? List.of("name") : null);
         userDocument.setOcrConfidence(1.0);
         userDocument.setUpdatedAt(Instant.now());
 
@@ -1046,7 +1112,7 @@ public class DocumentVerificationService {
         return switch (type) {
             case AADHAAR -> "Aadhaar Card";
             case PAN -> "PAN Card";
-            case BAR_COUNCIL_ID -> "Bar Council ID";
+            case BAR_COUNCIL_ID -> "Bar Council ID Card";
             case BAR_CERTIFICATE -> "Bar Enrollment Certificate";
             case CERTIFICATE_OF_PRACTICE -> "Certificate of Practice";
             case DEGREE_CERTIFICATE -> "Law Degree Certificate";
@@ -1060,17 +1126,17 @@ public class DocumentVerificationService {
     }
 
     // OCR is required for verification. A failed upload cannot create local identity data.
-    private CloudinaryService.UploadResult uploadWithOcr(MultipartFile file, String folder, String tag)
+    private S3StorageService.UploadResult uploadWithOcr(MultipartFile file, String folder, String tag)
             throws Exception {
-        if (s3StorageService != null && s3StorageService.isConfigured()) {
-            try {
-                String s3Key = String.format("%s/%s_%s", folder, tag, UUID.randomUUID());
-                s3StorageService.uploadBytes(file.getBytes(), s3Key, file.getContentType());
-            } catch (Exception e) {
-                log.warn("S3 mirror upload failed: {}", e.getMessage());
-            }
-        }
-        return cloudinaryService.uploadWithOcr(file, folder, tag);
+        return storageService.uploadWithOcr(file, folder, tag);
+    }
+
+    private String ocrText(Object rawOcrData) {
+        if (rawOcrData == null) return "";
+        var candidates = ocrExtractionService.extractTextCandidates(rawOcrData);
+        // Use the worker's best-ranked read for policy decisions; field parsing still
+        // considers every candidate.
+        return candidates.isEmpty() ? "" : candidates.get(0);
     }
 
     private String safeFileName(MultipartFile file) {
@@ -1080,11 +1146,11 @@ public class DocumentVerificationService {
         return name.replaceAll("[\\r\\n\\x00-\\x1f]", "");
     }
 
-    private void cleanupCloudinaryAssets(List<CloudinaryRef> refs) {
-        for (CloudinaryRef ref : refs) {
+    private void cleanupStorageAssets(List<StorageRef> refs) {
+        for (StorageRef ref : refs) {
             try {
                 if (ref.getPublicId() != null && !ref.getPublicId().startsWith("local_")) {
-                    cloudinaryService.delete(ref.getPublicId());
+                    storageService.delete(ref.getPublicId());
                 }
             } catch (Exception e) {
                 log.error("Failed to cleanup S3 asset: {}", ref.getPublicId(), e);
@@ -1254,7 +1320,7 @@ public class DocumentVerificationService {
         if (qr.photoBase64() != null && !qr.photoBase64().isBlank()) {
             try {
                 byte[] bytes = Base64.getDecoder().decode(qr.photoBase64());
-                CloudinaryRef ref = cloudinaryService.uploadBytes(bytes,
+                StorageRef ref = storageService.uploadBytes(bytes,
                         "documents/PAN", "qr");
                 photoUrl = ref.getSecureUrl();
                 photoPublicId = ref.getPublicId();
@@ -1529,6 +1595,146 @@ public class DocumentVerificationService {
         return applyPanQrScan(userId, toPanQrScan(qr, userId));
     }
 
+    /**
+     * Applies a scanned barcode/QR payload from a Bar Council ID card. The code is a
+     * consistency check against the printed enrollment number; it never proves
+     * authenticity on its own.
+     */
+    public UserDocument applyBarIdCode(String userId, String codeText, String format) {
+        validateExistingLawyer(userId);
+        if (codeText == null || codeText.isBlank()) {
+            throw new DocumentVerificationException("The scanned card code is empty.");
+        }
+        UserDocument doc = documentRepository.findByUserIdAndDocumentType(userId, DocumentType.BAR_COUNCIL_ID)
+                .orElseGet(UserDocument::new);
+        doc.setUserId(userId);
+        doc.setDocumentType(DocumentType.BAR_COUNCIL_ID);
+
+        Map<String, String> fields = new LinkedHashMap<>(doc.getExtractedData() == null
+                ? Map.of() : doc.getExtractedData());
+        fields.put("barcodeFormat", format == null ? "SCANNED" : format);
+        fields.put("barcodePayload", codeText.length() > 240 ? codeText.substring(0, 240) : codeText);
+
+        String codeEnrollment = enrollmentFromCode(codeText);
+        String ocrEnrollment = fields.get("enrollmentNumber");
+        if (codeEnrollment != null) {
+            fields.put("enrollmentNumber", codeEnrollment);
+            var validation = barCouncilValidationService.validate(codeEnrollment);
+            if (validation.valid()) {
+                fields.put("stateCode", validation.stateCode());
+                fields.put("stateCouncil", validation.stateCouncil());
+                fields.put("enrollmentYear", String.valueOf(validation.enrollmentYear()));
+                fields.put("sequenceNumber", validation.sequenceNumber());
+                doc.setMaskedDocumentNumber(validation.maskedNumber());
+            }
+        }
+        String codeName = nameFromCode(codeText);
+        if (codeName != null && !codeName.isBlank()) {
+            fields.put("name", codeName);
+        }
+        if (codeEnrollment == null) {
+            doc.setVerificationStatus(VerificationStatus.PENDING);
+            doc.setRequiresManualReview(true);
+            doc.setPendingReason("BAR_ID_CODE_UNPARSED");
+            doc.setManualReviewReason("The scanned card code could not be matched to an enrollment number. Sent for manual review.");
+            doc.setFailureReason(doc.getManualReviewReason());
+        } else if (ocrEnrollment != null && !sameEnrollment(codeEnrollment, ocrEnrollment)) {
+            doc.setVerificationStatus(VerificationStatus.PENDING);
+            doc.setRequiresManualReview(true);
+            doc.setPendingReason("BAR_ID_BARCODE_MISMATCH");
+            doc.setManualReviewReason("The scanned card code does not match the enrollment number printed on the card. Sent for manual review.");
+            doc.setFailureReason(doc.getManualReviewReason());
+        } else {
+            fields.put("barcodeEnrollmentNumber", codeEnrollment);
+            fields.put("barcodeMatchesOcr", ocrEnrollment != null ? "true" : "not_applicable");
+            String codeHash = hashEnrollment(codeEnrollment);
+            doc.setEnrollmentNumberHash(codeHash);
+            boolean duplicate = false;
+            if (codeHash != null) {
+                Optional<UserDocument> dup = documentRepository.findByEnrollmentNumberHash(codeHash);
+                duplicate = dup.isPresent() && !Objects.equals(userId, dup.get().getUserId());
+            }
+            Optional<GoldenIdentity> golden = findGoldenIdentity(userId);
+            String cardName = fields.get("name");
+            if (duplicate) {
+                doc.setVerificationStatus(VerificationStatus.PENDING);
+                doc.setRequiresManualReview(true);
+                doc.setPendingReason("BAR_DUPLICATE");
+                doc.setManualReviewReason("This Bar Council enrollment number is already registered to another account. Manual review is in progress.");
+                doc.setFailureReason(doc.getManualReviewReason());
+            } else if (golden.isEmpty()) {
+                doc.setVerificationStatus(VerificationStatus.PENDING);
+                doc.setRequiresManualReview(false);
+                doc.setPendingReason("AWAITING_IDENTITY");
+                doc.setManualReviewReason("Card code matched the card. Verify your Aadhaar or PAN to complete verification automatically.");
+                doc.setFailureReason(doc.getManualReviewReason());
+            } else if (cardName == null || !barCouncilValidationService.isNameMatching(cardName, golden.get().name())) {
+                doc.setVerificationStatus(VerificationStatus.PENDING);
+                doc.setRequiresManualReview(true);
+                doc.setPendingReason("BAR_ID_NAME_MISMATCH");
+                doc.setManualReviewReason("The name on the card does not match your verified Aadhaar/PAN name. Sent for manual review.");
+                doc.setFailureReason(doc.getManualReviewReason());
+            } else {
+                doc.setVerificationStatus(VerificationStatus.VERIFIED);
+                doc.setAutoApproved(true);
+                doc.setRequiresManualReview(false);
+                doc.setPendingReason(null);
+                doc.setManualReviewReason(null);
+                doc.setFailureReason(null);
+                doc.setFailureFile(null);
+                doc.setVerifiedAt(Instant.now());
+            }
+        }
+        doc.setExtractedData(fields);
+        doc.setOcrConfidence(doc.getOcrConfidence() == null ? 1.0 : doc.getOcrConfidence());
+        doc.setUpdatedAt(Instant.now());
+        UserDocument saved = documentRepository.save(doc);
+        applyDocumentVerificationToLawyer(userId, saved);
+        return saved;
+    }
+
+    private String nameFromCode(String code) {
+        if (code == null) return null;
+        String decoded = code;
+        try {
+            decoded = java.net.URLDecoder.decode(code, StandardCharsets.UTF_8);
+        } catch (Exception ignored) {
+        }
+        Matcher labeled = Pattern.compile(
+                "(?i)[\"']?(?:name|advocate_name|candidate_name)[\"']?\\s*[:=]\\s*[\"']?"
+                        + "([A-Za-z][A-Za-z .'-]{2,60}?)(?=[&\"'}`]|$)").matcher(decoded);
+        if (labeled.find()) return normalizeText(labeled.group(1));
+        return null;
+    }
+
+    private String normalizeText(String value) {
+        return value == null ? null : value.replaceAll("\\s+", " ").trim();
+    }
+
+    private String enrollmentFromCode(String code) {        if (code == null) return null;
+        Matcher general = Pattern.compile(
+                "(?i)\\b([A-Z]{1,4}[/-]\\s*\\d{1,6}[/-]\\s*\\d{4})\\b").matcher(code);
+        if (general.find()) {
+            var validation = barCouncilValidationService.validate(general.group(1));
+            if (validation.valid()) return validation.normalizedNumber();
+        }
+        Matcher labeled = Pattern.compile(
+                "(?i)(?:enrollment|enrolment|enrollment_no|enrolment_no|reg(?:istration)?|roll)"
+                        + "[^A-Za-z0-9]{0,4}([A-Z0-9]{0,4}[/-]?\\d{1,6}[/-]\\d{4})").matcher(code);
+        if (labeled.find()) {
+            var validation = barCouncilValidationService.validate(labeled.group(1));
+            if (validation.valid()) return validation.normalizedNumber();
+        }
+        var direct = barCouncilValidationService.validate(code.trim());
+        return direct.valid() ? direct.normalizedNumber() : null;
+    }
+
+    private boolean sameEnrollment(String first, String second) {
+        String a = first == null ? "" : first.replaceAll("[^A-Za-z0-9]", "").toUpperCase();
+        String b = second == null ? "" : second.replaceAll("[^A-Za-z0-9]", "").toUpperCase();
+        return !a.isBlank() && a.equals(b);
+    }
+
     private UserDocument applyPanQrScan(String userId, PanQrScan scan) {
         PanEvaluation evaluation = evaluatePanWithQr(userId, null, null, 0, scan.data());
         UserDocument doc = documentRepository.findByUserIdAndDocumentType(userId, DocumentType.PAN)
@@ -1573,7 +1779,7 @@ public class DocumentVerificationService {
         UserDocument saved = documentRepository.save(doc);
         if (!keepQrPhoto && scan.photoPublicId() != null) {
             try {
-                cloudinaryService.delete(scan.photoPublicId());
+                storageService.delete(scan.photoPublicId());
             } catch (Exception error) {
                 log.warn("Could not delete unused PAN QR photo: {}", error.getClass().getSimpleName());
             }
@@ -1581,7 +1787,7 @@ public class DocumentVerificationService {
         if (previousPhoto != null && (scan.photoPublicId() == null
                 || !previousPhoto.equals(scan.photoPublicId()))) {
             try {
-                cloudinaryService.delete(previousPhoto);
+                storageService.delete(previousPhoto);
             } catch (Exception error) {
                 log.warn("Could not delete replaced PAN QR photo: {}", error.getClass().getSimpleName());
             }
@@ -1597,7 +1803,13 @@ public class DocumentVerificationService {
     }
 
     public UserDocument approveDocument(String documentId, String adminId, String notes) {
+        return approveDocument(documentId, adminId, notes, Map.of());
+    }
+
+    public UserDocument approveDocument(String documentId, String adminId, String notes,
+                                        Map<String, Boolean> checklist) {
         UserDocument doc = requireReviewableDocument(documentId);
+        validateDegreeReviewChecklist(doc, checklist);
         if (doc.getDocumentType() == DocumentType.AADHAAR
                 && !Boolean.TRUE.equals(doc.getIsQrVerified())) {
             throw new DocumentVerificationException(
@@ -1626,6 +1838,7 @@ public class DocumentVerificationService {
         }
         doc.setVerificationStatus(VerificationStatus.VERIFIED);
         doc.setVerifiedAt(Instant.now());
+        doc.setCrossDocumentMismatchFields(null);
         doc.setRequiresManualReview(false);
         doc.setPendingReason(null);
         doc.setManualReviewReason(null);
@@ -1636,6 +1849,7 @@ public class DocumentVerificationService {
         doc.setReviewedAt(Instant.now());
         doc.setReviewDecision("APPROVED");
         doc.setReviewNotes(notes);
+        doc.setReviewChecklist(checklist == null || checklist.isEmpty() ? null : new LinkedHashMap<>(checklist));
         doc.setUpdatedAt(Instant.now());
         UserDocument saved = documentRepository.save(doc);
         applyDocumentVerificationToLawyer(doc.getUserId(), saved);
@@ -1666,8 +1880,26 @@ public class DocumentVerificationService {
         return saved;
     }
 
-    private UserDocument requireReviewableDocument(String documentId) {
-        UserDocument doc = documentRepository.findById(documentId)
+    private static final List<String> DEGREE_REQUIRED_CHECKLIST = List.of(
+            "degree_is_llb", "final_or_provisional", "name_matches_kyc", "university_bci_recognized");
+
+    private void validateDegreeReviewChecklist(UserDocument doc, Map<String, Boolean> checklist) {
+        if (doc.getDocumentType() != DocumentType.DEGREE_CERTIFICATE) return;
+        List<String> required = new ArrayList<>(DEGREE_REQUIRED_CHECKLIST);
+        if (doc.getVerificationFlags() != null
+                && doc.getVerificationFlags().contains("REQUIRES_BCI_EQUIVALENCE")) {
+            required.add("foreign_equivalence");
+        }
+        List<String> missing = required.stream()
+                .filter(key -> checklist == null || !Boolean.TRUE.equals(checklist.get(key)))
+                .toList();
+        if (!missing.isEmpty()) {
+            throw new DocumentVerificationException(
+                    "Complete the degree review checklist before approving: " + String.join(", ", missing));
+        }
+    }
+
+    private UserDocument requireReviewableDocument(String documentId) {        UserDocument doc = documentRepository.findById(documentId)
                 .orElseThrow(() -> new DocumentVerificationException("Document not found."));
         if (doc.getDocumentType() == null) {
             throw new DocumentVerificationException("Document type is missing.");

@@ -240,11 +240,23 @@ public class BarCouncilValidationService {
         Set<String> docTokens = new HashSet<>(Arrays.asList(normDoc.split("\\s+")));
         Set<String> profileTokens = new HashSet<>(Arrays.asList(normProfile.split("\\s+")));
 
-        Set<String> intersection = new HashSet<>(docTokens);
-        intersection.retainAll(profileTokens);
+        Set<String> used = new HashSet<>();
+        int matches = 0;
+        for (String docToken : docTokens) {
+            for (String profileToken : profileTokens) {
+                if (used.contains(profileToken)) continue;
+                if (docToken.equals(profileToken)
+                        || (docToken.length() == 1 && profileToken.startsWith(docToken))
+                        || (profileToken.length() == 1 && docToken.startsWith(profileToken))) {
+                    used.add(profileToken);
+                    matches++;
+                    break;
+                }
+            }
+        }
 
         int minTokens = Math.min(docTokens.size(), profileTokens.size());
-        return minTokens > 0 && ((double) intersection.size() / minTokens) >= 0.6;
+        return minTokens > 0 && ((double) matches / minTokens) >= 0.6;
     }
 
     private String cleanName(String name) {

@@ -13,7 +13,7 @@ mismatch becomes `PENDING` manual review, and a missing/invalid QR fails the upl
 Versioned V2/V3/V4 payloads and legacy 16-field payloads are supported. Masked Aadhaar
 cards that show only the last four digits are accepted and matched against the QR's last
 four digits. The worker also returns the QR-embedded photo as JPEG base64; Spring uploads
-it once during Aadhaar verification and stores the Cloudinary URL in `qrData.photoUrl`.
+it once during Aadhaar verification and stores the pre-signed S3 URL in `qrData.photoUrl`.
 Live selfie verification reuses the signed QR photo.
 
 Install prerequisites once:
@@ -38,3 +38,14 @@ Live selfie checks now combine a three-frame head-turn challenge, capture-qualit
 5 selfie challenges per hour. `FACE_THRESHOLD` and `PAD_THRESHOLD` are starting points,
 not calibrated values; validate false-accept and false-reject rates on real live/spoof
 samples before production use.
+
+## BCI degree-institution registry
+
+Law-degree recognition uses `src/main/resources/verification/bci-institutions.json`
+(versioned colleges, derived universities and manual aliases). The bundled data is a
+mirror of the BCI-approved directory published at `verify.exammint.in`, with the
+official BCI portal recorded in the JSON metadata. It is a curated cache, not a live
+scrape: verify entries against the official BCI list before production approval, and
+refresh the JSON manually (or point `DEGREE_REGISTRY_PATH` at an operator-maintained
+copy) when BCI publishes changes.
+

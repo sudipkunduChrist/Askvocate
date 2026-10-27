@@ -124,23 +124,47 @@ def local_ocr(image_bytes: bytes, side: str = "") -> dict:
     image = _image(image_bytes)
     rgb = cv2.cvtColor(image, cv2.COLOR_BGR2RGB)
     os.environ["TESSDATA_PREFIX"] = str(TESSDATA)
+    priority_texts = []
+    name_candidate = ""
     try:
         candidates = [(rgb, "--psm 6",
-                       pytesseract.image_to_string(rgb, lang="eng", config="--psm 6", timeout=10))]
-        if side in ("front", "back", "pan"):
+                       pytesseract.image_to_string(rgb, lang="eng", config="--psm 6", timeout=8))]
+        if side in ("front", "back", "pan", "certificate"):
             gray = cv2.cvtColor(image, cv2.COLOR_BGR2GRAY)
-            enhanced = cv2.createCLAHE(clipLimit=2.0, tileGridSize=(8, 8)).apply(gray)
-            if enhanced.shape[1] < 1400:
-                scale = min(2.0, 1400 / enhanced.shape[1])
+            base_enhanced = cv2.createCLAHE(clipLimit=2.0, tileGridSize=(8, 8)).apply(gray)
+            enhanced = base_enhanced
+            min_width = 1800 if side == "certificate" else 1400
+            if enhanced.shape[1] < min_width:
+                scale = min(2.5 if side == "certificate" else 2.0, min_width / enhanced.shape[1])
                 enhanced = cv2.resize(enhanced, None, fx=scale, fy=scale,
                                       interpolation=cv2.INTER_CUBIC)
-            for config in (("--psm 6", "--psm 4", "--psm 11") if side == "back"
-                           else ("--psm 6", "--psm 4", "--psm 11") if side == "pan"
-                           else ("--psm 6", "--psm 11")):
+            if side == "certificate":
+                enhanced = _deskew(enhanced)
+            configs = (("--psm 6", "--psm 4")
+                       if side == "certificate"
+                       else ("--psm 6", "--psm 4", "--psm 11") if side in ("back", "pan")
+                       else ("--psm 6", "--psm 11"))
+            for config in configs:
                 try:
                     candidates.append((enhanced, config,
                                        pytesseract.image_to_string(enhanced, lang="eng",
-                                                                   config=config, timeout=10)))
+                                                                   config=config, timeout=8)))
+                except (pytesseract.TesseractError, RuntimeError):
+                    pass
+            if side == "certificate":
+                try:
+                    threshold = cv2.adaptiveThreshold(
+                        gray, 255, cv2.ADAPTIVE_THRESH_GAUSSIAN_C, cv2.THRESH_BINARY, 35, 15)
+                    candidates.append((threshold, "--psm 6",
+                                       pytesseract.image_to_string(threshold, lang="eng",
+                                                                   config="--psm 6", timeout=8)))
+                except (pytesseract.TesseractError, RuntimeError):
+                    pass
+                try:
+                    _, otsu = cv2.threshold(enhanced, 0, 255, cv2.THRESH_BINARY + cv2.THRESH_OTSU)
+                    candidates.append((otsu, "--psm 6",
+                                       pytesseract.image_to_string(otsu, lang="eng",
+                                                                   config="--psm 6", timeout=8)))
                 except (pytesseract.TesseractError, RuntimeError):
                     pass
             if side == "pan":
@@ -149,7 +173,7 @@ def local_ocr(image_bytes: bytes, side: str = "") -> dict:
                         gray, 255, cv2.ADAPTIVE_THRESH_GAUSSIAN_C, cv2.THRESH_BINARY, 31, 15)
                     candidates.append((threshold, "--psm 6",
                                        pytesseract.image_to_string(threshold, lang="eng",
-                                                                   config="--psm 6", timeout=10)))
+                                                                   config="--psm 6", timeout=8)))
                 except (pytesseract.TesseractError, RuntimeError):
                     pass
                 cropped = _card_crop(image)
@@ -159,11 +183,65 @@ def local_ocr(image_bytes: bytes, side: str = "") -> dict:
                     try:
                         candidates.append((cropped_enhanced, "--psm 6",
                                            pytesseract.image_to_string(cropped_enhanced, lang="eng",
-                                                                       config="--psm 6", timeout=10)))
+                                                                       config="--psm 6", timeout=8)))
                     except (pytesseract.TesseractError, RuntimeError):
                         pass
+            # Name/degree block in the middle of the page. Use the original-scale
+            # enhanced image: pre-resizing before the crop loses the large name.
+            crop_source = _deskew(base_enhanced) if side == "certificate" else base_enhanced
+            enhanced_height, enhanced_width = crop_source.shape[:2]
+            name_crop = crop_source[int(enhanced_height * 0.25):int(enhanced_height * 0.60),
+                                    int(enhanced_width * 0.05):int(enhanced_width * 0.95)]
+            if name_crop.size:
+                if name_crop.shape[1] < 1800:
+                    scale = min(2.5, 1800 / name_crop.shape[1])
+                    name_crop = cv2.resize(name_crop, None, fx=scale, fy=scale,
+                                           interpolation=cv2.INTER_CUBIC)
+                for config in ("--psm 6", "--psm 4"):
+                    try:
+                        crop_data = pytesseract.image_to_data(name_crop, lang="eng", config=config,
+                                                              output_type=Output.DICT, timeout=8)
+                        crop_large = _large_text_candidate(crop_data)
+                        if crop_large:
+                            candidates.append((name_crop, config, crop_large))
+                            priority_texts.append(crop_large)
+                        crop_name = _name_candidate(crop_data, name_crop.shape[1])
+                        if crop_name:
+                            if not name_candidate:
+                                name_candidate = crop_name
+                            candidates.append((name_crop, config, crop_name))
+                            priority_texts.append(crop_name)
+                    except (pytesseract.TesseractError, RuntimeError):
+                        pass
+        if side == "certificate":
+            # KSLU and other university certificates place identity and award text
+            # in the middle, while registration, college, class and date sit near
+            # the bottom. These overlapping reads recover small print without
+            # letting repeated letterhead dominate the full-page OCR candidate.
+            region_height, region_width = enhanced.shape[:2]
+            for top, bottom in ((0.02, 0.30), (0.55, 0.98)):
+                y1, y2 = int(region_height * top), int(region_height * bottom)
+                x1, x2 = int(region_width * 0.03), int(region_width * 0.97)
+                region = enhanced[y1:y2, x1:x2]
+                if region.size == 0:
+                    continue
+                if region.shape[1] < 1800:
+                    scale = min(2.0, 1800 / region.shape[1])
+                    region = cv2.resize(region, None, fx=scale, fy=scale,
+                                        interpolation=cv2.INTER_CUBIC)
+                try:
+                    region_text = pytesseract.image_to_string(
+                        region, lang="eng", config="--psm 6", timeout=5).strip()
+                    if region_text:
+                        candidates.append((region, "--psm 6", region_text))
+                        priority_texts.append(region_text)
+                except (pytesseract.TesseractError, RuntimeError):
+                    pass
+
         rank = (_address_read_quality if side == "back" else _front_read_quality if side == "front"
-                else _pan_read_quality if side == "pan" else _general_read_quality)
+                else _pan_read_quality if side == "pan"
+                else _certificate_read_quality if side == "certificate"
+                else _general_read_quality)
         if side == "pan" and max(rank(entry[2]) for entry in candidates) < 40:
             # Poor first read: try polarity, global threshold, rotation, and upscaling.
             extras = [cv2.bitwise_not(enhanced)]
@@ -177,25 +255,246 @@ def local_ocr(image_bytes: bytes, side: str = "") -> dict:
                 try:
                     candidates.append((extra, "--psm 6",
                                        pytesseract.image_to_string(extra, lang="eng",
-                                                                   config="--psm 6", timeout=10)))
+                                                                   config="--psm 6", timeout=8)))
+                except (pytesseract.TesseractError, RuntimeError):
+                    pass
+        if side == "certificate" and max(rank(entry[2]) for entry in candidates) < 60:
+            # Rotated/skewed scans: try polarity and quarter turns before giving up.
+            extras = [cv2.bitwise_not(enhanced)]
+            for code in (cv2.ROTATE_90_CLOCKWISE, cv2.ROTATE_180, cv2.ROTATE_90_COUNTERCLOCKWISE):
+                extras.append(cv2.rotate(enhanced, code))
+            if enhanced.shape[1] < 2400:
+                extras.append(cv2.resize(enhanced, None, fx=1.5, fy=1.5, interpolation=cv2.INTER_CUBIC))
+            for extra in extras:
+                try:
+                    candidates.append((extra, "--psm 6",
+                                       pytesseract.image_to_string(extra, lang="eng",
+                                                                   config="--psm 6", timeout=8)))
                 except (pytesseract.TesseractError, RuntimeError):
                     pass
         selected_image, selected_config, text = max(candidates, key=lambda entry: rank(entry[2]))
         data = pytesseract.image_to_data(selected_image, lang="eng", config=selected_config,
-                                         output_type=Output.DICT, timeout=10)
+                                         output_type=Output.DICT, timeout=8)
     except (pytesseract.TesseractError, pytesseract.TesseractNotFoundError, RuntimeError) as exc:
         raise VerificationError("Local Tesseract OCR is unavailable.") from exc
+    large_text = _large_text_candidate(data) if side == "certificate" else ""
+    if side == "certificate" and large_text and rank(large_text) > rank(text):
+        text = large_text
     confidences = [float(value) for value in data["conf"] if float(value) >= 0]
     confidence = sum(confidences) / len(confidences) / 100 if confidences else 0.0
     candidate_texts = []
-    for _, _, candidate in sorted(candidates, key=lambda entry: rank(entry[2]), reverse=True)[:6]:
+    for value in priority_texts + ([large_text] if large_text else []):
+        value = value.strip()
+        if value and value not in candidate_texts:
+            candidate_texts.append(value)
+    for _, _, candidate in sorted(candidates, key=lambda entry: rank(entry[2]), reverse=True)[:10]:
         candidate = candidate.strip()
         if candidate and candidate not in candidate_texts:
             candidate_texts.append(candidate)
     filtered = _confident_text(data)
     if filtered and filtered not in candidate_texts:
         candidate_texts.append(filtered)
-    return {"ocrText": text, "candidates": candidate_texts, "confidence": round(confidence, 4)}
+    return {"ocrText": text, "candidates": candidate_texts, "confidence": round(confidence, 4),
+            "nameCandidate": name_candidate}
+
+
+def _deskew(gray):
+    """Rotate away small scan skew; leave large angles for the rotation pass."""
+    try:
+        inverted = cv2.bitwise_not(gray)
+        _, binary = cv2.threshold(inverted, 0, 255, cv2.THRESH_BINARY + cv2.THRESH_OTSU)
+        coords = cv2.findNonZero(binary)
+        if coords is None:
+            return gray
+        angle = cv2.minAreaRect(coords)[-1]
+        angle = -(90 + angle) if angle < -45 else -angle
+        if abs(angle) < 0.3 or abs(angle) > 15:
+            return gray
+        height, width = gray.shape[:2]
+        matrix = cv2.getRotationMatrix2D((width / 2, height / 2), angle, 1.0)
+        return cv2.warpAffine(gray, matrix, (width, height),
+                              flags=cv2.INTER_CUBIC, borderMode=cv2.BORDER_REPLICATE)
+    except Exception:
+        return gray
+
+
+def _certificate_read_quality(text: str) -> float:
+    """Prefer the read that contains real certificate fields, not watermark noise."""
+    lines = [line.strip() for line in text.splitlines() if line.strip()]
+    score = 0.0
+    signals = (
+        (r"certif(?:y|ies|ied)\s+that", 30),
+        (r"has\s+been\s+duly\s+admitted", 25),
+        (r"Bachelor\s+of\s+(?:Arts\s+and\s+)?(?:Bachelor\s+of\s+)?Laws", 35),
+        (r"\bLL\.?\s*B\b", 25),
+        (r"\bLL\.?\s*M\b|Master\s+of\s+Laws", 20),
+        (r"\b(?:Final|Provisional)\b", 12),
+        (r"\bUniversity\b", 12),
+        (r"\b(?:College|Institute|Vidyalaya)\b", 8),
+        (r"\b(?:AIBE|All\s+India\s+Bar\s+Examination)\b", 20),
+        (r"\b(?:Bar\s+Council|Enrolment|Enrollment)\b", 15),
+        (r"Examination\s+Registration\s+Number", 18),
+        (r"College\s+Name", 15),
+        (r"Given\s+under\s+the\s+seal", 12),
+        (r"Vice[-\s]?Chancellor", 12),
+        (r"\b(?:Marksheet|Consolidated|Semester|Transcript)\b", 8),
+        (r"\b(?:Diploma|Distance\s+Learning|Correspondence)\b", 8),
+        (r"\b(?:19|20)\d{2}\b", 6),
+        (r"(?im)^\s*(?:Name|Student\s+Name|Candidate\s+Name)\s*[:/-]", 10),
+    )
+    for pattern, weight in signals:
+        if re.search(pattern, text, re.I):
+            score += weight
+
+    meaningful = 0
+    for line in lines:
+        letters = len(re.findall(r"[A-Za-z]", line))
+        if letters >= 8 and letters / max(len(line), 1) >= 0.55 and len(line) <= 140:
+            meaningful += 1
+    score += min(meaningful, 20) * 2
+
+    # The certificate is printed on a repeating university watermark. A read that
+    # reproduces that watermark dozens of times is the wrong candidate.
+    university_repeats = len(re.findall(r"University", text, re.I))
+    if university_repeats > 3:
+        score -= (university_repeats - 3) * 8
+    short_lines = sum(1 for line in lines if len(line) <= 3)
+    score -= short_lines * 1.5
+    score -= text.count("�") * 4
+    score -= len(re.findall(r"[\\|~_]{1,}", text)) * 1.5
+    score -= len(re.findall(r"[^\x00-\x7F]", text)) * 0.2
+    return score
+
+
+def _large_text_candidate(data) -> str:
+    """Reconstruct certificate lines from large, confident words only.
+
+    The watermark is printed in a small font; the title, holder name and degree
+    line are much taller. Filtering by word height removes most watermark noise.
+    Adjacent fragments (e.g. "Ayu" + "shi") are re-joined when the gap is tiny.
+    """
+    words = []
+    heights = []
+    texts = data.get("text", [])
+    for index in range(len(texts)):
+        value = (texts[index] or "").strip(" \t|.,;:-_�")
+        if not value:
+            continue
+        try:
+            confidence = float(data["conf"][index])
+            height = int(data["height"][index])
+            width = int(data["width"][index])
+            left = int(data["left"][index])
+            top = int(data["top"][index])
+        except (ValueError, TypeError, KeyError):
+            continue
+        if confidence < 35 or height <= 0 or width <= 0:
+            continue
+        words.append((left, top, value, height, width,
+                      int(data["block_num"][index]), int(data["par_num"][index]),
+                      int(data["line_num"][index])))
+        heights.append(height)
+    if not words:
+        return ""
+    heights.sort()
+    threshold = max(18, heights[int(len(heights) * 0.55)])
+    lines = {}
+    for left, top, value, height, width, block, paragraph, line in words:
+        if height < threshold:
+            continue
+        lines.setdefault((block, paragraph, line), []).append((left, top, value, height, width))
+    ordered = sorted(lines.values(),
+                     key=lambda items: (min(top for _, top, _, _, _ in items),
+                                        min(left for left, _, _, _, _ in items)))
+    reconstructed = []
+    for items in ordered:
+        items.sort(key=lambda item: item[0])
+        parts = []
+        previous_right = None
+        for left, _, value, height, width in items:
+            if previous_right is not None:
+                gap = left - previous_right
+                parts.append(("" if gap <= max(3, int(height * 0.12)) else " ") + value)
+            else:
+                parts.append(value)
+            previous_right = left + width
+        line = "".join(parts).strip()
+        if line:
+            reconstructed.append(line)
+    return "\n".join(reconstructed)
+
+
+_NAME_STOP_WORDS = {
+    "university", "college", "institute", "school", "board", "examination", "registration",
+    "degree", "bachelor", "master", "diploma", "certificate", "class", "date", "bar", "council",
+    "name", "address", "father", "mother", "signature", "registrar", "chancellor", "seal",
+    "state", "law", "laws", "karnataka", "hubballi", "photograph", "certifies", "that", "given",
+    "under", "vice", "very", "good", "arts", "science", "commerce", "marks", "marksheet",
+    "semester", "transcript", "provisional", "final", "awarded", "admitted", "this",
+    "recognition", "fulfilment", "requirements", "said", "number", "roll", "exam",
+    "config", "tha", "cot", "tew", "con", "com", "unive", "oop", "cooh",
+}
+
+
+def _name_candidate(data, width: int) -> str:
+    """Pick the large, centred mixed-case word line — usually the holder's name."""
+    words = []
+    heights = []
+    for index, raw in enumerate(data.get("text", [])):
+        value = (raw or "").strip(" \t|.,;:-_�")
+        if not value:
+            continue
+        try:
+            confidence = float(data["conf"][index])
+            height = int(data["height"][index])
+            word_width = int(data["width"][index])
+            left = int(data["left"][index])
+            top = int(data["top"][index])
+        except (ValueError, TypeError, KeyError):
+            continue
+        if confidence < 40 or height <= 0 or word_width <= 0:
+            continue
+        words.append((left, top, value, height, word_width, confidence,
+                      int(data["block_num"][index]), int(data["par_num"][index]),
+                      int(data["line_num"][index])))
+        heights.append(height)
+    if not words or width <= 0:
+        return ""
+    heights.sort()
+    min_height = max(42, int(heights[len(heights) // 2] * 1.15))
+    lines = {}
+    for left, top, value, height, word_width, confidence, block, paragraph, line in words:
+        if height < min_height:
+            continue
+        centre = (left + word_width / 2) / width
+        if not 0.30 <= centre <= 0.70:
+            continue
+        letters = re.sub(r"[^A-Za-z]", "", value)
+        if len(letters) < 2:
+            continue
+        lower = letters.lower()
+        if lower in _NAME_STOP_WORDS or value.upper() == value:
+            continue
+        lines.setdefault((block, paragraph, line), []).append(
+            (left, height, word_width, value, confidence))
+    for items in sorted(lines.values(), key=lambda entries: min(entry[0] for entry in entries)):
+        mixed = [item for item in items if any(ch.isupper() for ch in item[3])]
+        if not mixed:
+            continue
+        items.sort(key=lambda item: item[0])
+        parts = []
+        previous_right = None
+        for left, height, word_width, value, _ in items:
+            if previous_right is not None:
+                gap = left - previous_right
+                parts.append(("" if gap <= max(3, int(height * 0.15)) else " ") + value)
+            else:
+                parts.append(value)
+            previous_right = left + word_width
+        candidate = "".join(parts).strip()
+        if 5 <= len(candidate) <= 80 and candidate[0].isupper():
+            return candidate
+    return ""
 
 
 def _general_read_quality(text: str) -> float:
@@ -329,6 +628,29 @@ def _image(raw: bytes) -> np.ndarray:
     if image is None:
         raise VerificationError("Image could not be decoded.")
     return image
+
+
+def read_bar_code(image_bytes: bytes) -> dict:
+    """Decode a Bar Council ID card barcode or QR into its raw payload."""
+    image = _image(image_bytes)
+    variants = [image]
+    gray = cv2.cvtColor(image, cv2.COLOR_BGR2GRAY)
+    variants.append(gray)
+    if image.shape[1] < 2200:
+        variants.append(cv2.resize(image, None, fx=2, fy=2, interpolation=cv2.INTER_CUBIC))
+    try:
+        import zxingcpp
+    except ImportError as exc:
+        raise VerificationError("Barcode decoding is unavailable.") from exc
+    for variant in variants:
+        try:
+            for barcode in zxingcpp.read_barcodes(variant):
+                text = (barcode.text or "").strip()
+                if text:
+                    return {"codeText": text, "format": str(barcode.format)}
+        except Exception:
+            continue
+    raise VerificationError("No barcode or QR code was found on the card.")
 
 
 def read_qr_text(image_bytes: bytes) -> str:

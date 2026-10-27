@@ -10,7 +10,7 @@ Spring Boot REST API service for Askvocate — supporting User Authentication, M
 - **Database**: MongoDB Atlas (Spring Data MongoDB)
 - **Security**: Spring Security + BCrypt Password Encoding
 - **Validation**: Jakarta Bean Validation (`@Email`, `@NotBlank`, `@Size`)
-- **Cloud Storage**: Cloudinary SDK (for Document Management)
+- **Cloud Storage**: AWS S3 (AWS SDK for Java v2) — documents, selfies, QR photos
 
 ---
 
@@ -22,9 +22,10 @@ Create a `.env` file in `backend/`:
 ```env
 MONGO_URL=mongodb+srv://<username>:<password>@cluster.mongodb.net/askvocate
 JWT_SECRET=your-256-bit-secret-key
-CLOUDINARY_CLOUD_NAME=your-cloud-name
-CLOUDINARY_API_KEY=your-api-key
-CLOUDINARY_API_SECRET=your-api-secret
+AWS_ACCESS_KEY_ID=your-aws-access-key-id
+AWS_SECRET_ACCESS_KEY=your-aws-secret-access-key
+AWS_S3_REGION=ap-south-1
+AWS_S3_BUCKET_NAME=your-s3-bucket-name
 ```
 
 ### 2. Run Locally
@@ -50,7 +51,7 @@ specific executable if needed. If Spring starts from outside the repository
 or `backend` directory, set `VERIFICATION_WORKER_PATH` to the absolute worker path.
 Set a stable, secret `AADHAAR_HASH_KEY` to enable keyed
 Aadhaar-number hashes for duplicate detection. The full Aadhaar number follows the
-existing document schema; restrict access to the MongoDB collection and Cloudinary
+existing document schema; restrict access to the MongoDB collection and the S3
 images in deployment.
 Before production rollout, reconcile that existing full-number/raw-image storage with
 [UIDAI's offline-verification guidance](https://uidai.gov.in/images/Dos_and_Don_ts_for_Offline_Verification_Seeking_entities.pdf),
@@ -76,7 +77,7 @@ which calls for retaining only the last four digits and redacting stored card co
   - `PENDING` + `PAN_QR_UNREADABLE` — quality failure. **No manual review**: retry the scan/photo or upload e-PAN. The latest image is kept as evidence.
   - `PENDING` + `PAN_WAITING_AADHAAR` — PAN verified, waiting for Aadhaar. Auto-completes when Aadhaar verifies.
   - `FAILED` — organization/non-individual or structurally invalid PAN.
-- Image retention: only `VERIFIED`, `PAN_QR_UNREADABLE`, and `PAN_WAITING_AADHAAR` keep the latest image. Mismatch/duplicate/org/invalid discard it. A new submission replaces (and deletes) the previous Cloudinary asset.
+- Image retention: only `VERIFIED`, `PAN_QR_UNREADABLE`, and `PAN_WAITING_AADHAAR` keep the latest image. Mismatch/duplicate/org/invalid discard it. A new submission replaces (and deletes) the previously stored asset.
 
 #### Role-based document sets
 
@@ -118,7 +119,7 @@ profile becomes `VERIFIED` only after Bar Council, Aadhaar, PAN, and a selfie ti
 verified Aadhaar are all verified. A new Aadhaar submission requires a new selfie match.
 
 All OCR, QR, signature, and face checks run locally without a paid per-verification API.
-Cloudinary image storage remains subject to its account quota and pricing.
+S3 storage and requests remain subject to AWS pricing and your bucket limits.
 
 ---
 

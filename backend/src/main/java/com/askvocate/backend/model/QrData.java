@@ -24,9 +24,9 @@ public class QrData {
     private String certificate;
     /** UIDAI Secure QR payload version, e.g. {@code "V2"}. */
     private String version;
-    /** Cloudinary URL of the photo embedded in the signed QR, stored once during verification. */
+    /** Pre-signed S3 URL of the photo embedded in the signed QR, stored once during verification. */
     private String photoUrl;
-    /** Cloudinary public ID of the QR photo, used for cleanup/replacement. */
+    /** S3 object key of the QR photo, used for cleanup/replacement. */
     private String photoPublicId;
     /** Raw decimal payload read from the QR, exactly as the scanner returned it. */
     private String rawText;

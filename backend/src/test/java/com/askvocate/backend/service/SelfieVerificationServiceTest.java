@@ -22,10 +22,10 @@ class SelfieVerificationServiceTest {
     private final UserDocumentRepository documentRepository = mock(UserDocumentRepository.class);
     private final SelfieVerificationRepository selfies = mock(SelfieVerificationRepository.class);
     private final MongoTemplate mongo = mock(MongoTemplate.class);
-    private final CloudinaryService cloudinary = mock(CloudinaryService.class);
+    private final S3StorageService storageService = mock(S3StorageService.class);
     private final VisionVerificationClient vision = mock(VisionVerificationClient.class);
     private final SelfieVerificationService service = new SelfieVerificationService(
-            documents, documentRepository, selfies, mongo, cloudinary, vision);
+            documents, documentRepository, selfies, mongo, storageService, vision);
     private final MockMultipartFile frame = new MockMultipartFile("center", "camera.jpg", "image/jpeg", new byte[]{1});
 
     @Test
@@ -35,7 +35,7 @@ class SelfieVerificationServiceTest {
         when(documentRepository.findByUserIdAndDocumentType("lawyer", DocumentType.AADHAAR))
                 .thenReturn(Optional.of(aadhaar));
         assertThrows(DocumentVerificationException.class, () -> service.createChallenge("lawyer"));
-        verifyNoInteractions(selfies, vision, cloudinary);
+        verifyNoInteractions(selfies, vision, storageService);
     }
 
     @Test
@@ -44,7 +44,7 @@ class SelfieVerificationServiceTest {
                 .thenReturn(Optional.of(verifiedAadhaar()));
         assertThrows(DocumentVerificationException.class,
                 () -> service.verify("lawyer", "used", frame, frame, frame));
-        verifyNoInteractions(vision, cloudinary);
+        verifyNoInteractions(vision, storageService);
     }
 
     @Test
@@ -69,14 +69,14 @@ class SelfieVerificationServiceTest {
         attempt.setExpectedTurn("left");
         attempt.setChallengeExpiresAt(Instant.now().plusSeconds(60));
         when(mongo.findAndModify(any(), any(), eq(SelfieVerification.class))).thenReturn(attempt);
-        when(cloudinary.downloadReference(any())).thenReturn(new byte[]{2});
+        when(storageService.downloadReference(any())).thenReturn(new byte[]{2});
         when(vision.verifyAadhaarQr(any(), anyMap(), nullable(String.class))).thenReturn(
                 new VisionVerificationClient.QrResult(true, Map.of("name", "Test Lawyer"), true,
                         "test.cer", "4626", List.of(), false, null, null, null));
         when(vision.verifySelfie(any(), anyList(), eq("left"))).thenReturn(
                 new VisionVerificationClient.SelfieResult(0.8, 0.363, true, 0.9, 0.95, true, null));
-        when(cloudinary.uploadSelfie(any(), anyString()))
-                .thenReturn(new CloudinaryRef("selfie-public-id", "https://res.cloudinary.com/test/image", "selfie"));
+        when(storageService.uploadSelfie(any(), anyString()))
+                .thenReturn(new StorageRef("selfie-public-id", "https://res.storageService.com/test/image", "selfie"));
         when(selfies.save(any())).thenAnswer(call -> call.getArgument(0));
 
         SelfieVerification saved = service.verify("lawyer", "challenge", frame, frame, frame);
@@ -96,8 +96,8 @@ class SelfieVerificationServiceTest {
         aadhaar.setIsQrVerified(true);
         aadhaar.setQrPrintedMismatch(false);
         aadhaar.setSubmissionToken("aadhaar-revision");
-        aadhaar.setCloudinaryReferences(List.of(new CloudinaryRef("back-id",
-                "https://res.cloudinary.com/test/image", "back")));
+        aadhaar.setStorageReferences(List.of(new StorageRef("back-id",
+                "https://res.storageService.com/test/image", "back")));
         return aadhaar;
     }
 }

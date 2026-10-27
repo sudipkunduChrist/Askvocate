@@ -1,14 +1,14 @@
 package com.askvocate.backend.model;
 
 /**
- * Embedded sub-document storing a reference to a single image on Cloudinary.
+ * Embedded sub-document storing a reference to a single image in AWS S3.
  * 
- * <p>No raw image bytes are stored in MongoDB — only the Cloudinary
- * {@code publicId} (for management operations) and the HTTPS {@code secureUrl}.
+ * <p>No raw image bytes are stored in MongoDB — only the S3 object key
+ * ({@code publicId}, for management operations) and the HTTPS {@code secureUrl}.
  */
-public class CloudinaryRef {
+public class StorageRef {
 
-    /** Cloudinary public ID used for asset management / deletion. */
+    /** S3 object key used for asset management / deletion. */
     private String publicId;
 
     /** HTTPS delivery URL for the uploaded image. */
@@ -17,10 +17,10 @@ public class CloudinaryRef {
     /** Label identifying the image side, e.g. "front" or "back". */
     private String label;
 
-    public CloudinaryRef() {
+    public StorageRef() {
     }
 
-    public CloudinaryRef(String publicId, String secureUrl, String label) {
+    public StorageRef(String publicId, String secureUrl, String label) {
         this.publicId = publicId;
         this.secureUrl = secureUrl;
         this.label = label;

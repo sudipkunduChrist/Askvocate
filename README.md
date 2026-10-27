@@ -82,7 +82,7 @@ Copy `backend/.env.example` → `backend/.env` and fill in:
 # MongoDB connection
 MONGO_URL=mongodb+srv://<username>:<password>@cluster.mongodb.net/askvocate
 
-# AWS S3 (file storage — replaces Cloudinary)
+# AWS S3 (file storage)
 # Create an IAM user with AmazonS3FullAccess (or scoped S3 permissions)
 AWS_ACCESS_KEY_ID=<your-aws-access-key-id>
 AWS_SECRET_ACCESS_KEY=<your-aws-secret-access-key>
@@ -296,7 +296,7 @@ After pulling updates, re-check `ApiConfig.kt` — the URLs are local developer 
 
 ## 6. Recommended startup order
 
-1. Configure `backend/.env` (MongoDB + Cloudinary).
+1. Configure `backend/.env` (MongoDB + AWS S3).
 2. Install verification Python deps + Tesseract.
 3. Start **backend** (`:8080`).
 4. Start **ai-service** (`:8000`) if using matching/legal-assistant.
@@ -332,7 +332,7 @@ Run the verification/AI test commands from `backend/verification/` or `ai-servic
 - **`./mvnw` or `./gradlew` permission denied (macOS/Linux):** run `chmod +x mvnw gradlew` from the repo root, and `chmod +x mvnw` inside `backend/`.
 - **Verification fails with "Python module missing":** run the verification `pip install` step with the same Python the backend finds. Set `VERIFICATION_PYTHON` explicitly.
 - **Tesseract not found:** install it or set `TESSERACT_CMD` to the executable path.
-- **Cloudinary/Mongo errors:** check the `.env` values and that the Cloudinary account/Atlas cluster allow access.
+- **S3/Mongo errors:** check the `.env` values and that the AWS bucket, credentials, and Atlas cluster allow access.
 - **Admin API login fails:** use the `ADMIN_PASSWORD` from `backend/.env` (default `askvocate-admin`).
 - **Port already in use:** stop the process using 8080 or 8000, or change the port.
 - **Legal assistant/matching unavailable:** that's `ai-service`; document verification still works without it.

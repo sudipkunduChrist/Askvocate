@@ -6,10 +6,14 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.stereotype.Service;
 
+import java.text.Normalizer;
 import java.util.ArrayList;
 import java.util.HashMap;
+import java.util.LinkedHashMap;
 import java.util.List;
+import java.util.Locale;
 import java.util.Map;
+import java.util.Set;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
@@ -95,12 +99,79 @@ public class OcrExtractionService {
 
     // ── Degree / AIBE patterns ──────────────────────────────────────────
     private static final Pattern CERTIFICATE_YEAR_PATTERN = Pattern.compile("\\b(?:19|20)\\d{2}\\b");
+    private static final Pattern CERTIFICATE_PASSING_YEAR_PATTERN = Pattern.compile(
+            "(?i)(?:year\\s+of\\s+passing|passing\\s+year|month\\s*(?:&|and)\\s*year\\s+of\\s+passing|academic\\s+session)"
+                    + "\\s*[:/-]?\\s*((?:19|20)\\d{2}(?:\\s*[-/]\\s*(?:(?:19|20)?\\d{2}))?)");
+    private static final Pattern CERTIFICATE_ISSUE_DATE_PATTERN = Pattern.compile(
+            "(?i)\\b(?:date|dated|issued\\s+on)\\s*[:/-]?\\s*((?:[0-3]?\\d[./-][01]?\\d[./-](?:19|20)\\d{2})"
+                    + "|(?:(?:19|20)\\d{2}[./-][01]?\\d[./-][0-3]?\\d))\\b");
+    private static final Pattern CERTIFICATE_CLASS_PATTERN = Pattern.compile(
+            "(?i)\\bclass\\s*(?:obtained\\s*)?[:/-]?\\s*([A-Z][A-Z0-9]*(?:\\s*\\([^\\r\\n)]{1,40}\\))?)");
+    private static final Pattern CERTIFICATE_GRADE_PATTERN = Pattern.compile(
+            "(?i)\\b([A-F])\\s*\\(\\s*(VERY\\s+GOOD|GOOD|AVERAGE|PASS)\\s*\\)");
+    private static final Pattern CERTIFICATE_ROMAN_CLASS_PATTERN = Pattern.compile(
+            "(?i)\\b(I{1,3}|FIRST|SECOND|THIRD)\\s+CLASS\\b");
+    private static final Pattern CERTIFICATE_DURATION_PATTERN = Pattern.compile(
+            "(?i)\\b((?:three|five|3|5)\\s*[- ]?\\s*year(?:s)?)\\b");
     private static final Pattern CERTIFICATE_INSTITUTION_PATTERN =
             Pattern.compile("(?i)(?:University|College|Institute|Board|Bar\\s+Council)[^\\n]*");
     private static final Pattern AIBE_NUMBER_PATTERN =
-            Pattern.compile("(?i)(?:AIBE|All\\s+India\\s+Bar\\s+Examination)\\s*(?:Roll|Reg(?:istration)?|No\\.?|Number)?\\s*[:/.-]?\\s*([A-Z0-9/\\-]+)");
+            Pattern.compile("(?i)(?:AIBE|All[ \\t]+India[ \\t]+Bar[ \\t]+Examination)[ \\t]*"
+                    + "(?:Roll|Registration|Reg|Enrollment|Enrolment)?[ \\t]*(?:No\\.?|Number)?[ \\t]*"
+                    + "[:/.-]?[ \\t]*([A-Z0-9][A-Z0-9/\\-]*\\d[A-Z0-9/\\-]*)");
     private static final Pattern DEGREE_NUMBER_PATTERN =
-            Pattern.compile("(?i)(?:Degree|Reg(?:istration)?|Roll|Certificate)\\s*(?:No\\.?|Number)?\\s*[:/.-]?\\s*([A-Z0-9/\\-]{4,})");
+            Pattern.compile("(?i)(?:Degree|Registration|Reg|Roll|Certificate)[ \\t]*"
+                    + "(?:No\\.?|Number)[ \\t]*[:/.-]?[ \\t]*"
+                    + "([A-Z0-9][A-Z0-9/\\-]*\\d[A-Z0-9/\\-]*)");
+    private static final Pattern CERTIFICATE_NAME_LABEL_PATTERN = Pattern.compile(
+            "(?im)^\\s*(?:Name\\s+of\\s+(?:the\\s+)?(?:Student|Candidate|Holder)|"
+                    + "Student'?s?\\s+Name|Candidate'?s?\\s+Name|Name)\\s*[:/-]?\\s*"
+                    + "([A-Za-z][A-Za-z .'-]{2,80})\\s*$");
+    private static final Pattern CERTIFICATE_INSTITUTION_LINE_PATTERN = Pattern.compile(
+            "(?im)^\\s*([A-Z][A-Za-z&.,'()\\- ]{4,120}?\\s+"
+                    + "(?:University|Vishwavidyalaya|College|Institute|Vidyalaya|Board))\\s*$");
+    private static final Pattern CERTIFICATE_DEGREE_TYPE_PATTERN = Pattern.compile(
+            "(?i)\\b((?:B\\.?\\s*A\\.?|B\\.?\\s*B\\.?\\s*A\\.?|B\\.?\\s*Com\\.?|B\\.?\\s*Sc\\.?)?"
+                    + "\\s*LL\\.?\\s*B\\.?|Bachelor\\s+of\\s+(?:Arts\\s+and\\s+)?(?:Bachelor\\s+of\\s+)?Laws|"
+                    + "LL\\.?\\s*M\\.?|Master\\s+of\\s+Laws|"
+                    + "M\\.?\\s*B\\.?\\s*L\\.?|Master\\s+of\\s+Business\\s+Laws|Diploma(?:\\s+in\\s+Law)?)\\b");
+    private static final Pattern CERTIFICATE_KIND_PATTERN =
+            Pattern.compile("(?i)\\b(FINAL|PROVISIONAL)\\b");
+    private static final Pattern CERTIFIES_THAT_LINE =
+            Pattern.compile("(?i)\\bcertif(?:y|ies|ied)\\s+that\\b");
+    private static final Pattern COLLEGE_NAME_LINE_PATTERN =
+            Pattern.compile("(?im)^\\s*(?:College(?:\\s+Name)?|Name\\s+of\\s+(?:the\\s+)?College)"
+                    + "(?:\\s+with\\s+code\\s+No\\.?)?\\s*[:/-]?\\s*(.+)$");
+    private static final Pattern COLLEGE_FROM_PATTERN =
+            Pattern.compile("(?i)\\bfrom\\s*[.:/-]?\\s*([A-Z][A-Za-z&.,'()\\- ]{3,100}?"
+                    + "\\b(?:Law\\s+)?College(?:,\\s*[A-Za-z .'-]{2,50})?)\\b");
+    private static final Pattern COLLEGE_LINE_PATTERN =
+            Pattern.compile("(?im)^\\s*([A-Z][A-Za-z&.,'()\\- ]{3,120}?\\s+College"
+                    + "(?:,\\s*[A-Za-z .'-]{2,50})?)\\s*$");
+    private static final Pattern EXAM_REGISTRATION_NUMBER_PATTERN =
+            Pattern.compile("(?i)\\b(?:Examination\\s*)?(?:Registration|Reg|Enrollment|Enrolment|Roll|Seat|PRN)"
+                    + "\\s*(?:No\\.?|Number|#)?\\s*[:/#.-]?\\s*([A-Z0-9][A-Z0-9/.-]{4,24})\\b");
+    private static final Pattern CERTIFICATE_SERIAL_NUMBER_PATTERN =
+            Pattern.compile("(?i)\\b(?:S\\s*[L1I]\\s*\\.?\\s*No\\.?|Serial\\s*(?:No\\.?|Number|#)|"
+                    + "Certificate\\s*(?:No\\.?|Number|#)|Degree\\s*(?:No\\.?|Number|#))"
+                    + "\\s*[:/#.-]?\\s*([A-Z0-9][A-Z0-9/.-]{2,24})");
+    private static final Pattern PDC_NUMBER_PATTERN =
+            Pattern.compile("(?i)\\bPDC\\s*(?:No\\.?|Number|#)?\\s*[:/#.-]?\\s*"
+                    + "([A-Z0-9](?:[A-Z0-9/.-]{0,5}[ \\t]+)?\\d{3,})");
+    private static final Pattern LONG_NUMBER_PATTERN = Pattern.compile("\\b(\\d{9,12})\\b");
+    private static final Set<String> NAME_STOP_WORDS = Set.of(
+            "university", "college", "institute", "school", "board", "examination", "registration",
+            "degree", "bachelor", "master", "diploma", "certificate", "class", "date", "bar",
+            "council", "name", "address", "father", "mother", "signature", "registrar", "chancellor",
+            "seal", "state", "law", "karnataka", "hubballi", "photograph", "certifies", "that",
+            "given", "under", "vice", "very", "good", "arts", "science", "commerce", "marks",
+            "marksheet", "semester", "transcript", "provisional", "final", "awarded", "admitted",
+            "this", "recognition", "fulfilment", "requirements", "said", "number", "roll", "exam",
+            "laws", "vice-chancellor", "vicechancellor", "year", "month", "session", "page",
+            "serial", "total", "grade", "cgpa", "percentage", "course", "branch",
+            "config", "tha", "cot", "tew", "con", "com", "unive", "oop", "cooh", "esd", "oenod",
+            "vidyapeeth", "vidyapecth", "vidyapoolh", "bharati", "bharali", "bhanati", "ghanati",
+            "deemed", "band", "bead", "wet", "dera");
 
     public OcrExtractionService() {
         this.barCouncilValidationService = new BarCouncilValidationService();
@@ -142,16 +213,55 @@ public class OcrExtractionService {
 
         ExtractionResult best = null;
         double bestScore = Double.NEGATIVE_INFINITY;
+        List<ExtractionResult> parsed = new ArrayList<>();
         for (String text : texts) {
             if (log.isDebugEnabled()) {
                 log.debug("OCR candidate for {} {}: {}", documentType, side, text);
             }
             ExtractionResult candidate = parseText(text, documentType, side, confidence);
+            parsed.add(candidate);
             double score = extractionScore(candidate, documentType);
             if (score > bestScore) {
                 best = candidate;
                 bestScore = score;
             }
+        }
+        // Certificates are often split across Tesseract passes: one pass reads the
+        // holder name, another the university/degree line. Merge missing fields from
+        // the other successful reads instead of discarding them.
+        if (best != null
+                && (documentType == DocumentType.DEGREE_CERTIFICATE
+                || documentType == DocumentType.AIBE_CERTIFICATE)) {
+            Map<String, String> merged = new LinkedHashMap<>(best.extractedFields());
+            for (ExtractionResult candidate : parsed) {
+                if (candidate == null || candidate.extractedFields().isEmpty()) continue;
+                candidate.extractedFields().forEach((key, value) -> {
+                    if (value == null || value.isBlank()) return;
+                    String current = merged.get(key);
+                    if (current == null || current.isBlank()) {
+                        merged.put(key, value);
+                    } else if (("institution".equals(key) || "college".equals(key))
+                            && institutionQuality(value) > institutionQuality(current)) {
+                        merged.put(key, value);
+                    } else if ("degreeType".equals(key) && value.length() > current.length()) {
+                        merged.put(key, value);
+                    } else if ("name".equals(key) && nameQuality(value) > nameQuality(current)) {
+                        merged.put(key, value);
+                    }
+                });
+            }
+            Object nameCandidate = rawOcrData instanceof Map<?, ?> map ? map.get("nameCandidate") : null;
+            if (nameCandidate instanceof String value && !value.isBlank()) {
+                String clean = mixedCaseName(value);
+                if (clean == null) clean = cleanPersonName(value);
+                if (clean != null && nameQuality(clean) > nameQuality(merged.get("name"))) {
+                    merged.put("name", clean);
+                }
+            }
+            boolean success = merged.containsKey("name");
+            best = new ExtractionResult(success, merged, best.maskedDocumentNumber(),
+                    best.confidence(), success ? null : best.error(),
+                    best.aadhaarNumber(), best.panNumber());
         }
         if (best != null) {
             log.info("OCR extraction chosen for documentType={}, side={}, success={}, fields={}, error={}",
@@ -160,8 +270,136 @@ public class OcrExtractionService {
         return best;
     }
 
-    /** The worker returns several Tesseract reads; try all of them before choosing fields. */
-    public List<String> extractTextCandidates(Object rawOcrData) {
+    /**
+     * Picks the candidate name that best matches the verified Aadhaar/PAN name.
+     * Low-resolution certificates often put the correct name in only one of the
+     * Tesseract passes, while other passes produce plausible-looking noise.
+     */
+    public String bestNameFor(Object rawOcrData, String expectedName) {
+        if (expectedName == null || expectedName.isBlank()) return null;
+        String expectedNormalized = normalizeName(expectedName);
+        String expectedFirst = expectedNormalized.split("\\s+")[0];
+        String best = null;
+        double bestScore = 0;
+        for (String text : extractTextCandidates(rawOcrData)) {
+            String[] tokens = text.split("\\s+");
+            for (int start = 0; start < tokens.length; start++) {
+                StringBuilder window = new StringBuilder();
+                for (int length = 1; length <= 4 && start + length <= tokens.length; length++) {
+                    String token = tokens[start + length - 1]
+                            .replaceAll("^[^A-Za-z]+", "")
+                            .replaceAll("[^A-Za-z.'-]+$", "");
+                    if (token.isEmpty() || token.length() > 20) break;
+                    if (window.length() > 0) window.append(' ');
+                    window.append(token);
+                    String candidate = window.toString();
+                    if (candidate.length() < 2 || candidate.length() > 60) continue;
+                    if (!looksLikeNameWindow(candidate)) continue;
+                    int exact = exactTokenMatches(candidate, expectedName);
+                    if (exact == 0) continue;
+                    double score = Math.max(editSimilarity(candidate, expectedName),
+                            (double) exact / Math.max(candidate.split("\\s+").length,
+                                    expectedNormalized.split("\\s+").length));
+                    String candidateFirst = normalizeName(candidate).split("\\s+")[0];
+                    if (candidateFirst.equals(expectedFirst)
+                            || candidateFirst.startsWith(expectedFirst)
+                            || expectedFirst.startsWith(candidateFirst)) {
+                        score += 0.25;
+                    }
+                    if (score > bestScore + 1e-9
+                            || (Math.abs(score - bestScore) <= 1e-9 && best != null
+                            && candidate.split("\\s+").length > best.split("\\s+").length)) {
+                        bestScore = score;
+                        best = candidate;
+                    }
+                }
+            }
+        }
+        return bestScore >= 0.5 ? best : null;
+    }
+
+    private static int exactTokenMatches(String first, String second) {
+        Set<String> left = new java.util.HashSet<>(java.util.Arrays.asList(normalizeStatic(first).split(" ")));
+        Set<String> right = new java.util.HashSet<>(java.util.Arrays.asList(normalizeStatic(second).split(" ")));
+        int common = 0;
+        for (String token : left) if (token.length() >= 2 && right.contains(token)) common++;
+        return common;
+    }
+
+    private double editSimilarity(String first, String second) {
+        String a = normalizeName(first);
+        String b = normalizeName(second);
+        if (a == null || b == null || a.isBlank() || b.isBlank()) return 0;
+        if (a.equals(b)) return 1.0;
+        return 1.0 - (double) levenshtein(a, b) / Math.max(a.length(), b.length());
+    }
+
+    private static String normalizeStatic(String value) {
+        if (value == null) return "";
+        return Normalizer.normalize(value, Normalizer.Form.NFKD)
+                .replaceAll("\\p{M}", "")
+                .replaceAll("[^A-Za-z0-9\\s]", " ")
+                .replaceAll("\\s+", " ")
+                .trim().toLowerCase(Locale.ROOT);
+    }
+
+    private static boolean looksLikeNameWindow(String candidate) {
+        boolean hasLongToken = false;
+        for (String token : candidate.split("\\s+")) {
+            String lower = token.toLowerCase(Locale.ROOT);
+            if (NAME_STOP_WORDS.contains(lower)) return false;
+            if (token.length() >= 3) hasLongToken = true;
+        }
+        return hasLongToken;
+    }
+
+    private double nameSimilarity(String first, String second) {
+        if (first == null || second == null) return 0;
+        String a = normalizeName(first);
+        String b = normalizeName(second);
+        if (a == null || b == null || a.isBlank() || b.isBlank()) return 0;
+        if (a.equals(b) || a.contains(b) || b.contains(a)) return 1.0;
+        int longest = Math.max(a.length(), b.length());
+        double edit = 1.0 - (double) levenshtein(a, b) / longest;
+        Set<String> left = new java.util.HashSet<>(java.util.Arrays.asList(a.split(" ")));
+        Set<String> right = new java.util.HashSet<>(java.util.Arrays.asList(b.split(" ")));
+        Set<String> used = new java.util.HashSet<>();
+        int common = 0;
+        for (String token : left) {
+            for (String candidate : right) {
+                if (used.contains(candidate)) continue;
+                if (token.equals(candidate)
+                        || (token.length() == 1 && candidate.startsWith(token))
+                        || (candidate.length() == 1 && token.startsWith(candidate))) {
+                    used.add(candidate);
+                    common++;
+                    break;
+                }
+            }
+        }
+        double tokens = (double) common / Math.min(left.size(), right.size());
+        return Math.max(edit, tokens);
+    }
+
+    private static int levenshtein(String a, String b) {
+        int[] previous = new int[b.length() + 1];
+        int[] current = new int[b.length() + 1];
+        for (int j = 0; j <= b.length(); j++) previous[j] = j;
+        for (int i = 1; i <= a.length(); i++) {
+            current[0] = i;
+            for (int j = 1; j <= b.length(); j++) {
+                int cost = a.charAt(i - 1) == b.charAt(j - 1) ? 0 : 1;
+                current[j] = Math.min(Math.min(current[j - 1] + 1, previous[j] + 1),
+                        previous[j - 1] + cost);
+            }
+            int[] swap = previous;
+            previous = current;
+            current = swap;
+        }
+        return previous[b.length()];
+    }
+
+    /** The worker returns several Tesseract reads; try all of them before choosing fields. */    public List<String> extractTextCandidates(Object rawOcrData) {
         List<String> texts = new ArrayList<>();
         if (rawOcrData instanceof Map<?, ?> map && map.get("candidates") instanceof List<?> candidates) {
             for (Object item : candidates) {
@@ -205,6 +443,16 @@ public class OcrExtractionService {
             if (result.extractedFields().containsKey("name")) score += 5;
             if (result.extractedFields().containsKey("year")) score += 3;
             if (result.extractedFields().containsKey("institution")) score += 3;
+            if (result.extractedFields().containsKey("degreeType")) score += 5;
+            if (result.extractedFields().containsKey("certificateType")) score += 3;
+            if (result.extractedFields().containsKey("degreeNumber")
+                    || result.extractedFields().containsKey("aibeNumber")) score += 3;
+            if (result.extractedFields().containsKey("institution")) score += 5;
+            if (result.extractedFields().containsKey("college")) score += 4;
+            if (result.extractedFields().containsKey("registrationNumber")) score += 6;
+            if (result.extractedFields().containsKey("certificateNumber")) score += 2;
+            if (result.extractedFields().containsKey("issueDate")) score += 2;
+            if (result.extractedFields().containsKey("classObtained")) score += 2;
         }
         return score;
     }
@@ -339,26 +587,441 @@ public class OcrExtractionService {
 
     private ExtractionResult parseCertificate(String text, DocumentType documentType, double confidence) {
         Map<String, String> fields = new HashMap<>();
-        Matcher nameMatcher = NAME_AFTER_LABEL_PATTERN.matcher(text);
-        if (nameMatcher.find()) fields.put("name", normalizeName(nameMatcher.group(1)));
-        if (!fields.containsKey("name")) {
-            Matcher certified = CERTIFIED_THAT_PATTERN.matcher(text);
-            if (certified.find()) fields.put("name", normalizeName(certified.group(1)));
+        String name = extractCertificateName(text);
+        if (name != null) fields.put("name", name);
+
+        String institution = extractInstitution(text, fields);
+        if (institution != null) {
+            fields.put("institution", institution);
         }
-        Matcher year = CERTIFICATE_YEAR_PATTERN.matcher(text);
-        if (year.find()) fields.put("year", year.group());
-        Matcher institution = CERTIFICATE_INSTITUTION_PATTERN.matcher(text);
-        if (institution.find()) fields.put("institution", institution.group().trim());
+
+        Matcher passingYear = CERTIFICATE_PASSING_YEAR_PATTERN.matcher(text);
+        if (passingYear.find()) {
+            String value = normalizeWhitespace(passingYear.group(1));
+            fields.put("passingYear", value);
+            Matcher yearToken = CERTIFICATE_YEAR_PATTERN.matcher(value);
+            if (yearToken.find()) fields.put("year", yearToken.group());
+        }
+        if (!fields.containsKey("year")) {
+            String awardYear = extractAwardYear(text);
+            if (awardYear != null) fields.put("year", awardYear);
+        }
+        Matcher issueDate = CERTIFICATE_ISSUE_DATE_PATTERN.matcher(text);
+        if (issueDate.find()) fields.put("issueDate", issueDate.group(1));
+
+        Matcher degreeType = CERTIFICATE_DEGREE_TYPE_PATTERN.matcher(text);
+        if (degreeType.find()) {
+            fields.put("degreeType", normalizeWhitespace(degreeType.group(1)).toUpperCase(Locale.ROOT));
+        }
+        Matcher kind = CERTIFICATE_KIND_PATTERN.matcher(text);
+        if (kind.find()) fields.put("certificateType", kind.group(1).toUpperCase(Locale.ROOT));
+
+        Matcher registration = EXAM_REGISTRATION_NUMBER_PATTERN.matcher(text);
+        while (registration.find()) {
+            String value = cleanCertificateNumber(registration.group(1));
+            if (value != null) {
+                fields.put("registrationNumber", value);
+                break;
+            }
+        }
+        if (!fields.containsKey("registrationNumber")
+                && text.toLowerCase(Locale.ROOT).contains("registration")) {
+            Matcher longNumber = LONG_NUMBER_PATTERN.matcher(text);
+            if (longNumber.find()) fields.put("registrationNumber", longNumber.group(1));
+        }
+
+        Matcher serial = CERTIFICATE_SERIAL_NUMBER_PATTERN.matcher(text);
+        if (serial.find()) {
+            String value = cleanCertificateNumber(serial.group(1));
+            if (value != null) {
+                fields.put("serialNumber", value);
+                fields.put("certificateNumber", value);
+            }
+        }
+        if (!fields.containsKey("certificateNumber")) {
+            Matcher pdc = PDC_NUMBER_PATTERN.matcher(text);
+            if (pdc.find()) {
+                String value = cleanCertificateNumber(pdc.group(1));
+                if (value != null) fields.put("certificateNumber", value);
+            }
+        }
+        Matcher degree = DEGREE_NUMBER_PATTERN.matcher(text);
+        if (degree.find()) {
+            String value = cleanCertificateNumber(degree.group(1));
+            if (value != null) fields.put("degreeNumber", value);
+        }
+
+        Matcher grade = CERTIFICATE_GRADE_PATTERN.matcher(text);
+        if (grade.find()) {
+            fields.put("classObtained", grade.group(1).toUpperCase(Locale.ROOT) + " ("
+                    + normalizeWhitespace(grade.group(2)).toUpperCase(Locale.ROOT) + ")");
+        } else {
+            Matcher classResult = CERTIFICATE_CLASS_PATTERN.matcher(text);
+            if (classResult.find()) {
+                String value = normalizeWhitespace(classResult.group(1));
+                if (value.length() >= 2
+                        && !Set.of("OF", "THE", "DEGREE", "OBTAINED", "EN", "ED")
+                        .contains(value.toUpperCase(Locale.ROOT))) {
+                    fields.put("classObtained", value);
+                }
+            } else {
+                Matcher romanClass = CERTIFICATE_ROMAN_CLASS_PATTERN.matcher(text);
+                if (romanClass.find()) fields.put("classObtained", romanClass.group(1).toUpperCase(Locale.ROOT));
+            }
+        }
+        Matcher duration = CERTIFICATE_DURATION_PATTERN.matcher(text);
+        if (duration.find()) fields.put("courseDuration", normalizeWhitespace(duration.group(1)));
+
         if (documentType == DocumentType.AIBE_CERTIFICATE) {
             Matcher aibe = AIBE_NUMBER_PATTERN.matcher(text);
-            if (aibe.find()) fields.put("aibeNumber", aibe.group(1));
-        } else {
-            Matcher degree = DEGREE_NUMBER_PATTERN.matcher(text);
-            if (degree.find()) fields.put("degreeNumber", degree.group(1));
+            if (aibe.find()) fields.put("aibeNumber", cleanCertificateNumber(aibe.group(1)));
         }
         boolean success = fields.containsKey("name");
         String error = success ? null : "Could not read the holder's name from the certificate.";
         return new ExtractionResult(success, fields, null, confidence, error);
+    }
+
+    /**
+     * Certificate names appear as {@code Name: ...}, "Certifies that <name>", or on
+     * the line after "Certifies that". The last case is common on university
+     * certificates printed over a watermark.
+     */
+    private String extractCertificateName(String text) {
+        Matcher labeled = CERTIFICATE_NAME_LABEL_PATTERN.matcher(text);
+        if (labeled.find()) {
+            String name = cleanPersonName(labeled.group(1));
+            if (name != null) return name;
+        }
+        String after = nameAfterCertifies(text);
+        if (after != null) return after;
+        Matcher certified = CERTIFIED_THAT_PATTERN.matcher(text);
+        if (certified.find()) {
+            String name = mixedCaseName(certified.group(1));
+            if (name == null) name = cleanPersonName(certified.group(1));
+            if (name != null) return name;
+        }
+        // Watermark-heavy certificates often lose the "Certifies that" line but keep
+        // the mixed-case name embedded in an all-caps watermark line.
+        for (String line : text.split("\\R")) {
+            if (!line.matches(".*\\b[A-Z]{4,}\\b.*")) continue;
+            String name = mixedCaseName(line);
+            if (name != null && name.split(" ")[0].length() >= 5) return name;
+        }
+        String noisyToken = noisyNameToken(text);
+        if (noisyToken != null) return noisyToken;
+        return null;
+    }
+
+    /**
+     * Low-resolution scans sometimes produce a single clean name token inside an
+     * otherwise noisy line, e.g. "Bead tie Ren ay Ps Ayushi bi HL".
+     */
+    private String noisyNameToken(String text) {
+        for (String line : text.split("\\R")) {
+            if (line.matches("(?i).*\\b(?:University|College|Institute|School|Seal|Given|Under|"
+                    + "Chancellor|Signature|Testimony|Examination|Registration|Board)\\b.*")) {
+                continue;
+            }
+            long shortLower = 0;
+            for (String token : line.split("\\s+")) {
+                if (token.matches("[a-z]{1,4}")) shortLower++;
+            }
+            if (shortLower < 3) continue;
+            java.util.Set<String> candidates = new java.util.LinkedHashSet<>();
+            Matcher matcher = Pattern.compile("\\b([A-Z][a-z]{4,8})\\b").matcher(line);
+            while (matcher.find()) {
+                String token = matcher.group(1);
+                if (!NAME_STOP_WORDS.contains(token.toLowerCase(Locale.ROOT))) {
+                    candidates.add(token);
+                }
+            }
+            if (candidates.size() == 1) return candidates.iterator().next();
+        }
+        return null;
+    }
+
+    private static int institutionQuality(String value) {
+        if (value == null) return Integer.MIN_VALUE;
+        String text = value.toLowerCase(Locale.ROOT);
+        int score = 0;
+        if (text.matches(".*\\b(?:university|vishwavidyalaya)\\b.*")) score += 6;
+        if (text.matches(".*\\b(?:college|institute)\\b.*")) score += 4;
+        if (value.length() <= 120) score += 2;
+        if (value.matches("(?i).*\\b(?:examination|registration|testimony|signature|chancellor)\\b.*")) {
+            score -= 6;
+        }
+        if (value.matches("(?i)^(?:given|under|the|university\\s+and\\b|in\\s+testimony|seal\\b|"
+                + "signatures?\\b).*")) score -= 12;
+        if (value.matches("(?i).*\\b(?:given|under|seal|testimony|signatures?|chancellor)\\b.*")) {
+            score -= 8;
+        }
+        long letters = value.chars().filter(Character::isLetter).count();
+        long uppers = value.chars().filter(Character::isUpperCase).count();
+        if (letters > 0 && uppers * 10 > letters * 6) score -= 4;
+        if (value.matches(".*[!|].*")) score -= 2;
+        if (value.contains(",")) score += 1;
+        score += Math.min(4, value.length() / 25);
+        return score;
+    }
+
+    private boolean hasTooManyDigits(String value) {
+        long digits = value.chars().filter(Character::isDigit).count();
+        long letters = value.chars().filter(Character::isLetter).count();
+        return digits > 0 && (letters < 4 || digits * 2 > letters);
+    }
+
+    private String nameAfterCertifies(String text) {
+        String[] lines = text.split("\\R");
+        for (int i = 0; i < lines.length; i++) {
+            if (!CERTIFIES_THAT_LINE.matcher(lines[i]).find()) continue;
+            String sameLine = lines[i].replaceFirst(
+                    "(?i).*\\bcertif(?:y|ies|ied)\\s+that\\b", "").trim();
+            if (looksLikeNameLine(sameLine)) {
+                String candidate = mixedCaseName(sameLine);
+                if (candidate == null) candidate = cleanPersonName(sameLine);
+                if (candidate != null) return candidate;
+            }
+            for (int j = i + 1; j < Math.min(lines.length, i + 8); j++) {
+                if (!looksLikeNameLine(lines[j])) continue;
+                String candidate = mixedCaseName(lines[j]);
+                if (candidate == null) candidate = cleanPersonName(lines[j]);
+                if (candidate != null) return candidate;
+            }
+        }
+        return null;
+    }
+
+    private boolean looksLikeNameLine(String line) {
+        String value = line == null ? "" : line.trim()
+                .replaceAll("^[^A-Za-z]+", "")
+                .replaceAll("[^A-Za-z .'-]+$", "");
+        if (value.isEmpty() || value.length() > 60) return false;
+        if (hasTooManyDigits(value)) return false;
+        String[] tokens = value.split("\\s+");
+        if (tokens.length == 0 || tokens.length > 4) return false;
+        if (!Character.isUpperCase(tokens[0].charAt(0))) return false;
+        for (String token : tokens) {
+            if (NAME_STOP_WORDS.contains(token.toLowerCase(Locale.ROOT))) return false;
+        }
+        return true;
+    }
+
+    /** Strict parser for explicit "Name:" labels. */
+    private String cleanPersonName(String raw) {
+        if (raw == null) return null;
+        String value = normalizeName(raw);
+        if (value == null || value.isBlank()) return null;
+        value = value.replaceAll("(?i)^(?:Mr\\.?|Mrs\\.?|Ms\\.?|Shri|Smt\\.?|Dr\\.?)\\s+", "").trim();
+
+        String[] tokens = value.split("\\s+");
+        StringBuilder kept = new StringBuilder();
+        for (String token : tokens) {
+            if (kept.length() > 0 && token.length() >= 4
+                    && token.equals(token.toUpperCase(Locale.ROOT))) break;
+            if (kept.length() > 0) kept.append(' ');
+            kept.append(token);
+        }
+        value = kept.toString().trim();
+        if (value.isEmpty() || value.length() > 80) return null;
+        if (!Character.isUpperCase(value.charAt(0))) return null;
+        if (!value.matches("[A-Za-z][A-Za-z .'-]{2,79}")) return null;
+        if (value.split("\\s+").length > 6) return null;
+        if (value.matches("(?i).*\\b(?:University|College|Institute|School|Board|Examination|"
+                + "Registration|Degree|Bachelor|Master|Diploma|Certificate|Class|Date|Bar|Council|"
+                + "Name|Address|Father|Mother|Signature|Registrar|Chancellor|Seal|State|Law|"
+                + "Karnataka|Hubballi|Photograph|Vishwavidyalaya|Vidyapeeth|Vidyapecth|Vidyapoolh|"
+                + "Bharati|Bharali|Bhanati|Ghanati|Deemed)\\b.*")) return null;
+        if (hasTooManyDigits(value)) return null;
+        if (value.equals(value.toUpperCase(Locale.ROOT)) && value.contains(" ")) return null;
+        return isPlausibleCertificateName(value) ? value : null;
+    }
+
+    /**
+     * Pulls a mixed-case person name out of a noisy certificate line. All-caps
+     * watermark words (KARNATAKA, NIVERSITY, ...) and boilerplate labels are skipped.
+     */
+    private String mixedCaseName(String raw) {
+        if (raw == null) return null;
+        String value = normalizeName(raw);
+        if (value == null || value.isBlank()) return null;
+        if (value.matches("(?i).*\\b(?:College|School|Institute|Address|Father|Mother|"
+                + "Examination|Registration|Config|Certifies|University|Vidyapeeth|Vidyapecth|"
+                + "Vidyapoolh|Bharati|Bharali|Bhanati|Ghanati|Deemed)\\b.*")) return null;
+        if (hasTooManyDigits(value)) return null;
+        if (value.split("\\s+").length > 4) return null;
+
+        List<String> run = new ArrayList<>();
+        for (String token : value.split("\\s+")) {
+            String word = token.replaceAll("^[^A-Za-z]+", "")
+                    .replaceAll("[^A-Za-z.'-]+$", "");
+            if (word.isEmpty()) continue;
+            if (word.length() == 1) {
+                if (!run.isEmpty() && Character.isUpperCase(word.charAt(0)) && run.size() < 4) {
+                    run.add(word);
+                    continue;
+                }
+                if (!run.isEmpty()) break;
+                continue;
+            }
+            String lower = word.toLowerCase(Locale.ROOT);
+            if (lower.startsWith("vice") || lower.startsWith("chancell")
+                    || lower.startsWith("registr") || lower.startsWith("controll")
+                    || lower.startsWith("cifancel")) {
+                if (!run.isEmpty()) break;
+                continue;
+            }
+            boolean mixedCase = !word.equals(word.toUpperCase(Locale.ROOT));
+            boolean upperStart = Character.isUpperCase(word.charAt(0));
+            long upperCount = word.chars().filter(Character::isUpperCase).count();
+            if (mixedCase && upperStart && upperCount <= 2 && word.length() >= 3
+                    && !NAME_STOP_WORDS.contains(lower)) {
+                run.add(word);
+            } else if (!run.isEmpty() && !mixedCase && word.length() >= 2 && word.length() <= 5
+                    && !NAME_STOP_WORDS.contains(lower) && run.size() <= 2) {
+                // OCR often splits a name into "Ayu" + "shi" across watermark text.
+                int last = run.size() - 1;
+                run.set(last, run.get(last) + word);
+            } else if (!run.isEmpty()) {
+                break;
+            }
+        }
+        if (run.isEmpty() || run.get(0).length() < 3) return null;
+        String name = String.join(" ", run);
+        return name.length() <= 80 && isPlausibleCertificateName(name) ? name : null;
+    }
+
+    private static boolean isPlausibleCertificateName(String value) {
+        for (String token : value.split("\\s+")) {
+            long upper = token.chars().filter(Character::isUpperCase).count();
+            if (upper > 2 || token.length() > 20) return false;
+            if (NAME_STOP_WORDS.contains(token.toLowerCase(Locale.ROOT))) return false;
+        }
+        return true;
+    }
+
+    private static int nameQuality(String value) {
+        if (value == null || value.isBlank()) return Integer.MIN_VALUE;
+        String[] tokens = value.split("\\s+");
+        int score = value.replace(" ", "").length() * 2 + tokens[0].length() * 2;
+        for (String token : tokens) {
+            long upper = token.chars().filter(Character::isUpperCase).count();
+            if (upper > 1) score -= 3;
+            if (token.length() < 3) score -= 2;
+        }
+        return score;
+    }
+
+    private String extractAwardYear(String text) {
+        int currentYear = java.time.LocalDate.now().getYear();
+        int best = -1;
+        for (String line : text.split("\\R")) {
+            if (line.matches("(?i).*(?:\\bUGC\\b|\\bAct\\b|established|u/s|section|regulation|"
+                    + "founded|since|university\\s+act).*")) {
+                continue;
+            }
+            Matcher matcher = CERTIFICATE_YEAR_PATTERN.matcher(line);
+            while (matcher.find()) {
+                int year = Integer.parseInt(matcher.group());
+                if (year >= 1950 && year <= currentYear + 1) best = Math.max(best, year);
+            }
+        }
+        return best > 0 ? String.valueOf(best) : null;
+    }
+
+    private String extractInstitution(String text, Map<String, String> fields) {
+        String college = extractCollegeName(text);
+        if (college != null) fields.put("college", college);
+
+        String best = null;
+        int bestScore = Integer.MIN_VALUE;
+        for (String line : text.split("\\R")) {
+            String value = cleanInstitution(line);
+            if (value == null || value.length() > 120) continue;
+            if (!value.matches("(?i).*\\b(?:University|Vishwavidyalaya)\\b.*")) continue;
+            if (value.matches("(?i).*\\b(?:Testimony|Seal|Signatures?|Chancellor|Vice|Conferred|"
+                    + "Examination|Academic\\s+Council|Board\\s+of\\s+Management|Given|Under)\\b.*")) continue;
+            String lower = value.toLowerCase(Locale.ROOT);
+            int occurrences = countOccurrences(lower, "university")
+                    + countOccurrences(lower, "vishwavidyalaya");
+            if (occurrences > 1) continue;
+            int score = 0;
+            if (!value.equals(value.toUpperCase(Locale.ROOT))) score += 3;
+            if (value.contains(",")) score += 2;
+            // "Deemed University, Pune" alone is a fragment; prefer the college line.
+            if (value.matches("(?i)^(?:deemed\\s+)?university\\b.*")) score -= 5;
+            if (score > bestScore) {
+                bestScore = score;
+                best = value;
+            }
+        }
+        if (best == null || best.matches("(?i)^(?:deemed\\s+)?university\\b.*")) {
+            String collegeName = fields.get("college");
+            if (collegeName != null) best = collegeName;
+        }
+        if (best == null) {
+            Matcher fallback = CERTIFICATE_INSTITUTION_PATTERN.matcher(text);
+            while (fallback.find()) {
+                String value = cleanInstitution(fallback.group());
+                if (value != null && !value.equals(value.toUpperCase(Locale.ROOT))
+                        && value.split("\\s+").length <= 10) {
+                    best = value;
+                    break;
+                }
+            }
+        }
+        return best != null ? best : fields.get("college");
+    }
+
+    private String extractCollegeName(String text) {
+        Matcher labeled = COLLEGE_NAME_LINE_PATTERN.matcher(text);
+        while (labeled.find()) {
+            String value = cleanInstitution(labeled.group(1));
+            if (value != null && value.toLowerCase(Locale.ROOT).contains("college")) return value;
+        }
+        Matcher from = COLLEGE_FROM_PATTERN.matcher(text);
+        if (from.find()) {
+            String value = cleanInstitution(from.group(1));
+            if (value != null) return value;
+        }
+        Matcher line = COLLEGE_LINE_PATTERN.matcher(text);
+        while (line.find()) {
+            String value = cleanInstitution(line.group(1));
+            if (value != null && value.toLowerCase(Locale.ROOT).contains("college")) return value;
+        }
+        return null;
+    }
+
+    private String cleanCertificateNumber(String raw) {
+        if (raw == null) return null;
+        String value = raw.replaceAll("\\s+", "").replaceAll("[^A-Za-z0-9/.-]", "")
+                .toUpperCase(Locale.ROOT);
+        return value.length() >= 4 && value.matches(".*\\d.*") ? value : null;
+    }
+
+    private String cleanInstitution(String raw) {
+        if (raw == null) return null;
+        String value = normalizeWhitespace(raw)
+                .replaceAll("^[^A-Za-z]+", "")
+                .replaceAll("[^A-Za-z.)]+$", "")
+                .replaceAll("[:;|]", " ")
+                .replaceAll("\\s+", " ")
+                .trim();
+        if (value.matches("(?i)^(?:given|under|the|university\\s+and\\b|in\\s+testimony|seal\\b|"
+                + "signatures?\\b).*")) return null;
+        if (value.matches("(?i).*\\b(?:given|under|seal|testimony|signatures?|chancellor)\\b.*")) {
+            return null;
+        }
+        return value.length() >= 6 ? value : null;
+    }
+
+    private int countOccurrences(String text, String needle) {
+        int count = 0;
+        int from = 0;
+        while ((from = text.indexOf(needle, from)) >= 0) {
+            count++;
+            from += needle.length();
+        }
+        return count;
     }
 
     // ── Aadhaar Parser ──────────────────────────────────────────────────
@@ -706,7 +1369,6 @@ public class OcrExtractionService {
      * Supports:
      * 1. Plain String (for tests / manual inputs)
      * 2. Maps with {@code text} or {@code ocrText}
-     * 3. Cloudinary nested adv_ocr: {@code info → ocr → adv_ocr → data[0] → fullTextAnnotation → text}
      */
     @SuppressWarnings("unchecked")
     public String extractTextFromOcrResponse(Object rawOcrData) {
@@ -734,28 +1396,7 @@ public class OcrExtractionService {
                 return directOcrText;
             }
 
-            Map<String, Object> ocr = (Map<String, Object>) info.get("ocr");
-            if (ocr == null) return null;
-
-            Map<String, Object> advOcr = (Map<String, Object>) ocr.get("adv_ocr");
-            if (advOcr == null) return null;
-
-            List<Map<String, Object>> data = (List<Map<String, Object>>) advOcr.get("data");
-            if (data == null || data.isEmpty()) return null;
-
-            Map<String, Object> firstPage = data.get(0);
-            // Cloudinary's adv_ocr response puts the complete OCR text in the
-            // first text annotation's description, not always in fullTextAnnotation.
-            List<Map<String, Object>> annotations =
-                    (List<Map<String, Object>>) firstPage.get("textAnnotations");
-            if (annotations != null && !annotations.isEmpty()) {
-                Object description = annotations.get(0).get("description");
-                if (description instanceof String value && !value.isBlank()) return value;
-            }
-            Map<String, Object> fullTextAnnotation =
-                    (Map<String, Object>) firstPage.get("fullTextAnnotation");
-            return fullTextAnnotation != null ? (String) fullTextAnnotation.get("text") : null;
-
+            return null;
         } catch (ClassCastException e) {
             log.warn("Unexpected OCR response structure");
             return null;
@@ -777,32 +1418,7 @@ public class OcrExtractionService {
                 return num.doubleValue();
             }
 
-            Map<String, Object> ocr = (Map<String, Object>) info.get("ocr");
-            if (ocr == null) return 0.85;
-
-            Map<String, Object> advOcr = (Map<String, Object>) ocr.get("adv_ocr");
-            if (advOcr == null) return 0.85;
-
-            List<Map<String, Object>> data = (List<Map<String, Object>>) advOcr.get("data");
-            if (data == null || data.isEmpty()) return 0.85;
-
-            Map<String, Object> firstPage = data.get(0);
-            List<Map<String, Object>> textAnnotations =
-                    (List<Map<String, Object>>) firstPage.get("textAnnotations");
-            if (textAnnotations == null || textAnnotations.isEmpty()) return 0.85;
-
-            // Average confidence from text annotations
-            double totalConfidence = 0;
-            int count = 0;
-            for (Map<String, Object> annotation : textAnnotations) {
-                Object conf = annotation.get("confidence");
-                if (conf instanceof Number) {
-                    totalConfidence += ((Number) conf).doubleValue();
-                    count++;
-                }
-            }
-            return count > 0 ? totalConfidence / count : 0.85;
-
+            return 0.85;
         } catch (Exception e) {
             return 0.85;
         }
@@ -867,6 +1483,10 @@ public class OcrExtractionService {
                 .replaceAll("^[^\\p{L}]+", "")
                 .replaceAll("[^\\p{L}\\p{M}]+$", "")
                 .trim();
+    }
+
+    private String normalizeWhitespace(String raw) {
+        return raw == null ? null : raw.replaceAll("\\s+", " ").trim();
     }
 
     // ── Result Record ───────────────────────────────────────────────────

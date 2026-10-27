@@ -23,12 +23,14 @@ def image(value: str) -> bytes:
 def run(request: dict) -> dict:
     from verification import (VerificationError, compare_printed_with_qr,
                               decode_pan_qr, decode_pan_qr_from_scanned, decode_signed_qr,
-                              local_ocr, match_live_selfie)
+                              local_ocr, match_live_selfie, read_bar_code)
 
     operation = request.get("operation")
     try:
         if operation == "ocr":
             return local_ocr(image(request["imageBase64"]), request.get("side", ""))
+        if operation == "barCode":
+            return read_bar_code(image(request["imageBase64"]))
         if operation == "aadhaarQr":
             qr = decode_signed_qr(image(request["imageBase64"]))
             mismatches = compare_printed_with_qr(
@@ -64,6 +66,8 @@ def run(request: dict) -> dict:
         reason = str(exc) if isinstance(exc, VerificationError) else "Invalid verification request."
         if operation == "ocr":
             return {"ocrText": "", "confidence": 0.0, "reason": reason}
+        if operation == "barCode":
+            return {"codeText": "", "reason": reason}
         if operation in ("aadhaarQr", "panQr", "panQrText"):
             return {"verified": False, "reason": reason}
         return {"matched": False, "livenessPassed": False, "reason": reason}

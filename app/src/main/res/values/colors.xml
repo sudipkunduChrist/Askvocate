@@ -120,5 +120,6 @@
     <color name="doc_success_soft">#FFE8F7EF</color>
     <color name="doc_warning_soft">#FFFDF4E3</color>
     <color name="doc_error_soft">#FFFFEBEB</color>
+    <color name="doc_neutral_soft">#FFF1F4F8</color>
     <color name="doc_loading_scrim">#DDF8FAFD</color>
 </resources>

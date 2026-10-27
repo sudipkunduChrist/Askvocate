@@ -27,21 +27,23 @@ import static org.mockito.ArgumentMatchers.*;
 import static org.mockito.Mockito.*;
 
 class VerificationGuardTest {
-    private final CloudinaryService cloudinary = mock(CloudinaryService.class);
+    private final S3StorageService storageService = mock(S3StorageService.class);
     private final UserDocumentRepository documents = mock(UserDocumentRepository.class);
     private final LawyerExperiencedProfileRepository experienced = mock(LawyerExperiencedProfileRepository.class);
     private final LawyerFresherProfileRepository freshers = mock(LawyerFresherProfileRepository.class);
     private final ClientProfileRepository clients = mock(ClientProfileRepository.class);
     private final VisionVerificationClient vision = mock(VisionVerificationClient.class);
     private final SelfieVerificationRepository selfies = mock(SelfieVerificationRepository.class);
-    private final DocumentVerificationService service = new DocumentVerificationService(cloudinary,
-            new OcrExtractionService(), new BarCouncilValidationService(), documents, experienced, freshers, clients,
+    private final DocumentVerificationService service = new DocumentVerificationService(storageService,
+            new OcrExtractionService(), new BarCouncilValidationService(),
+            new DegreeCertificatePolicy(new DegreeInstitutionAllowlist()),
+            documents, experienced, freshers, clients,
             vision, selfies, "test-hmac-key");
     private final MockMultipartFile front = new MockMultipartFile("front", "photo.jpg", "image/jpeg", new byte[]{1});
 
     @BeforeEach
     void resetMocks() {
-        reset(cloudinary, documents, experienced, freshers, clients, vision, selfies);
+        reset(storageService, documents, experienced, freshers, clients, vision, selfies);
     }
 
     @Test
@@ -59,7 +61,7 @@ class VerificationGuardTest {
         var error = assertThrows(DocumentVerificationException.class,
                 () -> service.verifyDocument("missing-id", DocumentType.PAN, front, null));
         assertEquals("Invalid userID.", error.getMessage());
-        verifyNoInteractions(cloudinary, documents);
+        verifyNoInteractions(storageService, documents);
     }
 
     @Test
@@ -76,7 +78,7 @@ class VerificationGuardTest {
         request.setUserId("client-id");
         request.setBarCouncilNumber("D/1234/2021");
         assertThrows(DocumentVerificationException.class, () -> service.verifyBarCouncilDirect(request));
-        verifyNoInteractions(cloudinary, documents);
+        verifyNoInteractions(storageService, documents);
     }
 
     @Test
@@ -87,7 +89,7 @@ class VerificationGuardTest {
         when(experienced.findById("admin-id")).thenReturn(Optional.of(profile));
         assertThrows(DocumentVerificationException.class,
                 () -> service.verifyDocument("admin-id", DocumentType.PAN, front, null));
-        verifyNoInteractions(cloudinary, documents);
+        verifyNoInteractions(storageService, documents);
     }
 
     @Test
@@ -96,8 +98,8 @@ class VerificationGuardTest {
         profile.setId("fresher-id");
         profile.setVerificationStatus(Verification_Status.REJECTED);
         when(freshers.findById("fresher-id")).thenReturn(Optional.of(profile));
-        when(cloudinary.uploadWithOcr(eq(front), anyString(), eq("front")))
-                .thenReturn(new CloudinaryService.UploadResult(new com.askvocate.backend.model.CloudinaryRef(), Map.of()));
+        when(storageService.uploadWithOcr(eq(front), anyString(), eq("front")))
+                .thenReturn(new S3StorageService.UploadResult(new com.askvocate.backend.model.StorageRef(), Map.of()));
         when(documents.save(any())).thenAnswer(invocation -> invocation.getArgument(0));
 
         var response = service.verifyDocument("fresher-id", DocumentType.PAN, front, null);
@@ -135,7 +137,7 @@ class VerificationGuardTest {
         request.setUserId("experienced-id");
         request.setBarCouncilNumber("D/1234/2021");
         assertThrows(DocumentVerificationException.class, () -> service.verifyBarCouncilDirect(request));
-        verifyNoInteractions(cloudinary);
+        verifyNoInteractions(storageService);
         verify(documents, never()).save(any());
     }
 
@@ -158,8 +160,8 @@ class VerificationGuardTest {
         profile.setId("fresher-id");
         when(freshers.findById("fresher-id")).thenReturn(Optional.of(profile));
         var namedFile = new MockMultipartFile("front", "C:\\uploads\\aadhaar_front.jpg", "image/jpeg", new byte[]{1});
-        when(cloudinary.uploadWithOcr(eq(namedFile), anyString(), eq("front")))
-                .thenThrow(new java.io.IOException("Cloudinary unavailable"));
+        when(storageService.uploadWithOcr(eq(namedFile), anyString(), eq("front")))
+                .thenThrow(new java.io.IOException("storage unavailable"));
 
         var error = assertThrows(DocumentVerificationException.class,
                 () -> service.verifyDocument("fresher-id", DocumentType.PAN, namedFile, null));
@@ -174,7 +176,7 @@ class VerificationGuardTest {
         var profile = new LawyerFresherProfile();
         profile.setId("fresher-id");
         when(freshers.findById("fresher-id")).thenReturn(Optional.of(profile));
-        when(cloudinary.uploadWithOcr(eq(front), anyString(), eq("front")))
+        when(storageService.uploadWithOcr(eq(front), anyString(), eq("front")))
                 .thenThrow(new DocumentVerificationException("Backend OCR is unavailable. Check Python and Tesseract."));
 
         var error = assertThrows(DocumentVerificationException.class,
@@ -194,11 +196,11 @@ class VerificationGuardTest {
         profile.setId("fresher-id");
         when(freshers.findById("fresher-id")).thenReturn(Optional.of(profile));
         var back = new MockMultipartFile("back", "aadhaar_rear.jpg", "image/jpeg", new byte[]{1});
-        when(cloudinary.uploadWithOcr(eq(front), anyString(), eq("front")))
-                .thenReturn(new CloudinaryService.UploadResult(new com.askvocate.backend.model.CloudinaryRef(),
+        when(storageService.uploadWithOcr(eq(front), anyString(), eq("front")))
+                .thenReturn(new S3StorageService.UploadResult(new com.askvocate.backend.model.StorageRef(),
                         Map.of("text", "Aadhaar\nName: Test Lawyer\nDOB: 01/02/1990\nMale\n" + validAadhaarNumber())));
-        when(cloudinary.uploadWithOcr(eq(back), anyString(), eq("back")))
-                .thenReturn(new CloudinaryService.UploadResult(new com.askvocate.backend.model.CloudinaryRef(), Map.of()));
+        when(storageService.uploadWithOcr(eq(back), anyString(), eq("back")))
+                .thenReturn(new S3StorageService.UploadResult(new com.askvocate.backend.model.StorageRef(), Map.of()));
         when(documents.save(any())).thenAnswer(invocation -> invocation.getArgument(0));
 
         var response = service.verifyDocument("fresher-id", DocumentType.AADHAAR, front, back);
@@ -216,11 +218,11 @@ class VerificationGuardTest {
         when(freshers.findById("fresher-id")).thenReturn(Optional.of(profile));
         String number = validAadhaarNumber();
         var back = new MockMultipartFile("back", "aadhaar_back.jpg", "image/jpeg", new byte[]{1});
-        when(cloudinary.uploadWithOcr(eq(front), anyString(), eq("front")))
-                .thenReturn(new CloudinaryService.UploadResult(new com.askvocate.backend.model.CloudinaryRef(),
+        when(storageService.uploadWithOcr(eq(front), anyString(), eq("front")))
+                .thenReturn(new S3StorageService.UploadResult(new com.askvocate.backend.model.StorageRef(),
                         Map.of("text", "Name: Test Lawyer\nDOB: 01/02/1990\nMale\n" + number)));
-        when(cloudinary.uploadWithOcr(eq(back), anyString(), eq("back")))
-                .thenReturn(new CloudinaryService.UploadResult(new com.askvocate.backend.model.CloudinaryRef(),
+        when(storageService.uploadWithOcr(eq(back), anyString(), eq("back")))
+                .thenReturn(new S3StorageService.UploadResult(new com.askvocate.backend.model.StorageRef(),
                         Map.of("text", "Address: 12 Test Road\nNew Delhi")));
         AtomicReference<com.askvocate.backend.model.UserDocument> stored = new AtomicReference<>();
         when(documents.save(any())).thenAnswer(invocation -> {
@@ -234,9 +236,9 @@ class VerificationGuardTest {
                         "dob", "01/02/1990", "gender", "M", "pincode", "201304",
                         "address", "12 Test Road New Delhi", "aadhaarLast4", number.substring(8)),
                         true, "uidai-test.cer", "4626", List.of(), false, null, "V2", "AQID"));
-        when(cloudinary.uploadBytes(any(), anyString(), eq("qr"))).thenReturn(
-                new com.askvocate.backend.model.CloudinaryRef("qr-photo-id",
-                        "https://res.cloudinary.com/test/qr.jpg", "qr"));
+        when(storageService.uploadBytes(any(), anyString(), eq("qr"))).thenReturn(
+                new com.askvocate.backend.model.StorageRef("qr-photo-id",
+                        "https://res.storageService.com/test/qr.jpg", "qr"));
 
         var response = service.verifyDocument("fresher-id", DocumentType.AADHAAR, front, back);
 
@@ -278,11 +280,11 @@ class VerificationGuardTest {
         when(freshers.findById("fresher-id")).thenReturn(Optional.of(profile));
         String number = validAadhaarNumber();
         var back = new MockMultipartFile("back", "aadhaar_back.jpg", "image/jpeg", new byte[]{1});
-        when(cloudinary.uploadWithOcr(eq(front), anyString(), eq("front")))
-                .thenReturn(new CloudinaryService.UploadResult(new com.askvocate.backend.model.CloudinaryRef(),
+        when(storageService.uploadWithOcr(eq(front), anyString(), eq("front")))
+                .thenReturn(new S3StorageService.UploadResult(new com.askvocate.backend.model.StorageRef(),
                         Map.of("text", "Name: Test Lawyer\nDOB: 01/02/1990\nMale\n" + number)));
-        when(cloudinary.uploadWithOcr(eq(back), anyString(), eq("back")))
-                .thenReturn(new CloudinaryService.UploadResult(new com.askvocate.backend.model.CloudinaryRef(),
+        when(storageService.uploadWithOcr(eq(back), anyString(), eq("back")))
+                .thenReturn(new S3StorageService.UploadResult(new com.askvocate.backend.model.StorageRef(),
                         Map.of("text", "Address: 12 Test Road\nNew Delhi")));
         AtomicReference<com.askvocate.backend.model.UserDocument> stored = new AtomicReference<>();
         when(documents.save(any())).thenAnswer(invocation -> {
@@ -302,7 +304,8 @@ class VerificationGuardTest {
         assertEquals(com.askvocate.backend.model.VerificationStatus.VERIFIED, response.getVerificationStatus());
         assertEquals(Boolean.TRUE, stored.get().getIsQrVerified());
         assertEquals(Boolean.FALSE, stored.get().getQrPrintedMismatch());
-        assertNull(stored.get().getQrMismatchFields());
+        // The QR stays authoritative, but the differing fields are retained for the app to explain.
+        assertEquals(List.of("name"), stored.get().getQrMismatchFields());
         assertFalse(stored.get().getRequiresManualReview());
         assertNull(stored.get().getPendingReason());
         assertTrue(stored.get().getAutoApproved());
@@ -319,11 +322,11 @@ class VerificationGuardTest {
         when(freshers.findById("fresher-id")).thenReturn(Optional.of(profile));
         String number = validAadhaarNumber();
         var back = new MockMultipartFile("back", "aadhaar_back.jpg", "image/jpeg", new byte[]{1});
-        when(cloudinary.uploadWithOcr(eq(front), anyString(), eq("front")))
-                .thenReturn(new CloudinaryService.UploadResult(new com.askvocate.backend.model.CloudinaryRef(),
+        when(storageService.uploadWithOcr(eq(front), anyString(), eq("front")))
+                .thenReturn(new S3StorageService.UploadResult(new com.askvocate.backend.model.StorageRef(),
                         Map.of("text", "Name: Test Lawyer\nDOB: 01/02/1990\nMale\n" + number)));
-        when(cloudinary.uploadWithOcr(eq(back), anyString(), eq("back")))
-                .thenReturn(new CloudinaryService.UploadResult(new com.askvocate.backend.model.CloudinaryRef(),
+        when(storageService.uploadWithOcr(eq(back), anyString(), eq("back")))
+                .thenReturn(new S3StorageService.UploadResult(new com.askvocate.backend.model.StorageRef(),
                         Map.of("text", "Address: 12 Test Road\nNew Delhi")));
         AtomicReference<com.askvocate.backend.model.UserDocument> stored = new AtomicReference<>();
         when(documents.save(any())).thenAnswer(invocation -> {
@@ -341,7 +344,7 @@ class VerificationGuardTest {
         assertFalse(stored.get().getIsQrVerified());
         assertNull(stored.get().getQrData());
         assertNull(stored.get().getQrText());
-        assertFalse(stored.get().getCloudinaryReferences().isEmpty());
+        assertFalse(stored.get().getStorageReferences().isEmpty());
         assertFalse(stored.get().getRequiresManualReview());
         assertEquals("AADHAAR_QR_UNREADABLE", stored.get().getPendingReason());
     }
@@ -354,11 +357,11 @@ class VerificationGuardTest {
         var back = new MockMultipartFile("back", "aadhaar_back.jpg", "image/jpeg", new byte[]{1});
         String frontText = "Name: Test Lawyer\nIssue Date: 01/02/2020\nMale\n" + validAadhaarNumber();
         String backText = "Address: 12 Test Road\nNew Delhi";
-        when(cloudinary.uploadWithOcr(eq(front), anyString(), eq("front")))
-                .thenReturn(new CloudinaryService.UploadResult(new com.askvocate.backend.model.CloudinaryRef(),
+        when(storageService.uploadWithOcr(eq(front), anyString(), eq("front")))
+                .thenReturn(new S3StorageService.UploadResult(new com.askvocate.backend.model.StorageRef(),
                         Map.of("text", frontText)));
-        when(cloudinary.uploadWithOcr(eq(back), anyString(), eq("back")))
-                .thenReturn(new CloudinaryService.UploadResult(new com.askvocate.backend.model.CloudinaryRef(),
+        when(storageService.uploadWithOcr(eq(back), anyString(), eq("back")))
+                .thenReturn(new S3StorageService.UploadResult(new com.askvocate.backend.model.StorageRef(),
                         Map.of("text", backText)));
         AtomicReference<com.askvocate.backend.model.UserDocument> stored = new AtomicReference<>();
         when(documents.save(any())).thenAnswer(invocation -> {
@@ -389,8 +392,8 @@ class VerificationGuardTest {
         when(freshers.findById("fresher-id")).thenReturn(Optional.of(profile));
         when(vision.verifyPanQr(any()))
                 .thenReturn(panQr("AAAPL1234C", "Test Lawyer", "Test Father", "01/02/1990"));
-        when(cloudinary.uploadWithOcr(eq(front), anyString(), eq("front")))
-                .thenReturn(new CloudinaryService.UploadResult(new com.askvocate.backend.model.CloudinaryRef(),
+        when(storageService.uploadWithOcr(eq(front), anyString(), eq("front")))
+                .thenReturn(new S3StorageService.UploadResult(new com.askvocate.backend.model.StorageRef(),
                         Map.of("text", "PAN Card\nAAAPL1234C\nName: Test Lawyer\n"
                                 + "Father's Name: Test Father\nDOB: 01/02/1990")));
         AtomicReference<com.askvocate.backend.model.UserDocument> stored = new AtomicReference<>();
@@ -412,7 +415,7 @@ class VerificationGuardTest {
         assertNull(stored.get().getCrossDocumentMismatchFields());
         assertNull(response.getPanNumber());
         assertEquals("XXXXXX234C", response.getMaskedDocumentNumber());
-        assertFalse(stored.get().getCloudinaryReferences().isEmpty());
+        assertFalse(stored.get().getStorageReferences().isEmpty());
     }
 
     @Test
@@ -425,8 +428,8 @@ class VerificationGuardTest {
                 .thenReturn(panQr("AAAPL1234C", "Test Lawyer", "Test Father", "01/02/1990"));
         when(documents.findByUserIdAndDocumentType("fresher-id", DocumentType.AADHAAR))
                 .thenReturn(Optional.of(verifiedAadhaarWithQr("Test Lawyer", "01-02-1990")));
-        when(cloudinary.uploadWithOcr(eq(front), anyString(), eq("front")))
-                .thenReturn(new CloudinaryService.UploadResult(new com.askvocate.backend.model.CloudinaryRef(),
+        when(storageService.uploadWithOcr(eq(front), anyString(), eq("front")))
+                .thenReturn(new S3StorageService.UploadResult(new com.askvocate.backend.model.StorageRef(),
                         Map.of("text", "PAN Card\nAAAPL1234C\nName: Test Lawyer\n"
                                 + "Father's Name: Test Father\nDOB: 01/02/1990")));
         AtomicReference<com.askvocate.backend.model.UserDocument> stored = new AtomicReference<>();
@@ -445,7 +448,7 @@ class VerificationGuardTest {
         assertFalse(stored.get().getRequiresManualReview());
         assertNull(stored.get().getPendingReason());
         assertNull(stored.get().getCrossDocumentMismatchFields());
-        assertFalse(stored.get().getCloudinaryReferences().isEmpty());
+        assertFalse(stored.get().getStorageReferences().isEmpty());
     }
 
     @Test
@@ -458,8 +461,8 @@ class VerificationGuardTest {
                 .thenReturn(panQr("AAAPL1234C", "Test Lawyer", "Test Father", "01/02/1990"));
         when(documents.findByUserIdAndDocumentType("fresher-id", DocumentType.AADHAAR))
                 .thenReturn(Optional.of(verifiedAadhaarWithQr("Different Lawyer", "02-02-1990")));
-        when(cloudinary.uploadWithOcr(eq(front), anyString(), eq("front")))
-                .thenReturn(new CloudinaryService.UploadResult(new com.askvocate.backend.model.CloudinaryRef(),
+        when(storageService.uploadWithOcr(eq(front), anyString(), eq("front")))
+                .thenReturn(new S3StorageService.UploadResult(new com.askvocate.backend.model.StorageRef(),
                         Map.of("text", "PAN Card\nAAAPL1234C\nName: Test Lawyer\n"
                                 + "Father's Name: Test Father\nDOB: 01/02/1990")));
         AtomicReference<com.askvocate.backend.model.UserDocument> stored = new AtomicReference<>();
@@ -478,7 +481,7 @@ class VerificationGuardTest {
         assertEquals(List.of("name", "dob"), stored.get().getCrossDocumentMismatchFields());
         assertTrue(stored.get().getManualReviewReason().contains("do not match"));
         assertNull(response.getPanNumber());
-        assertTrue(stored.get().getCloudinaryReferences().isEmpty());
+        assertTrue(stored.get().getStorageReferences().isEmpty());
     }
 
     @Test
@@ -491,8 +494,8 @@ class VerificationGuardTest {
         var other = new com.askvocate.backend.model.UserDocument();
         other.setUserId("other-user");
         when(documents.findByPanNumberHash(anyString())).thenReturn(Optional.of(other));
-        when(cloudinary.uploadWithOcr(eq(front), anyString(), eq("front")))
-                .thenReturn(new CloudinaryService.UploadResult(new com.askvocate.backend.model.CloudinaryRef(),
+        when(storageService.uploadWithOcr(eq(front), anyString(), eq("front")))
+                .thenReturn(new S3StorageService.UploadResult(new com.askvocate.backend.model.StorageRef(),
                         Map.of("text", "PAN Card\nAAAPL1234C\nName: Test Lawyer\n"
                                 + "Father's Name: Test Father\nDOB: 01/02/1990")));
         AtomicReference<com.askvocate.backend.model.UserDocument> stored = new AtomicReference<>();
@@ -509,7 +512,7 @@ class VerificationGuardTest {
         assertTrue(stored.get().getRequiresManualReview());
         assertEquals("PAN_DUPLICATE", stored.get().getPendingReason());
         assertTrue(stored.get().getManualReviewReason().contains("another account"));
-        assertTrue(stored.get().getCloudinaryReferences().isEmpty());
+        assertTrue(stored.get().getStorageReferences().isEmpty());
     }
 
     @Test
@@ -541,15 +544,15 @@ class VerificationGuardTest {
                 .thenAnswer(invocation -> Optional.ofNullable(panStored.get()));
         when(documents.findByUserIdAndDocumentType("fresher-id", DocumentType.AADHAAR))
                 .thenAnswer(invocation -> Optional.ofNullable(aadhaarStored.get()));
-        when(cloudinary.uploadWithOcr(eq(front), anyString(), eq("front")))
-                .thenReturn(new CloudinaryService.UploadResult(new com.askvocate.backend.model.CloudinaryRef(),
+        when(storageService.uploadWithOcr(eq(front), anyString(), eq("front")))
+                .thenReturn(new S3StorageService.UploadResult(new com.askvocate.backend.model.StorageRef(),
                         Map.of("text", "PAN Card\nAAAPL1234C\nName: Test Lawyer\n"
                                 + "Father's Name: Test Father\nDOB: 01/02/1990")));
-        when(cloudinary.uploadWithOcr(eq(aadhaarFront), anyString(), eq("front")))
-                .thenReturn(new CloudinaryService.UploadResult(new com.askvocate.backend.model.CloudinaryRef(),
+        when(storageService.uploadWithOcr(eq(aadhaarFront), anyString(), eq("front")))
+                .thenReturn(new S3StorageService.UploadResult(new com.askvocate.backend.model.StorageRef(),
                         Map.of("text", "Name: Test Lawyer\nDOB: 01/02/1990\nMale\n" + number)));
-        when(cloudinary.uploadWithOcr(eq(back), anyString(), eq("back")))
-                .thenReturn(new CloudinaryService.UploadResult(new com.askvocate.backend.model.CloudinaryRef(),
+        when(storageService.uploadWithOcr(eq(back), anyString(), eq("back")))
+                .thenReturn(new S3StorageService.UploadResult(new com.askvocate.backend.model.StorageRef(),
                         Map.of("text", "Address: 12 Test Road\nNew Delhi")));
         when(vision.verifyAadhaarQr(any(), anyMap(), anyString())).thenReturn(
                 new VisionVerificationClient.QrResult(true, Map.of("name", "Test Lawyer",
@@ -568,7 +571,7 @@ class VerificationGuardTest {
                 panStored.get().getVerificationStatus());
         assertTrue(panStored.get().getAutoApproved());
         assertNotNull(panStored.get().getVerifiedAt());
-        assertFalse(panStored.get().getCloudinaryReferences().isEmpty());
+        assertFalse(panStored.get().getStorageReferences().isEmpty());
     }
 
     @Test
@@ -577,8 +580,8 @@ class VerificationGuardTest {
         profile.setId("fresher-id");
         when(freshers.findById("fresher-id")).thenReturn(Optional.of(profile));
         String ocrText = "Name: Test Lawyer\nFather's Name: Test Father\nDOB: 01/02/1990";
-        when(cloudinary.uploadWithOcr(eq(front), anyString(), eq("front")))
-                .thenReturn(new CloudinaryService.UploadResult(new com.askvocate.backend.model.CloudinaryRef(),
+        when(storageService.uploadWithOcr(eq(front), anyString(), eq("front")))
+                .thenReturn(new S3StorageService.UploadResult(new com.askvocate.backend.model.StorageRef(),
                         Map.of("text", ocrText)));
         AtomicReference<com.askvocate.backend.model.UserDocument> stored = new AtomicReference<>();
         when(documents.save(any())).thenAnswer(invocation -> {
@@ -593,7 +596,7 @@ class VerificationGuardTest {
         assertTrue(response.getFailureReason().contains("QR could not be read"));
         assertFalse(stored.get().getRequiresManualReview());
         assertEquals("PAN_QR_UNREADABLE", stored.get().getPendingReason());
-        assertFalse(stored.get().getCloudinaryReferences().isEmpty());
+        assertFalse(stored.get().getStorageReferences().isEmpty());
     }
 
     @Test
@@ -601,8 +604,8 @@ class VerificationGuardTest {
         var profile = new LawyerFresherProfile();
         profile.setId("fresher-id");
         when(freshers.findById("fresher-id")).thenReturn(Optional.of(profile));
-        when(cloudinary.uploadWithOcr(eq(front), anyString(), eq("front")))
-                .thenReturn(new CloudinaryService.UploadResult(new com.askvocate.backend.model.CloudinaryRef(),
+        when(storageService.uploadWithOcr(eq(front), anyString(), eq("front")))
+                .thenReturn(new S3StorageService.UploadResult(new com.askvocate.backend.model.StorageRef(),
                         Map.of("text", "AAAPL1234C\nFather's Name: Test Father\nDOB: 01/02/1990")));
         when(documents.save(any())).thenAnswer(invocation -> invocation.getArgument(0));
 
@@ -626,7 +629,7 @@ class VerificationGuardTest {
                 () -> service.verifyDocument("fresher-id", DocumentType.PAN, front, back));
 
         assertEquals("pan_back.jpg", error.getFile());
-        verifyNoInteractions(cloudinary, documents);
+        verifyNoInteractions(storageService, documents);
     }
 
     @Test
@@ -651,6 +654,57 @@ class VerificationGuardTest {
         assertEquals("admin", saved.getReviewedBy());
         assertNotNull(saved.getVerifiedAt());
         assertFalse(saved.getRequiresManualReview());
+    }
+
+    @Test
+    void degreeApprovalRequiresReviewChecklist() {
+        var profile = new LawyerFresherProfile();
+        profile.setId("fresher-id");
+        when(freshers.findById("fresher-id")).thenReturn(Optional.of(profile));
+        var degree = new com.askvocate.backend.model.UserDocument();
+        degree.setId("degree-id");
+        degree.setUserId("fresher-id");
+        degree.setDocumentType(DocumentType.DEGREE_CERTIFICATE);
+        degree.setVerificationStatus(com.askvocate.backend.model.VerificationStatus.PENDING);
+        degree.setRequiresManualReview(true);
+        when(documents.findById("degree-id")).thenReturn(Optional.of(degree));
+        when(documents.save(any())).thenAnswer(invocation -> invocation.getArgument(0));
+
+        var error = assertThrows(DocumentVerificationException.class,
+                () -> service.approveDocument("degree-id", "admin", "Checked.",
+                        Map.of("degree_is_llb", true)));
+        assertTrue(error.getMessage().contains("checklist"));
+    }
+
+    @Test
+    void degreeApprovalPersistsChecklistAndRequiresForeignEquivalence() {
+        var profile = new LawyerFresherProfile();
+        profile.setId("fresher-id");
+        when(freshers.findById("fresher-id")).thenReturn(Optional.of(profile));
+        var degree = new com.askvocate.backend.model.UserDocument();
+        degree.setId("degree-id");
+        degree.setUserId("fresher-id");
+        degree.setDocumentType(DocumentType.DEGREE_CERTIFICATE);
+        degree.setVerificationStatus(com.askvocate.backend.model.VerificationStatus.PENDING);
+        degree.setRequiresManualReview(true);
+        degree.setVerificationFlags(List.of("FOREIGN_UNIVERSITY", "REQUIRES_BCI_EQUIVALENCE"));
+        when(documents.findById("degree-id")).thenReturn(Optional.of(degree));
+        when(documents.save(any())).thenAnswer(invocation -> invocation.getArgument(0));
+
+        var checklist = new java.util.HashMap<String, Boolean>();
+        checklist.put("degree_is_llb", true);
+        checklist.put("final_or_provisional", true);
+        checklist.put("name_matches_kyc", true);
+        checklist.put("university_bci_recognized", true);
+
+        assertThrows(DocumentVerificationException.class,
+                () -> service.approveDocument("degree-id", "admin", null, checklist));
+
+        checklist.put("foreign_equivalence", true);
+        var saved = service.approveDocument("degree-id", "admin", null, checklist);
+
+        assertEquals(com.askvocate.backend.model.VerificationStatus.VERIFIED, saved.getVerificationStatus());
+        assertEquals(Boolean.TRUE, saved.getReviewChecklist().get("foreign_equivalence"));
     }
 
     @Test
@@ -733,8 +787,8 @@ class VerificationGuardTest {
         when(freshers.findById("fresher-id")).thenReturn(Optional.of(profile));
         when(documents.findByUserIdAndDocumentType("fresher-id", DocumentType.AADHAAR))
                 .thenReturn(Optional.of(verifiedAadhaarWithQr("Test Lawyer", "01-02-1990")));
-        when(cloudinary.uploadWithOcr(eq(front), anyString(), eq("front")))
-                .thenReturn(new CloudinaryService.UploadResult(new com.askvocate.backend.model.CloudinaryRef(),
+        when(storageService.uploadWithOcr(eq(front), anyString(), eq("front")))
+                .thenReturn(new S3StorageService.UploadResult(new com.askvocate.backend.model.StorageRef(),
                         Map.of("text", "garbled ocr text")));
         when(vision.verifyPanQr(any())).thenReturn(
                 new VisionVerificationClient.PanQrResult(true,
@@ -765,8 +819,8 @@ class VerificationGuardTest {
         var profile = new LawyerFresherProfile();
         profile.setId("fresher-id");
         when(freshers.findById("fresher-id")).thenReturn(Optional.of(profile));
-        when(cloudinary.uploadWithOcr(eq(front), anyString(), eq("front")))
-                .thenReturn(new CloudinaryService.UploadResult(new com.askvocate.backend.model.CloudinaryRef(),
+        when(storageService.uploadWithOcr(eq(front), anyString(), eq("front")))
+                .thenReturn(new S3StorageService.UploadResult(new com.askvocate.backend.model.StorageRef(),
                         Map.of("text", "garbled ocr text")));
         when(vision.verifyPanQr(any())).thenReturn(
                 new VisionVerificationClient.PanQrResult(true,
@@ -797,8 +851,8 @@ class VerificationGuardTest {
         when(freshers.findById("fresher-id")).thenReturn(Optional.of(profile));
         when(documents.findByUserIdAndDocumentType("fresher-id", DocumentType.AADHAAR))
                 .thenReturn(Optional.of(verifiedAadhaarWithQr("Different Name", "01-02-1990")));
-        when(cloudinary.uploadWithOcr(eq(front), anyString(), eq("front")))
-                .thenReturn(new CloudinaryService.UploadResult(new com.askvocate.backend.model.CloudinaryRef(),
+        when(storageService.uploadWithOcr(eq(front), anyString(), eq("front")))
+                .thenReturn(new S3StorageService.UploadResult(new com.askvocate.backend.model.StorageRef(),
                         Map.of("text", "garbled ocr text")));
         when(vision.verifyPanQr(any())).thenReturn(
                 new VisionVerificationClient.PanQrResult(true,
@@ -856,12 +910,12 @@ class VerificationGuardTest {
         profile.setId("fresher-id");
         when(freshers.findById("fresher-id")).thenReturn(Optional.of(profile));
         var back = new MockMultipartFile("back", "aadhaar_back.jpg", "image/jpeg", new byte[]{1});
-        when(cloudinary.uploadWithOcr(eq(front), anyString(), eq("front")))
-                .thenReturn(new CloudinaryService.UploadResult(
-                        new com.askvocate.backend.model.CloudinaryRef(), Map.of("text", "garbled")));
-        when(cloudinary.uploadWithOcr(eq(back), anyString(), eq("back")))
-                .thenReturn(new CloudinaryService.UploadResult(
-                        new com.askvocate.backend.model.CloudinaryRef(), Map.of("text", "garbled")));
+        when(storageService.uploadWithOcr(eq(front), anyString(), eq("front")))
+                .thenReturn(new S3StorageService.UploadResult(
+                        new com.askvocate.backend.model.StorageRef(), Map.of("text", "garbled")));
+        when(storageService.uploadWithOcr(eq(back), anyString(), eq("back")))
+                .thenReturn(new S3StorageService.UploadResult(
+                        new com.askvocate.backend.model.StorageRef(), Map.of("text", "garbled")));
         when(vision.verifyAadhaarQr(any(), anyMap(), anyString())).thenReturn(
                 new VisionVerificationClient.QrResult(true, Map.of("name", "Test Lawyer",
                         "dob", "01-02-1990", "gender", "M", "pincode", "201304",
@@ -880,7 +934,7 @@ class VerificationGuardTest {
         assertNull(stored.get().getPendingReason());
         assertEquals(Boolean.TRUE, stored.get().getIsQrVerified());
         assertEquals(Boolean.FALSE, stored.get().getQrPrintedMismatch());
-        assertFalse(stored.get().getCloudinaryReferences().isEmpty());
+        assertFalse(stored.get().getStorageReferences().isEmpty());
         assertEquals("Test Lawyer", stored.get().getExtractedData().get("name"));
     }
 
@@ -890,9 +944,9 @@ class VerificationGuardTest {
         profile.setId("fresher-id");
         profile.setName("Test Lawyer");
         when(freshers.findById("fresher-id")).thenReturn(Optional.of(profile));
-        when(cloudinary.uploadWithOcr(eq(front), anyString(), eq("front")))
-                .thenReturn(new CloudinaryService.UploadResult(
-                        new com.askvocate.backend.model.CloudinaryRef(),
+        when(storageService.uploadWithOcr(eq(front), anyString(), eq("front")))
+                .thenReturn(new S3StorageService.UploadResult(
+                        new com.askvocate.backend.model.StorageRef(),
                         Map.of("text", "Bar Council of Delhi\nEnrolment No: D/1234/2021\nName: Test Lawyer")));
         AtomicReference<com.askvocate.backend.model.UserDocument> stored = new AtomicReference<>();
         when(documents.save(any())).thenAnswer(invocation -> {
@@ -905,7 +959,57 @@ class VerificationGuardTest {
         assertEquals(com.askvocate.backend.model.VerificationStatus.PENDING, response.getVerificationStatus());
         assertEquals("AWAITING_IDENTITY", stored.get().getPendingReason());
         assertNotNull(stored.get().getEnrollmentNumberHash());
-        assertFalse(stored.get().getCloudinaryReferences().isEmpty());
+        assertFalse(stored.get().getStorageReferences().isEmpty());
+    }
+
+    @Test
+    void barCouncilIdUsesVerifiedNameOverOcrNoise() throws Exception {
+        var profile = new LawyerFresherProfile();
+        profile.setId("fresher-id");
+        profile.setName("Ayushi Sharma");
+        when(freshers.findById("fresher-id")).thenReturn(Optional.of(profile));
+        when(documents.findByUserIdAndDocumentType("fresher-id", DocumentType.AADHAAR))
+                .thenReturn(Optional.of(verifiedAadhaarWithQr("Ayushi Sharma", "01/01/1990")));
+        when(storageService.uploadWithOcr(eq(front), anyString(), eq("front")))
+                .thenReturn(new S3StorageService.UploadResult(
+                        new com.askvocate.backend.model.StorageRef(),
+                        Map.of("text", "Bar Council of Delhi\nEnrolment No: D/1234/2021\n"
+                                + "Name: Wrong Person\nAdvocate Ayushi Sharma")));
+        AtomicReference<com.askvocate.backend.model.UserDocument> stored = new AtomicReference<>();
+        when(documents.save(any())).thenAnswer(invocation -> {
+            stored.set(invocation.getArgument(0));
+            return stored.get();
+        });
+
+        service.verifyDocument("fresher-id", DocumentType.BAR_COUNCIL_ID, front, null);
+
+        assertEquals("Ayushi Sharma", stored.get().getExtractedData().get("name"));
+    }
+
+    @Test
+    void barUploadWithBlankHashKeyDoesNotQueryNullHash() throws Exception {
+        var profile = new LawyerFresherProfile();
+        profile.setId("fresher-id");
+        profile.setName("Test Lawyer");
+        when(freshers.findById("fresher-id")).thenReturn(Optional.of(profile));
+        when(storageService.uploadWithOcr(eq(front), anyString(), eq("front")))
+                .thenReturn(new S3StorageService.UploadResult(
+                        new com.askvocate.backend.model.StorageRef(),
+                        Map.of("text", "Bar Council of Delhi\nEnrolment No: D/1234/2021\nName: Test Lawyer")));
+        AtomicReference<com.askvocate.backend.model.UserDocument> stored = new AtomicReference<>();
+        when(documents.save(any())).thenAnswer(invocation -> {
+            stored.set(invocation.getArgument(0));
+            return stored.get();
+        });
+        var blankKeyService = new DocumentVerificationService(storageService,
+                new OcrExtractionService(), new BarCouncilValidationService(),
+                new DegreeCertificatePolicy(new DegreeInstitutionAllowlist()),
+                documents, experienced, freshers, clients, vision, selfies, "");
+
+        blankKeyService.verifyDocument("fresher-id", DocumentType.BAR_CERTIFICATE, front, null);
+
+        assertNull(stored.get().getEnrollmentNumberHash());
+        verify(documents, never()).findByEnrollmentNumberHash(isNull());
     }
 
     @Test
@@ -916,9 +1020,9 @@ class VerificationGuardTest {
         when(freshers.findById("fresher-id")).thenReturn(Optional.of(profile));
         when(documents.findByUserIdAndDocumentType("fresher-id", DocumentType.AADHAAR))
                 .thenReturn(Optional.of(verifiedAadhaarWithQr("Test Lawyer", "01/01/1990")));
-        when(cloudinary.uploadWithOcr(eq(front), anyString(), eq("front")))
-                .thenReturn(new CloudinaryService.UploadResult(
-                        new com.askvocate.backend.model.CloudinaryRef(),
+        when(storageService.uploadWithOcr(eq(front), anyString(), eq("front")))
+                .thenReturn(new S3StorageService.UploadResult(
+                        new com.askvocate.backend.model.StorageRef(),
                         Map.of("text", "Bar Council of Delhi\nEnrolment No: D/1234/2021\nName: Test Lawyer")));
         AtomicReference<com.askvocate.backend.model.UserDocument> stored = new AtomicReference<>();
         when(documents.save(any())).thenAnswer(invocation -> {
@@ -939,10 +1043,10 @@ class VerificationGuardTest {
         profile.setId("fresher-id");
         profile.setName("Test Lawyer");
         when(freshers.findById("fresher-id")).thenReturn(Optional.of(profile));
-        when(cloudinary.uploadWithOcr(eq(front), anyString(), eq("front")))
-                .thenReturn(new CloudinaryService.UploadResult(
-                        new com.askvocate.backend.model.CloudinaryRef(),
-                        Map.of("text", "University of Delhi\nName: Test Lawyer\n2020")));
+        when(storageService.uploadWithOcr(eq(front), anyString(), eq("front")))
+                .thenReturn(new S3StorageService.UploadResult(
+                        new com.askvocate.backend.model.StorageRef(),
+                        Map.of("text", "University of Delhi\nFaculty of Law\nBachelor of Laws (LL.B.)\nName: Test Lawyer\n2020")));
         AtomicReference<com.askvocate.backend.model.UserDocument> stored = new AtomicReference<>();
         when(documents.save(any())).thenAnswer(invocation -> {
             stored.set(invocation.getArgument(0));
@@ -953,7 +1057,31 @@ class VerificationGuardTest {
 
         assertEquals(com.askvocate.backend.model.VerificationStatus.PENDING, response.getVerificationStatus());
         assertEquals("AWAITING_IDENTITY", stored.get().getPendingReason());
-        assertFalse(stored.get().getCloudinaryReferences().isEmpty());
+        assertFalse(stored.get().getStorageReferences().isEmpty());
+    }
+
+    @Test
+    void degreeWithoutReadableNameGoesToManualReviewNotInvalid() throws Exception {
+        var profile = new LawyerFresherProfile();
+        profile.setId("fresher-id");
+        profile.setName("Test Lawyer");
+        when(freshers.findById("fresher-id")).thenReturn(Optional.of(profile));
+        when(storageService.uploadWithOcr(eq(front), anyString(), eq("front")))
+                .thenReturn(new S3StorageService.UploadResult(
+                        new com.askvocate.backend.model.StorageRef(),
+                        Map.of("text", "Karnataka State Law University, Hubballi\n"
+                                + "Bachelor of Arts and Bachelor of Laws")));
+        AtomicReference<com.askvocate.backend.model.UserDocument> stored = new AtomicReference<>();
+        when(documents.save(any())).thenAnswer(invocation -> {
+            stored.set(invocation.getArgument(0));
+            return stored.get();
+        });
+
+        var response = service.verifyDocument("fresher-id", DocumentType.DEGREE_CERTIFICATE, front, null);
+
+        assertEquals(com.askvocate.backend.model.VerificationStatus.PENDING, response.getVerificationStatus());
+        assertEquals("DEGREE_OCR_INCOMPLETE", stored.get().getPendingReason());
+        assertTrue(stored.get().getRequiresManualReview());
     }
 
     @Test
@@ -964,10 +1092,10 @@ class VerificationGuardTest {
         when(freshers.findById("fresher-id")).thenReturn(Optional.of(profile));
         when(documents.findByUserIdAndDocumentType("fresher-id", DocumentType.AADHAAR))
                 .thenReturn(Optional.of(verifiedAadhaarWithQr("Test Lawyer", "01/01/1990")));
-        when(cloudinary.uploadWithOcr(eq(front), anyString(), eq("front")))
-                .thenReturn(new CloudinaryService.UploadResult(
-                        new com.askvocate.backend.model.CloudinaryRef(),
-                        Map.of("text", "University of Delhi\nName: Test Lawyer\n2020")));
+        when(storageService.uploadWithOcr(eq(front), anyString(), eq("front")))
+                .thenReturn(new S3StorageService.UploadResult(
+                        new com.askvocate.backend.model.StorageRef(),
+                        Map.of("text", "University of Delhi\nFaculty of Law\nBachelor of Laws (LL.B.)\nName: Test Lawyer\n2020")));
         AtomicReference<com.askvocate.backend.model.UserDocument> stored = new AtomicReference<>();
         when(documents.save(any())).thenAnswer(invocation -> {
             stored.set(invocation.getArgument(0));

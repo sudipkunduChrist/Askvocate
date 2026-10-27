@@ -25,7 +25,7 @@ class MyDocumentsControllerTest {
     @Mock SelfieVerificationRepository selfies;
     @Mock DocumentVerificationService verifier;
     @Mock DocumentService uploads;
-    @Mock CloudinaryService cloudinary;
+    @Mock S3StorageService storageService;
     @InjectMocks MyDocumentsController controller;
 
     @Test void clientCannotAccessVerificationCatalogue() {
@@ -42,7 +42,7 @@ class MyDocumentsControllerTest {
         doc.setDocumentType(DocumentType.PAN);
         doc.setVerificationStatus(VerificationStatus.VERIFIED);
         doc.setMaskedDocumentNumber("XXXXXX1234");
-        doc.setCloudinaryReferences(List.of(new CloudinaryRef("private-id", "https://res.cloudinary.com/x", "front")));
+        doc.setStorageReferences(List.of(new StorageRef("private-id", "https://res.storageService.com/x", "front")));
         when(verifiedDocs.findByUserIdAndDocumentType("owner", DocumentType.PAN)).thenReturn(Optional.of(doc));
         var item = controller.detail("Bearer lawyer", "PAN").getBody();
         assertEquals("VERIFIED", item.status());
@@ -112,13 +112,13 @@ class MyDocumentsControllerTest {
         UserDocument pan = new UserDocument();
         pan.setDocumentType(DocumentType.PAN);
         pan.setVerificationStatus(VerificationStatus.VERIFIED);
-        pan.setPanQrPhotoUrl("https://res.cloudinary.com/demo/pan-qr.jpg");
+        pan.setPanQrPhotoUrl("https://res.storageService.com/demo/pan-qr.jpg");
         when(verifiedDocs.findByUserIdAndDocumentType(anyString(), any())).thenReturn(Optional.empty());
         when(verifiedDocs.findByUserIdAndDocumentType("owner", DocumentType.PAN)).thenReturn(Optional.of(pan));
 
         var item = controller.detail("Bearer lawyer", "PAN").getBody();
 
-        assertEquals("https://res.cloudinary.com/demo/pan-qr.jpg", item.qrPhotoUrl());
+        assertEquals("https://res.storageService.com/demo/pan-qr.jpg", item.qrPhotoUrl());
     }
 
     @Test void verifiedAadhaarDetailUsesSignedQrData() {
@@ -135,7 +135,7 @@ class MyDocumentsControllerTest {
         qr.setAddress("12 Road, Delhi");
         qr.setPincode("110001");
         qr.setAadhaarLast4("1234");
-        qr.setPhotoUrl("https://res.cloudinary.com/demo/aadhaar-qr.jpg");
+        qr.setPhotoUrl("https://res.storageService.com/demo/aadhaar-qr.jpg");
         doc.setQrData(qr);
         doc.setIsQrVerified(true);
         when(verifiedDocs.findByUserIdAndDocumentType("owner", DocumentType.AADHAAR)).thenReturn(Optional.of(doc));

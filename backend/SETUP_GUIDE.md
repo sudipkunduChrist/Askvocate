@@ -27,9 +27,10 @@ Example:
 GOOGLE_WEB_CLIENT_ID=your_google_client_id_here.apps.googleusercontent.com
 MONGO_URL=mongodb+srv://<username>:<password>@cluster.mongodb.net/askvocate
 JWT_SECRET=your_jwt_secret_here
-CLOUDINARY_CLOUD_NAME=your_cloud_name
-CLOUDINARY_API_KEY=your_api_key
-CLOUDINARY_API_SECRET=your_api_secret
+AWS_ACCESS_KEY_ID=your_aws_access_key_id
+AWS_SECRET_ACCESS_KEY=your_aws_secret_access_key
+AWS_S3_REGION=ap-south-1
+AWS_S3_BUCKET_NAME=your_askvocate_bucket_name
 ```
 
 > Keep this file local and do not commit the real secrets.

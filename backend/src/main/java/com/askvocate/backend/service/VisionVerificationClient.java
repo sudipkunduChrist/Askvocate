@@ -87,8 +87,20 @@ public class VisionVerificationClient {
         }
     }
 
-    public Map<String, Object> localOcr(byte[] image) {
-        return localOcr(image, "");
+    public BarCodeResult readBarCode(byte[] image) {
+        try {
+            Map<String, Object> request = Map.of("operation", "barCode",
+                    "imageBase64", Base64.getEncoder().encodeToString(image));
+            BarCodeResult result = mapper.readValue(invoke(request), BarCodeResult.class);
+            return result != null ? result : BarCodeResult.unavailable("Barcode decoder returned no result.");
+        } catch (Exception error) {
+            log.warn("Backend barcode decoding unavailable: {}: {}",
+                    error.getClass().getSimpleName(), error.getMessage());
+            return BarCodeResult.unavailable("Barcode decoding failed: " + safeErrorMessage(error));
+        }
+    }
+
+    public Map<String, Object> localOcr(byte[] image) {        return localOcr(image, "");
     }
 
     public Map<String, Object> localOcr(byte[] image, String side) {
@@ -292,6 +304,12 @@ public class VisionVerificationClient {
                               String rawText, String reason) {
         public static PanQrResult unavailable(String reason) {
             return new PanQrResult(false, null, false, null, null, false, null, reason);
+        }
+    }
+
+    public record BarCodeResult(String codeText, String format, String reason) {
+        public static BarCodeResult unavailable(String reason) {
+            return new BarCodeResult(null, null, reason);
         }
     }
 

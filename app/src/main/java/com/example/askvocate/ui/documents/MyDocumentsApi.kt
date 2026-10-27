@@ -33,7 +33,8 @@ data class MyDocument(
     val panNumber: String? = null,
     val qrDetails: Map<String, String> = emptyMap(), val qrPhotoUrl: String? = null,
     val requiresManualReview: Boolean = false, val pendingReason: String? = null,
-    val required: Boolean = false, val requirementGroup: String? = null
+    val required: Boolean = false, val requirementGroup: String? = null,
+    val mismatchFields: List<String> = emptyList()
 ) {
     fun toJson(): JSONObject = JSONObject().apply {
         put("type", type)
@@ -56,6 +57,7 @@ data class MyDocument(
         put("pendingReason", pendingReason ?: JSONObject.NULL)
         put("required", required)
         put("requirementGroup", requirementGroup ?: JSONObject.NULL)
+        put("mismatchFields", JSONArray(mismatchFields))
     }
 
     companion object {
@@ -69,6 +71,7 @@ data class MyDocument(
                 qrFields.optionalText(key)?.let { key to it }
             }?.toMap() ?: emptyMap()
             val mediaArray = json.optJSONArray("media") ?: JSONArray()
+            val mismatchArray = json.optJSONArray("mismatchFields") ?: JSONArray()
             return MyDocument(json.getString("type"), json.getString("title"), json.getString("status"),
                 json.optionalText("note"), json.optionalText("maskedNumber"), details,
                 json.optionalText("submittedAt"), json.optionalText("verifiedAt"),
@@ -77,7 +80,8 @@ data class MyDocument(
                 json.optionalText("aadhaarNumber"), json.optionalText("panNumber"),
                 qrDetails, json.optionalText("qrPhotoUrl"),
                 json.optBoolean("requiresManualReview"), json.optionalText("pendingReason"),
-                json.optBoolean("required"), json.optionalText("requirementGroup"))
+                json.optBoolean("required"), json.optionalText("requirementGroup"),
+                (0 until mismatchArray.length()).map { mismatchArray.getString(it) })
         }
     }
 }
@@ -173,6 +177,33 @@ class MyDocumentsApi(private val context: Context) {
                 ?.takeIf { it.matches(Regex("[A-Z]{5}[0-9]{4}[A-Z]")) }
                 ?: throw IllegalStateException("The verified PAN number is unavailable.")
         } finally { conn.disconnect() }
+    }
+
+    suspend fun revealBarEnrollmentNumber(): String = withContext(Dispatchers.IO) {
+        val conn = connection("/BAR_COUNCIL_ID/number")
+        try {
+            JSONObject(response(conn)).optionalText("enrollmentNumber")
+                ?.takeIf { it.length >= 6 }
+                ?: throw IllegalStateException("The enrollment number is unavailable.")
+        } finally { conn.disconnect() }
+    }
+
+    suspend fun scanBarIdCode(codeText: String): MyDocument = withContext(Dispatchers.IO) {
+        val conn = connection("/BAR_COUNCIL_ID/code", "POST")
+        try {
+            conn.doOutput = true
+            conn.setRequestProperty("Content-Type", "application/json; charset=utf-8")
+            conn.outputStream.bufferedWriter(Charsets.UTF_8).use { writer ->
+                writer.write(JSONObject().put("codeText", codeText).toString())
+            }
+            MyDocument.from(JSONObject(response(conn)))
+        } catch (error: IOException) {
+            throw IllegalStateException("Could not check the card code. Check your connection and try again.")
+        } catch (error: JSONException) {
+            throw IllegalStateException("The server returned an unexpected response. Please try again.")
+        } finally {
+            conn.disconnect()
+        }
     }
 
     suspend fun scanPanQrText(qrText: String): MyDocument = withContext(Dispatchers.IO) {

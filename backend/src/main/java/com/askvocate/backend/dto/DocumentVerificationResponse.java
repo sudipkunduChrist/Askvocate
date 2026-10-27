@@ -14,7 +14,7 @@ import java.util.List;
  * <ul>
  *   <li>Full Aadhaar and PAN numbers are included only in their immediate successful upload responses.</li>
  *   <li>Raw OCR text is <b>never</b> included.</li>
- *   <li>Internal Cloudinary public IDs are <b>never</b> exposed.</li>
+ *   <li>Internal S3 object keys are <b>never</b> exposed.</li>
  * </ul>
  */
 public class DocumentVerificationResponse {
