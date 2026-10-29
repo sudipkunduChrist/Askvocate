@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import http.client
 import json
 import logging
 import os
@@ -27,19 +28,20 @@ except ImportError:
 # cannot use.
 GEMINI_MODEL_PREFERENCES = (
     os.getenv("GEMINI_MODEL", "").strip(),
-    "gemini-3.8-flash",
-    "gemini-3.5-flash-lite",
     "gemini-2.5-flash",
     "gemini-2.5-flash-lite",
+    "gemini-2.0-flash",
+    "gemini-1.5-flash",
 )
 GROQ_MODEL_PREFERENCES = (
     os.getenv("GROQ_MODEL", "").strip(),
+    "llama-3.3-70b-versatile",
+    "llama-3.1-70b-versatile",
+    "qwen/qwen3.8-27b",
     "openai/gpt-oss-20b",
     "openai/gpt-oss-120b",
-    "qwen/qwen3.8-27b",
-    "llama-3.3-70b-versatile",
 )
-NVIDIA_MODEL = os.getenv("NVIDIA_MODEL", "nvidia/nemotron-3-super-120b-a12b")
+NVIDIA_MODEL = os.getenv("NVIDIA_MODEL", "nvidia/nemotron-3-ultra-550b-a55b")
 NVIDIA_API_URL = "https://integrate.api.nvidia.com/v1/chat/completions"
 
 
@@ -274,7 +276,17 @@ def _classify_with_nvidia(query: str, domains: list[str]) -> dict[str, Any] | No
         result = _parse_json(str(content), set(domains))
         result["source"] = f"nvidia:{NVIDIA_MODEL}"
         return result
-    except (urllib.error.URLError, KeyError, IndexError, TypeError, ValueError, json.JSONDecodeError) as error:
+    except (
+        urllib.error.URLError,
+        TimeoutError,
+        OSError,
+        http.client.HTTPException,
+        KeyError,
+        IndexError,
+        TypeError,
+        ValueError,
+    ) as error:
+        # A slow or unreachable provider must degrade to the next provider, never fail the request.
         logger.warning("NVIDIA classification unavailable: %s", type(error).__name__)
         return None
 
@@ -310,8 +322,17 @@ def _classify_with_groq(query: str, domains: list[str]) -> dict[str, Any] | None
 def classify_with_llm(query: str, domains: list[str]) -> dict[str, Any] | None:
     """Try the configured free providers in order, keeping local matching as the primary route."""
     redacted_query = _redact_sensitive_text(query)
-    return (
-        _classify_with_nvidia(redacted_query, domains)
-        or _classify_with_gemini(redacted_query, domains)
-        or _classify_with_groq(redacted_query, domains)
+    providers = (
+        ("nvidia", _classify_with_nvidia),
+        ("gemini", _classify_with_gemini),
+        ("groq", _classify_with_groq),
     )
+    for name, provider in providers:
+        try:
+            result = provider(redacted_query, domains)
+        except Exception as error:  # noqa: BLE001 - classification is best effort
+            logger.warning("%s classification crashed: %s", name, type(error).__name__)
+            continue
+        if result:
+            return result
+    return None

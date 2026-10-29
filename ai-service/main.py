@@ -87,6 +87,7 @@ def recommend(request: RecommendationRequest) -> dict:
     except FileNotFoundError as error:
         raise HTTPException(status_code=503, detail=str(error)) from error
     except Exception as error:
+        logger.exception("Recommendation failed for query: %r", request.query)
         raise HTTPException(status_code=500, detail=f"Recommendation failed: {error}") from error
 
 
